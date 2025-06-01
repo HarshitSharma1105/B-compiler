@@ -49,7 +49,7 @@ public:
                 
                 if(vars.count(peek().val)==0)
                 {
-                    std::cerr << "variable already declared\n";
+                    std::cerr << "variable not declared\n" << peek().val;
                     exit(EXIT_FAILURE);
                 }
                 int offset=vars[consume().val];
@@ -75,7 +75,7 @@ public:
                     case identifier: stream << "    lw $a0," << vars[peek().val]*4 << "($s1)\n";break;
                     default: std::cout << "fuck offff\n";
                 }
-                consume();
+                if(peek().type!=Tokentype::close_paren)consume();
                 try_consume(Tokentype::close_paren,"expected ')'\n");
                 stream << "    jal " << func_name << "\n";
                 try_consume(Tokentype::semicolon,"Expected ;\n");//semicolon
@@ -83,11 +83,12 @@ public:
             else if(peek().type==Tokentype::close_curly)
             {
                 stream << "    move $sp,$s1\n";
+                stream << "    jr $ra\n";
                 count=0;
                 consume();
-                stream << "    li $v0,10\n" << "    syscall\n";
             }
         }
+        stream << "    li $v0,10\n" << "    syscall\n";
         generate_stdlib();
         return stream.str();
     }
