@@ -1,12 +1,7 @@
-foo(a,b){
-    putchar(a);
-}
-
-
-
 main(){
     extrn putchar,printf;
     auto a,b,c;
-    a=2;
+    b=69;
+    a=b;
     putchar(a);
 }

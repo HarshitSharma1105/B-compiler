@@ -12,7 +12,7 @@ identifier,
 assignment,
 integer_lit,
 open_paren,
-closed_paren,
+close_paren,
 open_curly,
 close_curly,
 comma,
@@ -34,7 +34,7 @@ void debug(const Tokentype& tokentype)
         case open_curly:        std::cout << "open_curly "; break;
         case close_curly:       std::cout << "closed_curly "; break;
         case open_paren:        std::cout << "open_paren "; break;
-        case closed_paren:      std::cout << "closed_paren "; break;
+        case close_paren:       std::cout << "close_paren "; break;
         case integer_lit:       std::cout << "integer_lit "; break;
         case assignment:        std::cout << "assignment "; break;
         case identifier:        std::cout << "identifier "; break;
@@ -61,14 +61,6 @@ public:
     {
         std::vector<Token> tokens;
         std::string buffer;
-        auto check=[&](Tokentype type1,Tokentype type2){
-            int val=0;
-            for(const Token& token:tokens){
-                if(token.type==type1)val++;
-                else if(token.type==type2)val--;
-            }
-            return val==0;
-        };
         while(true){
             
             if(std::isalpha(peek()))
@@ -109,16 +101,19 @@ public:
             }
             else if(peek()=='(')
             {
-                if(tokens.size() && tokens.back().type==Tokentype::identifier)
+                if(tokens.back().type==Tokentype::identifier)
                 {
                     tokens.back().type=Tokentype::funcall;
                 }
+                int curr=0;
+                while(peek(curr++)!=')'){}
+                if(peek(curr)=='{')tokens.back().type=Tokentype::funcdecl;
                 tokens.push_back({Tokentype::open_paren,"("});
                 consume();
             }
             else if(peek()==')')
             {
-                tokens.push_back({Tokentype::closed_paren,")"});
+                tokens.push_back({Tokentype::close_paren,")"});
                 consume();
             }
             else if (peek()=='{')
@@ -172,18 +167,6 @@ public:
                 std::cerr << "errorrred from tokenizer\n";
                 exit(EXIT_FAILURE);
             }
-        }
-        int i=0;
-        while(i<tokens.size())
-        {
-            int func;
-            if(tokens[i].type==Tokentype::funcall)
-            {
-                func=i;
-                while(tokens[i++].val!=")"){}
-                if(tokens[i].type==Tokentype::open_curly)tokens[func].type=Tokentype::funcdecl;
-            }
-            i++;
         }
         return tokens;
     }
