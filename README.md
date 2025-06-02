@@ -9,7 +9,7 @@ For running the compiler with or without debug info :
     ./main.exe test.b debug/nodebug;
 
     
-For running the generated MIPS Assemlby:
+For running the generated MIPS Assembly:
 
 QtSpim.exe -file output.asm  (Opens a QtSpim window, have to click run button to execute)
 OR
