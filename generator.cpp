@@ -1,14 +1,13 @@
 #include"tokenizer.cpp"
 #include<unordered_map>
 #include<unordered_set>
-
 class Generator{
 public:
     Generator(const std::vector<Token> tokens) : tokens(tokens){}
     std::string generate()
     {
-        int count=0;
         stream << ".text\n";
+        stream << ".globl main\n";
         while(peek().type!=Tokentype::endoffile)
         {
             if(peek().type==Tokentype::funcdecl)
@@ -17,15 +16,32 @@ public:
                 try_consume(Tokentype::open_paren,"expcted '('\n");
                 try_consume(Tokentype::close_paren,"expected ')'\n");
                 try_consume(Tokentype::open_curly,"expected '{'\n");
-                stream << "    move $s1,$sp\n";
+                stream << "    addi $sp,$sp,-4\n";
+                stream << "    sw $ra,0($sp)\n";
+                parse_func();
             }
-            else if(peek().type==Tokentype::extrn)
+        }
+        generate_stdlib();
+        return stream.str();
+    }
+
+
+
+private:
+    void parse_func()
+    {
+        std::unordered_map<std::string,int> vars;
+        int count=0;
+        while(true)
+        {
+            if(peek().type==Tokentype::extrn)
             {
                 while(peek().type!=Tokentype::semicolon)
                 {
                     extrns.insert(consume().val);
                 }
                 try_consume(Tokentype::semicolon,"Expected ;\n");//semicolon
+                
             }
             else if (peek().type==Tokentype::auto_)
             {
@@ -46,10 +62,9 @@ public:
             }
             else if(peek().type==Tokentype::identifier)
             {
-                
                 if(vars.count(peek().val)==0)
                 {
-                    std::cerr << "variable not declared\n" << peek().val;
+                    std::cerr << "variable not declared " << peek().val << "\n";
                     exit(EXIT_FAILURE);
                 }
                 int offset=vars[consume().val];
@@ -57,22 +72,22 @@ public:
                 switch(peek().type)
                 {
                     case integer_lit: stream << "    li $s0," << peek().val << "\n";break;
-                    case identifier: stream << "    lw $s0," << vars[peek().val]*4 << "($s1)\n";break;
+                    case identifier: stream << "    lw $s0," << (count-vars[peek().val]-1)*4 << "($sp)\n";break;
                     default: std::cout << "fuck off\n";
                 }
                 consume();//identifier or literal;
-                stream << "    sw $s0," << offset*4 << "($s1)\n";
+                stream << "    sw $s0," << (count-offset-1)*4 << "($sp)\n";
                 try_consume(Tokentype::semicolon,"Expected ;\n");//semicolon
             }
             else if(peek().type==Tokentype::funcall)
             {
-                
                 std::string func_name=consume().val;
                 try_consume(Tokentype::open_paren,"expected '('\n");
                 switch(peek().type)
                 {
                     case integer_lit: stream << "    li $a0," << peek().val << "\n";break;
-                    case identifier: stream << "    lw $a0," << vars[peek().val]*4 << "($s1)\n";break;
+                    case identifier: stream << "    lw $a0," << (count-vars[peek().val]-1)*4 << "($sp)\n";break;
+                    case close_paren: break;
                     default: std::cout << "fuck offff\n";
                 }
                 if(peek().type!=Tokentype::close_paren)consume();
@@ -82,20 +97,16 @@ public:
             }
             else if(peek().type==Tokentype::close_curly)
             {
-                stream << "    move $sp,$s1\n";
+                stream << "    addi $sp,$sp," << 4*count << "\n";
+                stream << "    lw $ra,0($sp)\n";
+                stream << "    addi $sp,$sp,4\n";
                 stream << "    jr $ra\n";
                 count=0;
                 consume();
+                break;
             }
         }
-        stream << "    li $v0,10\n" << "    syscall\n";
-        generate_stdlib();
-        return stream.str();
     }
-
-
-
-private:
     void generate_stdlib()
     {
         stream << "putchar:\n";
@@ -131,6 +142,5 @@ private:
     std::vector<Token> tokens;
     int index=0;
     std::stringstream stream;
-    std::unordered_map<std::string,int> vars;
     std::unordered_set<std::string> extrns;
 };
