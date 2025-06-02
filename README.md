@@ -5,7 +5,7 @@ For compiling the compiler :
     -g++ main.cpp -o main.exe 
 
 
-For running the compiler with or without debuf info :  
+For running the compiler with or without debug info :  
     ./main.exe test.b debug/nodebug;
 
     
