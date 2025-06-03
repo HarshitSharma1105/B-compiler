@@ -107,6 +107,7 @@ public:
                 }
                 int curr=0;
                 while(peek(curr++)!=')'){}
+                while(std::isspace(peek(curr))){curr++;}
                 if(peek(curr)=='{')tokens.back().type=Tokentype::funcdecl;
                 tokens.push_back({Tokentype::open_paren,"("});
                 consume();

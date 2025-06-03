@@ -12,13 +12,15 @@ public:
         {
             if(peek().type==Tokentype::funcdecl)
             {
-                stream << consume().val << ":\n";
+                std::string func_name=consume().val;
+                stream << func_name << ":\n";
                 try_consume(Tokentype::open_paren,"expcted '('\n");
                 try_consume(Tokentype::close_paren,"expected ')'\n");
                 try_consume(Tokentype::open_curly,"expected '{'\n");
-                stream << "    addi $sp,$sp,-4\n";
+                stream << "    addi $sp,$sp,-8\n";
                 stream << "    sw $ra,0($sp)\n";
-                parse_func();
+                stream << "    sw $s1,4($sp)\n";
+                parse_func(func_name);
             }
         }
         generate_stdlib();
@@ -28,8 +30,9 @@ public:
 
 
 private:
-    void parse_func()
+    void parse_func(const std::string& func_name)
     {
+        stream << "    move $s1,$sp\n";
         std::unordered_map<std::string,int> vars;
         int count=0;
         while(true)
@@ -57,7 +60,7 @@ private:
                     }
                     vars[consume().val]=count++;
                 }
-                stream << "    addi $sp,$sp," << (count-curr)*(-4) << "\n";
+                stream << "    addi $sp,$sp," << (count-curr)*(-8) << "\n";
                 try_consume(Tokentype::semicolon,"Expected ;\n");//semicolon
             }
             else if(peek().type==Tokentype::identifier)
@@ -72,11 +75,11 @@ private:
                 switch(peek().type)
                 {
                     case integer_lit: stream << "    li $s0," << peek().val << "\n";break;
-                    case identifier: stream << "    lw $s0," << (count-vars[peek().val]-1)*4 << "($sp)\n";break;
+                    case identifier: stream << "    ld $s0," << -(vars[peek().val]+1)*8 << "($s1)\n";break;
                     default: std::cout << "fuck off\n";
                 }
                 consume();//identifier or literal;
-                stream << "    sw $s0," << (count-offset-1)*4 << "($sp)\n";
+                stream << "    sd $s0," << -(offset+1)*8 << "($s1)\n";
                 try_consume(Tokentype::semicolon,"Expected ;\n");//semicolon
             }
             else if(peek().type==Tokentype::funcall)
@@ -86,7 +89,7 @@ private:
                 switch(peek().type)
                 {
                     case integer_lit: stream << "    li $a0," << peek().val << "\n";break;
-                    case identifier: stream << "    lw $a0," << (count-vars[peek().val]-1)*4 << "($sp)\n";break;
+                    case identifier: stream << "    ld $a0," << -(vars[peek().val]+1)*8 << "($s1)\n";break;
                     case close_paren: break;
                     default: std::cout << "fuck offff\n";
                 }
@@ -97,10 +100,13 @@ private:
             }
             else if(peek().type==Tokentype::close_curly)
             {
-                stream << "    addi $sp,$sp," << 4*count << "\n";
+                //stream << "    addi $sp,$sp," << 8*count << "\n";
+                stream << "    move $sp,$s1\n";
                 stream << "    lw $ra,0($sp)\n";
-                stream << "    addi $sp,$sp,4\n";
-                stream << "    jr $ra\n";
+                stream << "    lw $s1,4($sp)\n";
+                stream << "    addi $sp,$sp,8\n";
+                if(func_name!="main")stream << "    jr $ra\n";
+                else stream << "    li $v0,10\n" << "    syscall\n";
                 count=0;
                 consume();
                 break;

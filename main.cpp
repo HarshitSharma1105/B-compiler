@@ -28,5 +28,7 @@ int main(int argc,char* argv[])
         std::ofstream outFile("output.asm");  // create and open the file
         outFile << assembly_sourcecode;
     }
+    std::string command = "java -jar Mars4_5.jar sm output.asm";
+    system(command.c_str());
     return 0;
 }

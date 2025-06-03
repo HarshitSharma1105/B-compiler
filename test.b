@@ -1,8 +1,4 @@
-foo(){
-    auto d;
-    d=69;
-    putchar(d);
-}
+
 
 
 main(){
@@ -10,5 +6,11 @@ main(){
     auto a,b,c;
     b=69;
     a=b;
-    foo();
+    h();
 }
+
+h()
+{
+    putchar(72);
+}
+
