@@ -91,7 +91,7 @@ private:
                     case integer_lit: stream << "    li $a0," << peek().val << "\n";break;
                     case identifier: stream << "    ld $a0," << -(vars[peek().val]+1)*8 << "($s1)\n";break;
                     case close_paren: break;
-                    default: std::cout << "fuck offff\n";
+                    default: std::cout << "default assignment\n";
                 }
                 if(peek().type!=Tokentype::close_paren)consume();
                 try_consume(Tokentype::close_paren,"expected ')'\n");

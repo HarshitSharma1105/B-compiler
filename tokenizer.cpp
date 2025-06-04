@@ -75,7 +75,6 @@ public:
                     tokens.push_back({Tokentype::auto_,buffer});
                     buffer.clear();
                 }
-                
                 else if(buffer=="extrn")
                 {
                     buffer.clear();
@@ -91,7 +90,13 @@ public:
                         tokens.push_back({Tokentype::extrn,buffer});
                         buffer.clear();
                     }
-                    
+                }
+                else if(buffer=="include")
+                {
+                    buffer.clear();
+                    while(std::isspace(peek())){consume();}
+                    consume();//open double;
+                    while(consume()!='\"'){}
                 }
                 else 
                 { 
@@ -157,6 +162,10 @@ public:
                 consume();
                 tokens.push_back({Tokentype::semicolon,";"});
             }
+            else if (peek()=='#')
+            {
+                consume();
+            }
             else if(peek()=='\0')
             {
                 consume();
@@ -165,7 +174,7 @@ public:
             }
             else
             {
-                std::cerr << "errorrred from tokenizer\n";
+                std::cerr << "errorrred from tokenizer\n" << peek();
                 exit(EXIT_FAILURE);
             }
         }

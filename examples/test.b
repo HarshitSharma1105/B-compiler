@@ -1,5 +1,4 @@
-
-
+#include "main.b"
 
 main(){
     extrn putchar,printf;
@@ -7,6 +6,7 @@ main(){
     b=69;
     a=b;
     h();
+    c();
 }
 
 h()
