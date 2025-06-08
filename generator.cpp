@@ -39,7 +39,7 @@ private:
         std::unordered_map<std::string,int> vars;
         int count=0;
         vars[token.val]=count++;
-        stream << "    sw $a0," << -(vars[token.val]+1)*8 << "($s1)\n";
+        stream << "    sd $a0," << -(vars[token.val]+1)*8 << "($s1)\n";
         while(true)
         {
             if(peek().type==Tokentype::extrn)

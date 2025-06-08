@@ -182,10 +182,7 @@ public:
     }
 private:
 char peek(int offset=0){
-    if(index+offset>=src.length()){
-        return '@';
-    }
-    return src[index+offset];
+    return src[index+offset]; //segfault prone lol
 }
 char consume(){
     return src[index++];

@@ -2,6 +2,10 @@
 #include "generator.cpp"
 
 
+
+
+
+
 void open_file(const std::string& path,std::string& b_sourcecode)
 {
     {
@@ -16,7 +20,8 @@ void open_file(const std::string& path,std::string& b_sourcecode)
 
 int main(int argc,char* argv[])
 {
-    std::string b_sourcecode,finalb_sourcecode,path=argv[1];
+    
+    std::string b_sourcecode,finalb_sourcecode,path=argv[1],curr_path=argv[3];
     bool debugging=(std::string)argv[2]=="debug";
     open_file(path,b_sourcecode);
     std::string rel_path;
@@ -34,12 +39,14 @@ int main(int argc,char* argv[])
             exit(EXIT_FAILURE);
         }
         rel_path.clear();
+        rel_path="/";
         index++;//consume the starting double qoute
         while(b_sourcecode[index]!='\"')
         {   
             rel_path.push_back(b_sourcecode[index++]);
         }
         index++;//consume the ending double qoute
+        rel_path=curr_path+rel_path;
         open_file(rel_path,finalb_sourcecode);
         rel_path.clear();
         while(true)
@@ -66,5 +73,6 @@ int main(int argc,char* argv[])
     }
     std::string command = "java -jar Mars4_5.jar sm output.asm";
     system(command.c_str());
+    if(!debugging)system("del output.asm");
     return 0;
 }
