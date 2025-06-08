@@ -1,15 +1,18 @@
-#include "main.b"
+#include "examples/another.b"
+#include "examples/main.b"
 
-main(){
+
+main(e){
     extrn putchar,printf;
     auto a,b,c;
     b=69;
     a=b;
     h();
     c();
+    d(74);
 }
 
-h()
+h(d)
 {
     putchar(72);
 }

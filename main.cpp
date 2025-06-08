@@ -9,53 +9,55 @@ void open_file(const std::string& path,std::string& b_sourcecode)
         std::fstream input(path, std::ios::in);
         contents_stream << input.rdbuf();
         b_sourcecode += contents_stream.str();
+        b_sourcecode.push_back('\n');
     }
 }
 
 
 int main(int argc,char* argv[])
 {
-    std::string b_sourcecode,path=argv[1];
+    std::string b_sourcecode,finalb_sourcecode,path=argv[1];
     bool debugging=(std::string)argv[2]=="debug";
     open_file(path,b_sourcecode);
-    path.clear();
+    std::string rel_path;
     int index=0;
-    while(b_sourcecode[index++]=='#'){
-        while(b_sourcecode[index]!='\"')
-        {   
-            if(!std::isspace(b_sourcecode[index])) path.push_back(b_sourcecode[index]);
-            index++;
-        }
-        if(path!="include")
-        {
-            std::cerr << "wrong declaration\n" << path.back();
-            exit(EXIT_FAILURE);
-        }
-        path.clear();
+    while(b_sourcecode[index]=='#'){
         index++;
         while(b_sourcecode[index]!='\"')
         {   
-            path.push_back(b_sourcecode[index++]);
+            if(!std::isspace(b_sourcecode[index])) rel_path.push_back(b_sourcecode[index]);
+            index++;
         }
+        if(rel_path!="include")
+        {
+            std::cerr << "wrong declaration\n" << rel_path.back();
+            exit(EXIT_FAILURE);
+        }
+        rel_path.clear();
+        index++;//consume the starting double qoute
+        while(b_sourcecode[index]!='\"')
+        {   
+            rel_path.push_back(b_sourcecode[index++]);
+        }
+        index++;//consume the ending double qoute
+        open_file(rel_path,finalb_sourcecode);
+        rel_path.clear();
         while(true)
         {
             if(std::isspace(b_sourcecode[index]))index++;
             else break;
         }
-        std::cout << path << "\n";
-        open_file(path,b_sourcecode);
-        path.clear();
     }
-    std::cout << b_sourcecode << std::endl;
-    b_sourcecode.push_back('\0');
-    Tokenizer tokenizer(b_sourcecode);
+    finalb_sourcecode+=b_sourcecode.substr(index,b_sourcecode.size()-index+1);
+    finalb_sourcecode.push_back('\0');
+    Tokenizer tokenizer(finalb_sourcecode);
     std::vector<Token> tokens=tokenizer.tokenize();
     Generator generator(tokens);
     std::string assembly_sourcecode=generator.generate();
     if(debugging)
     {
         debug(tokens);
-        std::cout << b_sourcecode << std::endl;
+        std::cout << finalb_sourcecode << std::endl;
         std::cout << assembly_sourcecode << std::endl; 
     }
     {
