@@ -1,5 +1,5 @@
-#include "main.b"
-#include "another.b"
+#include "examples/main.b"
+#include "examples/another.b"
 
 
 main(){
@@ -8,7 +8,8 @@ main(){
     b=69;
     a=b;
     h();
-    c(65,99);
+    b=78;
+    c(a,b);
     putchar(10);
     d(74);
 }

@@ -39,6 +39,7 @@ private:
     void parse_func(const std::string& func_name,std::vector<std::string> args)
     {
         stream << "    move $s1,$sp\n";
+        stream << "    addi $sp,$sp," << (args.size())*(-8) << "\n";
         std::string regs[4]={"$a0","$a1","$a2","$a3"};
         if(args.size()>4)std::cerr << "too many arguments\n";
         std::unordered_map<std::string,int> vars;
@@ -61,6 +62,7 @@ private:
             }
             else if (peek().type==Tokentype::auto_)
             {
+                int curr=count;
                 consume();
                 while(peek().type!=Tokentype::semicolon)
                 {
@@ -72,6 +74,7 @@ private:
                     }
                     vars[consume().val]=count++;
                 }
+                stream << "    addi $sp,$sp," << (count-curr)*(-8) << "\n";
                 try_consume(Tokentype::semicolon,"Expected ;\n");//semicolon
             }
             else if(peek().type==Tokentype::identifier)
