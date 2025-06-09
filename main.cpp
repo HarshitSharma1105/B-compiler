@@ -1,4 +1,5 @@
 #include<fstream>
+#include<filesystem>
 #include "generator.cpp"
 
 
@@ -11,6 +12,11 @@ void open_file(const std::string& path,std::string& b_sourcecode)
     {
         std::stringstream contents_stream;
         std::fstream input(path, std::ios::in);
+        if (!input.is_open()) 
+        {
+            std::cerr << "Failed to open file   " << path << "\n";
+            exit(EXIT_FAILURE);
+        }
         contents_stream << input.rdbuf();
         b_sourcecode += contents_stream.str();
         b_sourcecode.push_back('\n');
@@ -21,9 +27,10 @@ void open_file(const std::string& path,std::string& b_sourcecode)
 int main(int argc,char* argv[])
 {
     
-    std::string b_sourcecode,finalb_sourcecode,path=argv[1],curr_path=argv[3];
+    std::string b_sourcecode,finalb_sourcecode,path=argv[1];
     bool debugging=(std::string)argv[2]=="debug";
     open_file(path,b_sourcecode);
+    path=std::filesystem::absolute(path).parent_path().string();
     std::string rel_path;
     int index=0;
     while(b_sourcecode[index]=='#'){
@@ -46,7 +53,7 @@ int main(int argc,char* argv[])
             rel_path.push_back(b_sourcecode[index++]);
         }
         index++;//consume the ending double qoute
-        rel_path=curr_path+rel_path;
+        rel_path=path+rel_path;
         open_file(rel_path,finalb_sourcecode);
         rel_path.clear();
         while(true)
