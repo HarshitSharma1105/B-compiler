@@ -91,13 +91,6 @@ public:
                         buffer.clear();
                     }
                 }
-                else if(buffer=="include")
-                {
-                    buffer.clear();
-                    while(std::isspace(peek())){consume();}
-                    consume();//open double;
-                    while(consume()!='\"'){}
-                }
                 else 
                 { 
                     tokens.push_back({Tokentype::identifier,buffer});
@@ -108,14 +101,14 @@ public:
             {
                 if(tokens.back().type==Tokentype::identifier)
                 {
-                    tokens.back().type=Tokentype::funcall;
+                    int curr=0;
+                    while(peek(curr++)!=')'){}
+                    while(std::isspace(peek(curr))){curr++;}
+                    if(peek(curr)=='{')tokens.back().type=Tokentype::funcdecl;
+                    else if(peek(curr)==';')tokens.back().type=Tokentype::funcall;
+                    tokens.push_back({Tokentype::open_paren,"("});
+                    consume();   
                 }
-                int curr=0;
-                while(peek(curr++)!=')'){}
-                while(std::isspace(peek(curr))){curr++;}
-                if(peek(curr)=='{')tokens.back().type=Tokentype::funcdecl;
-                tokens.push_back({Tokentype::open_paren,"("});
-                consume();
             }
             else if(peek()==')')
             {
@@ -161,10 +154,6 @@ public:
             {
                 consume();
                 tokens.push_back({Tokentype::semicolon,";"});
-            }
-            else if (peek()=='#')
-            {
-                consume();
             }
             else if(peek()=='\0')
             {

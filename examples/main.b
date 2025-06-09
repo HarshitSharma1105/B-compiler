@@ -1,6 +1,5 @@
-c(e)
+c(d,e)
 {
-    auto d;
-    d=99;
     putchar(d);
+    putchar(e);
 }

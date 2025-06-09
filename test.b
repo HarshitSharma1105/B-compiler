@@ -2,17 +2,18 @@
 #include "examples/main.b"
 
 
-main(e){
+main(){
     extrn putchar,printf;
     auto a,b,c;
     b=69;
     a=b;
     h();
-    c();
+    c(65,99);
+    putchar(10);
     d(74);
 }
 
-h(d)
+h()
 {
     putchar(72);
 }

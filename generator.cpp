@@ -14,16 +14,19 @@ public:
             {
                 std::string func_name=consume().val;
                 stream << func_name << ":\n";
+                std::vector<std::string> args;
                 try_consume(Tokentype::open_paren,"expcted '('\n");
-                char error_msg[100];
-                sprintf(error_msg,"expected identifier at function %s",func_name.c_str());
-                Token var =try_consume(Tokentype::identifier,error_msg);
+                while(peek().type==Tokentype::identifier)
+                {
+                    args.push_back(consume().val);
+                    if(peek().type==Tokentype::comma)consume();
+                }
                 try_consume(Tokentype::close_paren,"expected ')'\n");
                 try_consume(Tokentype::open_curly,"expected '{'\n");
                 stream << "    addi $sp,$sp,-8\n";
                 stream << "    sw $ra,0($sp)\n";
                 stream << "    sw $s1,4($sp)\n";
-                parse_func(func_name,var);
+                parse_func(func_name,args);
             }
         }
         generate_stdlib();
@@ -33,13 +36,18 @@ public:
 
 
 private:
-    void parse_func(const std::string& func_name,Token token)
+    void parse_func(const std::string& func_name,std::vector<std::string> args)
     {
         stream << "    move $s1,$sp\n";
+        std::string regs[4]={"$a0","$a1","$a2","$a3"};
+        if(args.size()>4)std::cerr << "too many arguments\n";
         std::unordered_map<std::string,int> vars;
         int count=0;
-        vars[token.val]=count++;
-        stream << "    sd $a0," << -(vars[token.val]+1)*8 << "($s1)\n";
+        for (int i=0;i<args.size();i++)
+        {
+            vars[args[i]]=count++;
+            stream << "    sd " << regs[i] << "," << -(vars[args[i]]+1)*8 << "($s1)\n";
+        }
         while(true)
         {
             if(peek().type==Tokentype::extrn)
@@ -53,7 +61,6 @@ private:
             }
             else if (peek().type==Tokentype::auto_)
             {
-                int curr=count;
                 consume();
                 while(peek().type!=Tokentype::semicolon)
                 {
@@ -65,7 +72,6 @@ private:
                     }
                     vars[consume().val]=count++;
                 }
-                stream << "    addi $sp,$sp," << (count-curr)*(-8) << "\n";
                 try_consume(Tokentype::semicolon,"Expected ;\n");//semicolon
             }
             else if(peek().type==Tokentype::identifier)
@@ -91,12 +97,17 @@ private:
             {
                 std::string func_name=consume().val;
                 try_consume(Tokentype::open_paren,"expected '('\n");
-                switch(peek().type)
-                {
-                    case integer_lit: stream << "    li $a0," << consume().val << "\n";break;
-                    case identifier: stream << "    ld $a0," << -(vars[consume().val]+1)*8 << "($s1)\n";break;
-                    case close_paren: break;
-                    default: std::cout << "default assignment\n";
+                bool a=0;
+                int index=0;
+                while(!a)
+                {   
+                    switch(peek().type)
+                    {
+                        case integer_lit:stream << "    li " << regs[index++] << ","<< consume().val << "\n";break;
+                        case identifier: stream << "    ld " << regs[index++] << "," << -(vars[consume().val]+1)*8 << "($s1)\n";break;
+                        case comma: consume();break;
+                        default: std::cout << "default assignment\n";a=1;break;
+                    }
                 }
                 try_consume(Tokentype::close_paren,"expected ')'\n");
                 stream << "    jal " << func_name << "\n";
@@ -139,6 +150,7 @@ private:
             return consume();
         }
         std::cerr << err_msg << std::endl;
+        debug({peek(),peek(1),peek(2)});
         exit(EXIT_FAILURE);
     }
 
