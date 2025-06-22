@@ -1,14 +1,13 @@
-#include<fstream>
-#include<filesystem>
-#include "generator.cpp"
+#include<string>
+#include <filesystem>
+#include <sstream>
+#include <fstream>
+#include<iostream>
 
 
-
-
-
-
-void open_file(const std::string& path,std::string& b_sourcecode)
+void open_file(const std::string& path,std::string& finalb_sourcecode)
 {
+    if(!path.empty())
     {
         std::stringstream contents_stream;
         std::fstream input(path, std::ios::in);
@@ -18,18 +17,19 @@ void open_file(const std::string& path,std::string& b_sourcecode)
             exit(EXIT_FAILURE);
         }
         contents_stream << input.rdbuf();
-        b_sourcecode += contents_stream.str();
-        b_sourcecode.push_back('\n');
+        finalb_sourcecode += contents_stream.str();
+        finalb_sourcecode.push_back('\n');
     }
 }
 
 
-int main(int argc,char* argv[])
+
+
+
+std::string preprocessor(std::string& path,const std::string& b_sourcecode)
 {
-    
-    std::string b_sourcecode,finalb_sourcecode,path=argv[1];
-    bool debugging=(std::string)argv[2]=="debug";
-    open_file(path,b_sourcecode);
+
+    std::string finalb_sourcecode;
     path=std::filesystem::absolute(path).parent_path().string();
     std::string rel_path;
     int index=0;
@@ -64,22 +64,5 @@ int main(int argc,char* argv[])
     }
     finalb_sourcecode+=b_sourcecode.substr(index,b_sourcecode.size()-index+1);
     finalb_sourcecode.push_back('\0');
-    Tokenizer tokenizer(finalb_sourcecode);
-    std::vector<Token> tokens=tokenizer.tokenize();
-    Generator generator(tokens);
-    std::string assembly_sourcecode=generator.generate();
-    if(debugging)
-    {
-        debug(tokens);
-        std::cout << finalb_sourcecode << std::endl;
-        std::cout << assembly_sourcecode << std::endl; 
-    }
-    {
-        std::ofstream outFile("output.asm");  
-        outFile << assembly_sourcecode;
-    }
-    std::string command = "java -jar Mars4_5.jar sm output.asm";
-    system(command.c_str());
-    if(!debugging)system("del output.asm");
-    return 0;
+    return finalb_sourcecode;
 }

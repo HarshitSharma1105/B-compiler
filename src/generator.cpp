@@ -1,6 +1,9 @@
 #include"tokenizer.cpp"
 #include<unordered_map>
 #include<unordered_set>
+
+
+
 class Generator{
 public:
     Generator(const std::vector<Token> tokens) : tokens(tokens){}
@@ -39,7 +42,7 @@ private:
     void parse_func(const std::string& func_name,std::vector<std::string> args)
     {
         stream << "    move $s1,$sp\n";
-        stream << "    addi $sp,$sp," << (args.size())*(-8) << "\n";
+        if(args.size()!=0)stream << "    addi $sp,$sp,-" << args.size()*8 << "\n";
         std::string regs[4]={"$a0","$a1","$a2","$a3"};
         if(args.size()>4)std::cerr << "too many arguments\n";
         std::unordered_map<std::string,int> vars;
@@ -153,7 +156,6 @@ private:
             return consume();
         }
         std::cerr << err_msg << std::endl;
-        debug({peek(),peek(1),peek(2)});
         exit(EXIT_FAILURE);
     }
 

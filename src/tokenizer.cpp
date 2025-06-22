@@ -1,7 +1,6 @@
 #include<vector>
-#include<string>
-#include<iostream>
-#include<sstream>
+#include "preprocessor.cpp"
+
 
 enum Tokentype{
 funcall,

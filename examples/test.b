@@ -1,5 +1,5 @@
-#include "examples/main.b"
-#include "examples/another.b"
+#include "main.b"
+#include "another.b"
 
 
 main(){
