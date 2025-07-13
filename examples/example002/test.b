@@ -1,5 +1,4 @@
 #include "main.b"
-#include "another.b"
 
 
 main(){

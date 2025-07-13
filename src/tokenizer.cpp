@@ -162,7 +162,7 @@ public:
             }
             else
             {
-                std::cerr << "errorrred from tokenizer\n" << peek();
+                std::cerr << "errorrred from tokenizer " << peek() << "\n";
                 exit(EXIT_FAILURE);
             }
         }

@@ -26,7 +26,7 @@ void open_file(const std::string& path,std::string& finalb_sourcecode)
 
 
 
-std::string preprocessor(std::string& path,const std::string& b_sourcecode)
+std::string preprocessor(std::string path,const std::string& b_sourcecode)
 {
 
     std::string finalb_sourcecode;
@@ -54,15 +54,15 @@ std::string preprocessor(std::string& path,const std::string& b_sourcecode)
         }
         index++;//consume the ending double qoute
         rel_path=path+rel_path;
-        open_file(rel_path,finalb_sourcecode);
+        std::string temp;
+        open_file(rel_path,temp);
+        finalb_sourcecode+=preprocessor(rel_path,temp);
         rel_path.clear();
-        while(true)
+        while(std::isspace(b_sourcecode[index]))
         {
-            if(std::isspace(b_sourcecode[index]))index++;
-            else break;
+            index++;
         }
     }
     finalb_sourcecode+=b_sourcecode.substr(index,b_sourcecode.size()-index+1);
-    finalb_sourcecode.push_back('\0');
     return finalb_sourcecode;
 }
