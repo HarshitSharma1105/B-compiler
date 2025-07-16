@@ -13,11 +13,7 @@ int main(int argc,char* argv[])
         contents_stream << input.rdbuf();
         b_sourcecode = contents_stream.str();
     }
-
-
-
     std::string finalb_sourcecode=preprocessor(path,b_sourcecode);
-    finalb_sourcecode.push_back('\0');
     Tokenizer tokenizer(finalb_sourcecode);
     std::vector<Token> tokens=tokenizer.tokenize();
     Generator generator(tokens);

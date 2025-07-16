@@ -1,12 +1,14 @@
-file_name= "please give file name"
+file_name := "please give file name"
+mode := "nodebug"
 
-mode = "nodebug"
+SRC := src/*
+BIN := builds/compiler
 
-run: compiler
-	builds/compiler $(file_name) $(mode)
+run: $(BIN)
+	$(BIN) $(file_name) $(mode)
 
-compiler: src/*
+$(BIN): $(SRC)
 	g++  src/main.cpp -o builds/compiler
-	
-clean :
-	rm compiler
+
+clean:
+	rm -rf builds/*

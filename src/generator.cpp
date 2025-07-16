@@ -3,26 +3,25 @@
 #include<unordered_set>
 
 
-
 class Generator{
 public:
-    Generator(const std::vector<Token> tokens) : tokens(tokens){}
+    Generator(const std::vector<Token> &tokens) : tokens(tokens){}
     std::string generate()
     {
         stream << ".text\n";
         stream << ".globl main\n";
-        while(peek().type!=Tokentype::endoffile)
+        while(peek().has_value())
         {
-            if(peek().type==Tokentype::funcdecl)
+            if(peek().value().type==Tokentype::funcdecl)
             {
                 std::string func_name=consume().val;
                 stream << func_name << ":\n";
                 std::vector<std::string> args;
                 try_consume(Tokentype::open_paren,"expcted '('\n");
-                while(peek().type==Tokentype::identifier)
+                while(peek().value().type==Tokentype::identifier)
                 {
                     args.push_back(consume().val);
-                    if(peek().type==Tokentype::comma)consume();
+                    if(peek().value().type==Tokentype::comma)consume();
                 }
                 try_consume(Tokentype::close_paren,"expected ')'\n");
                 try_consume(Tokentype::open_curly,"expected '{'\n");
@@ -33,6 +32,10 @@ public:
             }
         }
         generate_stdlib();
+        if(ismainfuncpresent!=true){
+            std::cerr << "Main function not declared\n";
+            exit(EXIT_FAILURE);
+        }
         return stream.str();
     }
 
@@ -41,6 +44,7 @@ public:
 private:
     void parse_func(const std::string& func_name,std::vector<std::string> args)
     {
+        if(func_name=="main")ismainfuncpresent=true;
         stream << "    move $s1,$sp\n";
         if(args.size()!=0)stream << "    addi $sp,$sp,-" << args.size()*8 << "\n";
         std::string regs[4]={"$a0","$a1","$a2","$a3"};
@@ -54,23 +58,23 @@ private:
         }
         while(true)
         {
-            if(peek().type==Tokentype::extrn)
+            if(peek().value().type==Tokentype::extrn)
             {
-                while(peek().type!=Tokentype::semicolon)
+                while(peek().value().type!=Tokentype::semicolon)
                 {
                     extrns.insert(consume().val);
                 }
                 try_consume(Tokentype::semicolon,"Expected ;\n");//semicolon
                 
             }
-            else if (peek().type==Tokentype::auto_)
+            else if (peek().value().type==Tokentype::auto_)
             {
                 int curr=count;
-                consume();
-                while(peek().type!=Tokentype::semicolon)
+                consume();//consume auto
+                while(peek().value().type!=Tokentype::semicolon)
                 {
-                    if(peek().type==Tokentype::comma)consume();
-                    if(vars.count(peek().val))
+                    if(peek().value().type==Tokentype::comma)consume();
+                    if(vars.count(peek().value().val))
                     {
                         std::cerr << "variable already declared\n";
                         exit(EXIT_FAILURE);
@@ -80,46 +84,46 @@ private:
                 stream << "    addi $sp,$sp," << (count-curr)*(-8) << "\n";
                 try_consume(Tokentype::semicolon,"Expected ;\n");//semicolon
             }
-            else if(peek().type==Tokentype::identifier)
+            else if(peek().value().type==Tokentype::identifier)
             {
-                if(vars.count(peek().val)==0)
+                if(vars.count(peek().value().val)==0)
                 {
-                    std::cerr << "variable not declared " << peek().val << "\n";
+                    std::cerr << "variable not declared " << peek().value().val << "\n";
                     exit(EXIT_FAILURE);
                 }
                 int offset=vars[consume().val];
                 try_consume(Tokentype::assignment,"expteced =\n");
-                switch(peek().type)
+                switch(peek().value().type)
                 {
-                    case integer_lit: stream << "    li $s0," << peek().val << "\n";break;
-                    case identifier: stream << "    ld $s0," << -(vars[peek().val]+1)*8 << "($s1)\n";break;
+                    case integer_lit: stream << "    li $s0," << peek().value().val << "\n";break;
+                    case identifier: stream << "    ld $s0," << -(vars[peek().value().val]+1)*8 << "($s1)\n";break;
                     default: std::cout << "TODO:Expressions\n";
                 }
-                consume();//identifier or literal;
+                consume();//identifier or literal
                 stream << "    sd $s0," << -(offset+1)*8 << "($s1)\n";
                 try_consume(Tokentype::semicolon,"Expected ;\n");//semicolon
             }
-            else if(peek().type==Tokentype::funcall)
+            else if(peek().value().type==Tokentype::funcall)
             {
                 std::string func_name=consume().val;
                 try_consume(Tokentype::open_paren,"expected '('\n");
-                bool a=0;
+                bool a=false;
                 int index=0;
                 while(!a)
                 {   
-                    switch(peek().type)
+                    switch(peek().value().type)
                     {
                         case integer_lit:stream << "    li " << regs[index++] << ","<< consume().val << "\n";break;
                         case identifier: stream << "    ld " << regs[index++] << "," << -(vars[consume().val]+1)*8 << "($s1)\n";break;
                         case comma: consume();break;
-                        default:a=1;break;
+                        default:a=true;break;
                     }
                 }
                 try_consume(Tokentype::close_paren,"expected ')'\n");
                 stream << "    jal " << func_name << "\n";
                 try_consume(Tokentype::semicolon,"Expected ;\n");//semicolon
             }
-            else if(peek().type==Tokentype::close_curly)
+            else if(peek().value().type==Tokentype::close_curly)
             {
                 //stream << "    addi $sp,$sp," << 8*count << "\n";
                 stream << "    move $sp,$s1\n";
@@ -141,9 +145,9 @@ private:
         stream << "    syscall\n";
         stream << "    jr $ra\n";
     }
-    Token peek(int offset=0){
+    std::optional<Token> peek(int offset=0){
         if(index+offset>=tokens.size()){
-            return {Tokentype::endoffile,""};
+            return {};
         }
         return tokens[index+offset];
     }
@@ -152,22 +156,23 @@ private:
     }
     Token try_consume(const Tokentype& type, const std::string& err_msg)
     {
-        if (peek().type == type) {
+        if (peek().value().type == type) {
             return consume();
         }
         std::cerr << err_msg << std::endl;
         exit(EXIT_FAILURE);
     }
 
-    Token try_consume(const Tokentype& type)
+    std::optional<Token> try_consume(const Tokentype& type)
     {
-        if (peek().type == type) {
+        if (peek().value().type == type) {
             return consume();
         }
-        return {Tokentype::endoffile,""};
+        return {};
     }
     std::vector<Token> tokens;
     int index=0;
     std::stringstream stream;
     std::unordered_set<std::string> extrns;
+    bool ismainfuncpresent=false;
 };

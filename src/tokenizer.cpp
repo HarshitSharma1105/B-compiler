@@ -1,4 +1,5 @@
 #include<vector>
+#include<optional>
 #include "preprocessor.cpp"
 
 
@@ -15,8 +16,7 @@ close_paren,
 open_curly,
 close_curly,
 comma,
-semicolon,
-endoffile
+semicolon
 };
 
 struct Token{
@@ -39,7 +39,6 @@ void debug(const Tokentype& tokentype)
         case identifier:        std::cout << "identifier "; break;
         case comma:             std::cout << "comma "; break;
         case semicolon:         std::cout << "semicolon ";break;
-        case endoffile:         std::cout << "end of file ";break;
         default:                std::cout << "Unknown token "; break;
     }
 }
@@ -60,12 +59,12 @@ public:
     {
         std::vector<Token> tokens;
         std::string buffer;
-        while(true){
+        while(peek().has_value()){
             
-            if(std::isalpha(peek()))
+            if(std::isalpha(peek().value()))
             {
                 buffer.push_back(consume());
-                while (std::isalnum(peek()))
+                while (std::isalnum(peek().value()))
                 {
                     buffer.push_back(consume());
                 }
@@ -77,11 +76,11 @@ public:
                 else if(buffer=="extrn")
                 {
                     buffer.clear();
-                    while(std::isspace(peek()))consume();
-                    while(peek()!=';')
+                    while(std::isspace(peek().value()))consume();
+                    while(peek().value()!=';')
                     {
-                        if(peek()==',')consume();
-                        while(peek()!=',' && peek()!=';')
+                        if(peek().value()==',')consume();
+                        while(peek().value()!=',' && peek().value()!=';')
                         {
                             buffer.push_back(consume());
                         }
@@ -96,80 +95,75 @@ public:
                     buffer.clear();
                 }
             }
-            else if(peek()=='(')
+            else if(peek().value()=='(')
             {
                 if(tokens.back().type==Tokentype::identifier)
                 {
                     int curr=0;
                     while(peek(curr++)!=')'){}
-                    while(std::isspace(peek(curr))){curr++;}
+                    while(std::isspace(peek(curr).value())){curr++;}
                     if(peek(curr)=='{')tokens.back().type=Tokentype::funcdecl;
                     else if(peek(curr)==';')tokens.back().type=Tokentype::funcall;
                     tokens.push_back({Tokentype::open_paren,"("});
                     consume();   
                 }
             }
-            else if(peek()==')')
+            else if(peek().value()==')')
             {
                 tokens.push_back({Tokentype::close_paren,")"});
                 consume();
             }
-            else if (peek()=='{')
+            else if (peek().value()=='{')
             {
                 tokens.push_back({Tokentype::open_curly,"{"});
                 consume();
             }
-            else if (peek()=='}')
+            else if (peek().value()=='}')
             {
                 tokens.push_back({Tokentype::close_curly,"}"});
                 consume();
             }
-            else if (peek()=='=')
+            else if (peek().value()=='=')
             {
                 tokens.push_back({Tokentype::assignment,"="});
                 consume();
             }
             
-            else if(peek()==',')
+            else if(peek().value()==',')
             {
                 tokens.push_back({Tokentype::comma,","});
                 consume();
             }
-            else if (std::isdigit(peek())) 
+            else if (std::isdigit(peek().value())) 
             {
                 buffer.push_back(consume());
-                while (std::isdigit(peek())) 
+                while (std::isdigit(peek().value())) 
                 {
                     buffer.push_back(consume());
                 }
                 tokens.push_back({Tokentype::integer_lit,buffer});
                 buffer.clear();
             }
-            else if(std::isspace(peek()))
+            else if(std::isspace(peek().value()))
             {
                 consume();
             }
-            else if(peek()==';')
+            else if(peek().value()==';')
             {
                 consume();
                 tokens.push_back({Tokentype::semicolon,";"});
             }
-            else if(peek()=='\0')
-            {
-                consume();
-                tokens.push_back({Tokentype::endoffile,""});
-                break;
-            }
             else
             {
-                std::cerr << "errorrred from tokenizer " << peek() << "\n";
+                std::cerr << "errorrred from tokenizer " << peek().value() << "\n";
                 exit(EXIT_FAILURE);
             }
         }
         return tokens;
     }
 private:
-char peek(int offset=0){
+std::optional<char> peek(int offset=0){
+    if(index+offset>=src.size())return {};
     return src[index+offset]; //segfault prone lol
 }
 char consume(){
