@@ -100,11 +100,11 @@ public:
             {
                 if(tokens.back().type==Tokentype::identifier)
                 {
+                    tokens.back().type=Tokentype::funcall;
                     int curr=0;
                     while(peek(curr++)!=')'){}
                     while(std::isspace(peek(curr).value())){curr++;}
                     if(peek(curr)=='{')tokens.back().type=Tokentype::funcdecl;
-                    else if(peek(curr)==';')tokens.back().type=Tokentype::funcall;
                     tokens.push_back({Tokentype::open_paren,"("});
                     consume();   
                 }
