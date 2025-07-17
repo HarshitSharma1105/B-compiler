@@ -1,3 +1,3 @@
-putint(d){
+putintt(d){
     putchar(81);
 }

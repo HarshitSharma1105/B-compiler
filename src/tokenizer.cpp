@@ -1,6 +1,6 @@
 #include<vector>
 #include<optional>
-#include "preprocessor.cpp"
+#include"preprocessor.cpp"
 
 
 enum Tokentype{
@@ -11,6 +11,7 @@ extrn,
 identifier,
 assignment,
 integer_lit,
+string_lit,
 open_paren,
 close_paren,
 open_curly,
@@ -35,6 +36,7 @@ void debug(const Tokentype& tokentype)
         case open_paren:        std::cout << "open_paren "; break;
         case close_paren:       std::cout << "close_paren "; break;
         case integer_lit:       std::cout << "integer_lit "; break;
+        case string_lit:        std::cout << "string_lit ";  break;
         case assignment:        std::cout << "assignment "; break;
         case identifier:        std::cout << "identifier "; break;
         case comma:             std::cout << "comma "; break;
@@ -59,8 +61,7 @@ public:
     {
         std::vector<Token> tokens;
         std::string buffer;
-        while(peek().has_value()){
-            
+        while(peek().has_value()){            
             if(std::isalpha(peek().value()))
             {
                 buffer.push_back(consume());
@@ -107,6 +108,17 @@ public:
                     tokens.push_back({Tokentype::open_paren,"("});
                     consume();   
                 }
+            }
+            else if(peek().value()=='"')   
+            {
+                buffer.push_back(consume());
+                while(peek().value()!='\"')
+                {
+                    buffer.push_back(consume());
+                }
+                buffer.push_back(consume());
+                tokens.push_back({Tokentype::string_lit,buffer});
+                buffer.clear();
             }
             else if(peek().value()==')')
             {
