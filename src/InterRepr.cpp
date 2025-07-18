@@ -7,7 +7,7 @@
 struct AutoVar{
     int count; 
 };
-
+//TODO : Fix this bs
 struct Arg{
     std::variant<std::string,int> val;
 };
@@ -30,7 +30,7 @@ struct Funcall{
 
 struct FuncDecl{
     std::string name;
-    size_t count;
+    int count;
 };
 
 struct Op{
@@ -38,50 +38,53 @@ struct Op{
 };
 
 
-// Helper to print Arg
 void print_arg(const Arg& arg) {
     std::visit([](auto&& value) {
         std::cout << value;
     }, arg.val);
 }
 
-// Main visitor
-struct Visitor {
-    void operator()(const AutoVar& autovar) const {
-        std::cout << "AutoVar: count = " << autovar.count << "\n";
+struct DebugVisitor {
+    void operator()(const AutoVar& autovar) 
+    {
+        std::cout << "Auto variables (" << autovar.count << ")\n";
     }
 
-    void operator()(const AutoAssign& autoassign) const {
-        std::cout << "AutoAssign: offset = " << autoassign.offset << ", arg = ";
+    void operator()(const AutoAssign& autoassign) 
+    {
+        std::cout << "Assign Var(" << autoassign.offset << ")";
         print_arg(autoassign.arg);
         std::cout << "\n";
     }
 
-    void operator()(const ExtrnDecl& extrndecl) const {
-        std::cout << "ExtrnDecl: name = " << extrndecl.name << "\n";
+    void operator()(const ExtrnDecl& extrndecl)
+    {
+        std::cout << "Extrn " << extrndecl.name << "\n";
     }
 
-    void operator()(const Funcall& funcall) const {
-        std::cout << "Funcall: name = " << funcall.name << ", args = [";
+    void operator()(const Funcall& funcall) 
+    {
+        std::cout << "Function call " << funcall.name << "(";
         for (size_t i = 0; i < funcall.args.size(); ++i) {
             print_arg(funcall.args[i]);
             if (i != funcall.args.size() - 1) std::cout << ", ";
         }
-        std::cout << "]\n";
+        std::cout << ")\n";
     }
 
-    void operator()(const FuncDecl& funcdecl) const {
-        std::cout << "FuncDecl: name = " << funcdecl.name << ", count = " << funcdecl.count << "\n";
+    void operator()(const FuncDecl& funcdecl) 
+    {
+        std::cout << "Function declaration " << funcdecl.name << "(" << funcdecl.count << ")\n";
     }
 };
 
 
 void debug(const std::vector<Op>& ops)
 {
-    Visitor visitor;
+    DebugVisitor debugvisitor;
     for(const Op& op:ops)
     {
-        std::visit(visitor,op.op);
+        std::visit(debugvisitor,op.op);
     }
 }
 
@@ -91,25 +94,105 @@ class IREmittor{
 public:
     IREmittor(const std::vector<Token> &tokens) : tokens(tokens){}
     std::vector<Op>   EmitIR()
-    {
-        
+    {   
         while(peek().has_value())
         {
             if(peek().value().type==Tokentype::funcdecl)
             {
                 std::string func_name=consume().val;
+                if(func_name=="main")ismainfuncpresent=true;
+                std::unordered_map<std::string,int> vars;
+                int count=0;
                 try_consume(Tokentype::open_paren,"expcted '('\n");
-                std::vector<std::string> args;
                 while(peek().value().type==Tokentype::identifier)
                 {
-                    args.push_back(consume().val);
+                    vars[consume().val]=count++;
                     if(peek().value().type==Tokentype::comma)consume();
                 }
                 try_consume(Tokentype::close_paren,"expected ')'\n");
                 try_consume(Tokentype::open_curly,"expected '{'\n");
-                ops.emplace_back(Op{FuncDecl{func_name, args.size()}});
-                parse_func(func_name,args);
-            }
+                ops.emplace_back(Op{FuncDecl{func_name, count}});
+                while(true)
+                {
+                    if(peek().value().type==Tokentype::extrn)
+                    {
+
+                        while(peek().value().type!=Tokentype::semicolon)
+                        {
+                            std::string extrn_name=consume().val;
+                            extrns.insert(extrn_name);
+                            ops.emplace_back(Op{ExtrnDecl{extrn_name}});
+                        }
+                        try_consume(Tokentype::semicolon,"Expected ;\n");//semicolon
+                    }
+                    else if(peek().value().type==Tokentype::auto_)
+                    {
+                        int curr=count;
+                        consume();//consume auto
+                        while(peek().value().type!=Tokentype::semicolon)
+                        {
+                            if(peek().value().type==Tokentype::comma)consume();
+                            if(vars.count(peek().value().val))
+                            {
+                                std::cerr << "variable already declared\n";
+                                exit(EXIT_FAILURE);
+                            }
+                            vars[consume().val]=count++;
+                        }
+                        ops.emplace_back(Op{AutoVar{count-curr}});
+                        try_consume(Tokentype::semicolon,"Expected ;\n");//semicolon
+                    }
+                    else if(peek().value().type==Tokentype::identifier)
+                    {
+                        if(vars.count(peek().value().val)==0)
+                        {
+                            std::cerr << "variable not declared " << peek().value().val << "\n";
+                            exit(EXIT_FAILURE);
+                        }
+                        int offset=vars[consume().val];
+                        try_consume(Tokentype::assignment,"expteced =\n");
+                        switch(peek().value().type)
+                        {
+                            case integer_lit:
+                            case string_lit:ops.emplace_back(Op{AutoAssign{offset,consume().val}});break;
+                            case identifier:ops.emplace_back(Op{AutoAssign{offset,vars[consume().val]}}); break;
+                            default: std::cerr << "TODO:Expressions\n";break;
+                        }
+                        try_consume(Tokentype::semicolon,"Expected ;\n");//semicolon
+                    }
+                    else if(peek().value().type==Tokentype::funcall)
+                    {
+                        std::string funcall_name=consume().val;
+                        try_consume(Tokentype::open_paren,"expected '('\n");
+                        bool a=false;
+                        std::vector<Arg> args;
+                        while(!a)
+                        {   
+                            switch(peek().value().type)
+                            {
+                                case integer_lit:
+                                case string_lit: args.push_back({consume().val}) ;break;
+                                case identifier:args.push_back({vars[consume().val]});break;
+                                case comma: consume();break;
+                                default:a=true;break;
+                            }
+                        }
+                        try_consume(Tokentype::close_paren,"expected ')'\n");
+                        ops.emplace_back(Op{Funcall{funcall_name,args}});
+                        try_consume(Tokentype::semicolon,"Expected ;\n");//semicolon
+                    }
+                    else if(peek().value().type==Tokentype::close_curly)
+                    {
+                        count=0;
+                        consume();
+                        break;
+                    }
+                }
+            } 
+        }
+        if(ismainfuncpresent!=true){
+            std::cerr << "Main function not declared\n";
+            exit(EXIT_FAILURE);
         }
         return ops;
     }
@@ -117,93 +200,6 @@ public:
 
 
 private:
-    void parse_func(const std::string& func_name,std::vector<std::string> args)
-    {
-        if(func_name=="main")ismainfuncpresent=true;
-        std::unordered_map<std::string,int> vars;
-        int count=args.size();
-        int temp_vars_index=0;
-        for (int i=0;i<args.size();i++)
-        {
-            vars[args[i]]=i;
-        }
-        while(true)
-        {
-            if(peek().value().type==Tokentype::extrn)
-            {
-                while(peek().value().type!=Tokentype::semicolon)
-                {
-                    std::string extrn_name=consume().val;
-                    extrns.insert(extrn_name);
-                    ops.emplace_back(Op{ExtrnDecl{extrn_name}});
-                }
-                try_consume(Tokentype::semicolon,"Expected ;\n");//semicolon
-                
-            }
-            else if (peek().value().type==Tokentype::auto_)
-            {
-                int curr=count;
-                consume();//consume auto
-                while(peek().value().type!=Tokentype::semicolon)
-                {
-                    if(peek().value().type==Tokentype::comma)consume();
-                    if(vars.count(peek().value().val))
-                    {
-                        std::cerr << "variable already declared\n";
-                        exit(EXIT_FAILURE);
-                    }
-                    vars[consume().val]=count++;
-                }
-                ops.emplace_back(Op{AutoVar{count-curr}});
-                try_consume(Tokentype::semicolon,"Expected ;\n");//semicolon
-            }
-            else if(peek().value().type==Tokentype::identifier)
-            {
-                if(vars.count(peek().value().val)==0)
-                {
-                    std::cerr << "variable not declared " << peek().value().val << "\n";
-                    exit(EXIT_FAILURE);
-                }
-                int offset=vars[consume().val];
-                try_consume(Tokentype::assignment,"expteced =\n");
-                switch(peek().value().type)
-                {
-                    case integer_lit:
-                    case string_lit:ops.emplace_back(Op{AutoAssign{offset,consume().val}});break;
-                    case identifier:ops.emplace_back(Op{AutoAssign{offset,vars[consume().val]}}); break;
-                    default: std::cerr << "TODO:Expressions\n";break;
-                }
-                try_consume(Tokentype::semicolon,"Expected ;\n");//semicolon
-            }
-            else if(peek().value().type==Tokentype::funcall)
-            {
-                std::string func_name=consume().val;
-                try_consume(Tokentype::open_paren,"expected '('\n");
-                bool a=false;
-                std::vector<Arg> args;
-                while(!a)
-                {   
-                    switch(peek().value().type)
-                    {
-                        case integer_lit:
-                        case string_lit: args.push_back({consume().val}) ;break;
-                        case identifier:args.push_back({vars[consume().val]});break;
-                        case comma: consume();break;
-                        default:a=true;break;
-                    }
-                }
-                try_consume(Tokentype::close_paren,"expected ')'\n");
-                ops.emplace_back(Op{Funcall{func_name,args}});
-                try_consume(Tokentype::semicolon,"Expected ;\n");//semicolon
-            }
-            else if(peek().value().type==Tokentype::close_curly)
-            {
-                count=0;
-                consume();
-                break;
-            }
-        }
-    }
     std::optional<Token> peek(int offset=0){
         if(index+offset>=tokens.size()){
             return {};

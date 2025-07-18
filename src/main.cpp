@@ -16,11 +16,12 @@ int main(int argc,char* argv[])
     std::string finalb_sourcecode=preprocessor(path,b_sourcecode);
     Tokenizer tokenizer(finalb_sourcecode);
     std::vector<Token> tokens=tokenizer.tokenize();
-    Generator generator(tokens);
     IREmittor iremittor(tokens);
     std::vector<Op> ops=iremittor.EmitIR();
-    debug(ops);
+    Generator_x86_64 generator(ops);
     std::string assembly_sourcecode=generator.generate();
+    debug(ops);
+    std::cout << assembly_sourcecode;
     if(debugging)
     {
         debug(tokens);
@@ -31,8 +32,16 @@ int main(int argc,char* argv[])
         std::ofstream outFile("output.asm");  
         outFile << assembly_sourcecode;
     }
-    std::string command = "java -jar assemblers/Mars4_5.jar sm output.asm";
+    std::string command = "fasm output.asm";
     system(command.c_str());
-    if(!debugging)system("rm output.asm");
+    command = "cc -no-pie output.o -o output";
+    system(command.c_str());
+    command = "./output";
+    system(command.c_str());
+    if(!debugging)
+    {
+        system("rm output.asm");
+        system("rm output.o");
+    }
     return 0;
 }

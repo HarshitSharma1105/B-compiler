@@ -1,3 +1,4 @@
 /builds/
 *.asm
+*.o
 .vscode/
