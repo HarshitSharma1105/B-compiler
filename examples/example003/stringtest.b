@@ -5,5 +5,5 @@ main(){
     y=103;
     putint(z);
     putchar(y);
-    putstr(x);
+    putstr("hello");
 }

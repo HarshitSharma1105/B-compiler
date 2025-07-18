@@ -17,6 +17,9 @@ int main(int argc,char* argv[])
     Tokenizer tokenizer(finalb_sourcecode);
     std::vector<Token> tokens=tokenizer.tokenize();
     Generator generator(tokens);
+    IREmittor iremittor(tokens);
+    std::vector<Op> ops=iremittor.EmitIR();
+    debug(ops);
     std::string assembly_sourcecode=generator.generate();
     if(debugging)
     {

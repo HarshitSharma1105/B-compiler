@@ -1,4 +1,5 @@
 main(){
+    extrn putchar;
     putchar(72);
     putchar(69);
     putchar(76);

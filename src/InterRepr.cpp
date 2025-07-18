@@ -1,26 +1,105 @@
-#include"InterRepr.cpp"
+#include"tokenizer.cpp"
+#include<variant>
+#include<unordered_map>
+#include<unordered_set>
 
 
+struct AutoVar{
+    int count; 
+};
+
+struct Arg{
+    std::variant<std::string,int> val;
+};
+
+struct AutoAssign{
+    int offset;
+    Arg arg;
+};
 
 
+struct ExtrnDecl{
+    std::string name;
+};
+
+struct Funcall{
+    std::string name;
+    std::vector<Arg> args;
+};
 
 
-class Generator{
-public:
-    Generator(const std::vector<Token> &tokens) : tokens(tokens){}
-    std::string generate()
+struct FuncDecl{
+    std::string name;
+    size_t count;
+};
+
+struct Op{
+    std::variant<AutoVar,AutoAssign,ExtrnDecl,Funcall,FuncDecl> op;
+};
+
+
+// Helper to print Arg
+void print_arg(const Arg& arg) {
+    std::visit([](auto&& value) {
+        std::cout << value;
+    }, arg.val);
+}
+
+// Main visitor
+struct Visitor {
+    void operator()(const AutoVar& autovar) const {
+        std::cout << "AutoVar: count = " << autovar.count << "\n";
+    }
+
+    void operator()(const AutoAssign& autoassign) const {
+        std::cout << "AutoAssign: offset = " << autoassign.offset << ", arg = ";
+        print_arg(autoassign.arg);
+        std::cout << "\n";
+    }
+
+    void operator()(const ExtrnDecl& extrndecl) const {
+        std::cout << "ExtrnDecl: name = " << extrndecl.name << "\n";
+    }
+
+    void operator()(const Funcall& funcall) const {
+        std::cout << "Funcall: name = " << funcall.name << ", args = [";
+        for (size_t i = 0; i < funcall.args.size(); ++i) {
+            print_arg(funcall.args[i]);
+            if (i != funcall.args.size() - 1) std::cout << ", ";
+        }
+        std::cout << "]\n";
+    }
+
+    void operator()(const FuncDecl& funcdecl) const {
+        std::cout << "FuncDecl: name = " << funcdecl.name << ", count = " << funcdecl.count << "\n";
+    }
+};
+
+
+void debug(const std::vector<Op>& ops)
+{
+    Visitor visitor;
+    for(const Op& op:ops)
     {
-        textstream << ".text\n";
-        textstream << "    .globl main\n";
-        datastream << ".data\n";
+        std::visit(visitor,op.op);
+    }
+}
+
+
+
+class IREmittor{
+public:
+    IREmittor(const std::vector<Token> &tokens) : tokens(tokens){}
+    std::vector<Op>   EmitIR()
+    {
+        
         while(peek().has_value())
         {
             if(peek().value().type==Tokentype::funcdecl)
             {
                 std::string func_name=consume().val;
-                textstream << func_name << ":\n";
-                std::vector<std::string> args;
                 try_consume(Tokentype::open_paren,"expcted '('\n");
+                std::vector<std::string> args;
                 while(peek().value().type==Tokentype::identifier)
                 {
                     args.push_back(consume().val);
@@ -28,19 +107,11 @@ public:
                 }
                 try_consume(Tokentype::close_paren,"expected ')'\n");
                 try_consume(Tokentype::open_curly,"expected '{'\n");
-                textstream << "    addi $sp,$sp,-8\n";
-                textstream << "    sw $ra,0($sp)\n";
-                textstream << "    sw $s1,4($sp)\n";
+                ops.emplace_back(Op{FuncDecl{func_name, args.size()}});
                 parse_func(func_name,args);
             }
         }
-        generate_stdlib();
-        if(ismainfuncpresent!=true){
-            std::cerr << "Main function not declared\n";
-            exit(EXIT_FAILURE);
-        }
-        textstream << datastream.str();
-        return textstream.str();
+        return ops;
     }
 
 
@@ -49,17 +120,12 @@ private:
     void parse_func(const std::string& func_name,std::vector<std::string> args)
     {
         if(func_name=="main")ismainfuncpresent=true;
-        textstream << "    move $s1,$sp\n";
-        if(args.size()!=0)textstream << "    addi $sp,$sp,-" << args.size()*8 << "\n";
-        std::string regs[4]={"$a0","$a1","$a2","$a3"};
-        if(args.size()>4)std::cerr << "too many arguments\n";
         std::unordered_map<std::string,int> vars;
         int count=args.size();
         int temp_vars_index=0;
         for (int i=0;i<args.size();i++)
         {
             vars[args[i]]=i;
-            textstream << "    sd " << regs[i] << "," << -(i+1)*8 << "($s1)\n";
         }
         while(true)
         {
@@ -67,7 +133,9 @@ private:
             {
                 while(peek().value().type!=Tokentype::semicolon)
                 {
-                    extrns.insert(consume().val);
+                    std::string extrn_name=consume().val;
+                    extrns.insert(extrn_name);
+                    ops.emplace_back(Op{ExtrnDecl{extrn_name}});
                 }
                 try_consume(Tokentype::semicolon,"Expected ;\n");//semicolon
                 
@@ -86,7 +154,7 @@ private:
                     }
                     vars[consume().val]=count++;
                 }
-                textstream << "    addi $sp,$sp," << (count-curr)*(-8) << "\n";
+                ops.emplace_back(Op{AutoVar{count-curr}});
                 try_consume(Tokentype::semicolon,"Expected ;\n");//semicolon
             }
             else if(peek().value().type==Tokentype::identifier)
@@ -100,76 +168,41 @@ private:
                 try_consume(Tokentype::assignment,"expteced =\n");
                 switch(peek().value().type)
                 {
-                    case integer_lit: textstream << "    li $s0," << peek().value().val << "\n";break;
-                    case identifier: textstream << "    ld $s0," << -(vars[peek().value().val]+1)*8 << "($s1)\n";break;
-                    case string_lit: {
-                        datastream << "    data_" << offset << ": .asciiz " << peek().value().val << "\n";
-                        textstream << "    la $s0,data_" << offset << "\n";
-                    } break;
-                    default: std::cout << "TODO:Expressions\n";
+                    case integer_lit:
+                    case string_lit:ops.emplace_back(Op{AutoAssign{offset,consume().val}});break;
+                    case identifier:ops.emplace_back(Op{AutoAssign{offset,vars[consume().val]}}); break;
+                    default: std::cerr << "TODO:Expressions\n";break;
                 }
-                consume();//identifier or literal
-                textstream << "    sd $s0," << -(offset+1)*8 << "($s1)\n";
                 try_consume(Tokentype::semicolon,"Expected ;\n");//semicolon
             }
             else if(peek().value().type==Tokentype::funcall)
             {
-                std::string funcall_name=consume().val;
+                std::string func_name=consume().val;
                 try_consume(Tokentype::open_paren,"expected '('\n");
                 bool a=false;
-                int index=0;
+                std::vector<Arg> args;
                 while(!a)
                 {   
                     switch(peek().value().type)
                     {
-                        case integer_lit:textstream << "    li " << regs[index++] << ","<< consume().val << "\n";break;
-                        case identifier: textstream << "    ld " << regs[index++] << "," << -(vars[consume().val]+1)*8 << "($s1)\n";break;
-                        case string_lit: {
-                            datastream << "    temp_" << temp_vars_index << " :.asciiz " << consume().val << "\n";
-                            textstream << "    la " << regs[index++] << "," << "temp_" << temp_vars_index++ << "\n";
-                        }break;
+                        case integer_lit:
+                        case string_lit: args.push_back({consume().val}) ;break;
+                        case identifier:args.push_back({vars[consume().val]});break;
                         case comma: consume();break;
                         default:a=true;break;
                     }
                 }
                 try_consume(Tokentype::close_paren,"expected ')'\n");
-                textstream << "    jal " << funcall_name << "\n";
+                ops.emplace_back(Op{Funcall{func_name,args}});
                 try_consume(Tokentype::semicolon,"Expected ;\n");//semicolon
             }
             else if(peek().value().type==Tokentype::close_curly)
             {
-                textstream << "    move $sp,$s1\n";
-                textstream << "    lw $ra,0($sp)\n";
-                textstream << "    lw $s1,4($sp)\n";
-                textstream << "    addi $sp,$sp,8\n";
-                if(func_name!="main")textstream << "    jr $ra\n";
-                else textstream << "    li $v0,10\n" << "    syscall\n";
                 count=0;
                 consume();
                 break;
             }
         }
-    }
-    void generate_stdlib()
-    {
-        textstream << "putchar:\n";
-        textstream << "    li $v0,11\n";
-        textstream << "    syscall\n";
-        textstream << "    jr $ra\n";
-
-        textstream << "putint:\n";
-        textstream << "    li $v0,1\n";
-        textstream << "    syscall\n";
-        textstream << "    jr $ra\n";
-
-
-        textstream << "putstr:\n";
-        textstream << "    li $v0,4\n";
-        textstream << "    syscall\n";
-        textstream << "    jr $ra\n";
-
-
-
     }
     std::optional<Token> peek(int offset=0){
         if(index+offset>=tokens.size()){
@@ -196,9 +229,9 @@ private:
         }
         return {};
     }
+    std::vector<Op> ops;
     std::vector<Token> tokens;
     int index=0;
-    std::stringstream textstream,datastream;
     std::unordered_set<std::string> extrns;
     bool ismainfuncpresent=false;
 };
