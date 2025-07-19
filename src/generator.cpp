@@ -2,7 +2,7 @@
 
 
 
-// class Generator{
+// class Generator_Mips{
 // public:
 //     Generator(const std::vector<Token> &tokens) : tokens(tokens){}
 //     std::string generate()
@@ -202,79 +202,9 @@
 
 
 
-void visit_arg(std::stringstream& stream,const Arg& arg) {
-    struct ArgVisitor{
-            std::stringstream& streamm;
-            void operator()(int offset)
-            {
-                streamm << "mov rax,[rbp-" << (offset+1)*8 << "]\n";
-            }
-
-            void operator()(const std::string& val)
-            {
-                streamm << "mov rax," << val << "\n";
-            }
-    };
-    std::visit(ArgVisitor{stream},arg.val);
-}
 
 
-struct Visitor {
-    std::stringstream& stream;
-    std::string regs[3]={"rdi","rsi","rdx"};
-    void operator()(const AutoVar& autovar) 
-    {
-        stream << "    sub rsp," << autovar.count*8 << "\n";
-    }
 
-    void operator()(const AutoAssign& autoassign) 
-    {
-        visit_arg(stream,autoassign.arg);
-        stream << "    mov QWORD [rbp-" << (autoassign.offset+1)*8 << "],rax;\n";
-        stream << "\n";
-    }
-
-    void operator()(const ExtrnDecl& extrndecl)
-    {
-        stream << "    extrn " << extrndecl.name << "\n";
-    }
-
-    void operator()(const Funcall& funcall) 
-    {
-        
-        for(size_t i=0;i<funcall.args.size();i++)
-        {
-            visit_arg(stream,funcall.args[i]);
-            stream << "    mov " << regs[i] << ",rax\n";
-            stream << "\n";
-        }
-        stream << "    call " << funcall.name << "\n";
-    }
-
-    void operator()(const FuncDecl& funcdecl) 
-    {
-        stream << "    sub rsp," << funcdecl.count*8 << "\n";
-        for (int i=0;i<funcdecl.count; i++)
-        {
-            stream << "    mov [rbp-" << (i+1)*8 << "]," << regs[i] << "\n";
-        }
-    }
-    void operator()(const ScopeBegin& scope)
-    {
-        stream << "public " << scope.name << "\n";
-        stream << scope.name << ":\n";
-        stream << "    push rbp\n";
-        stream << "    mov rbp,rsp\n";
-    }
-
-    void operator()(const ScopeClose& scope)
-    {
-        stream << "    mov rsp,rbp\n";
-        stream << "    pop rbp\n";
-        stream << "    xor rax,rax\n";
-        stream << "    ret\n"; // TODO : You dont need to return out ot every scope!!
-    }
-};
 
 
 class Generator_x86_64{
@@ -282,12 +212,82 @@ public:
     Generator_x86_64(const std::vector<Op> &ops) : ops(ops){}
     std::string generate()
     {
+        struct ArgVisitor{
+            std::stringstream& stream;
+            void operator()(uint32_t offset)
+            {
+                stream << "    mov rax,[rbp-" << (offset+1)*8 << "]\n";
+            }
+
+            void operator()(int literal)
+            {
+                stream << "    mov rax," << literal << "\n";
+            }
+        };
+        struct Visitor {
+            std::stringstream& stream;
+            std::string regs[3]={"rdi","rsi","rdx"};
+            
+            void operator()(const AutoVar& autovar) 
+            {
+                stream << "    sub rsp," << autovar.count*8 << "\n";
+            }
+
+            void operator()(const AutoAssign& autoassign) 
+            {
+                std::visit(ArgVisitor{stream},autoassign.arg);
+                stream << "    mov QWORD [rbp-" << (autoassign.offset+1)*8 << "],rax;\n";
+                stream << "\n";
+            }
+
+            void operator()(const ExtrnDecl& extrndecl)
+            {
+                stream << "    extrn " << extrndecl.name << "\n";
+            }
+
+            void operator()(const Funcall& funcall) 
+            {
+                
+                for(size_t i=0;i<funcall.args.size();i++)
+                {
+                    std::visit(ArgVisitor{stream},funcall.args[i]);
+                    stream << "    mov " << regs[i] << ",rax\n";
+                    stream << "\n";
+                }
+                stream << "    call " << funcall.name << "\n";
+            }
+
+            void operator()(const FuncDecl& funcdecl) 
+            {
+                stream << "    sub rsp," << funcdecl.count*8 << "\n";
+                for (int i=0;i<funcdecl.count; i++)
+                {
+                    stream << "    mov [rbp-" << (i+1)*8 << "]," << regs[i] << "\n";
+                }
+            }
+            void operator()(const ScopeBegin& scope)
+            {
+                stream << "public " << scope.name << "\n";
+                stream << scope.name << ":\n";
+                stream << "    push rbp\n";
+                stream << "    mov rbp,rsp\n";
+            }
+
+            void operator()(const ScopeClose& scope)
+            {
+                stream << "    mov rsp,rbp\n";
+                stream << "    pop rbp\n";
+                stream << "    xor rax,rax\n";
+                stream << "    ret\n"; 
+                // TODO : You dont need to return out of every scope!!
+            }
+        };
         textstream << "format ELF64\n";
         textstream << "section \".text\" executable\n";
         Visitor visitor{textstream};
         while(peek().has_value())
         {
-            std::visit(visitor,consume().op);
+            std::visit(visitor,consume());
         }
         return textstream.str();
     }
