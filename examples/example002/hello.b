@@ -4,8 +4,11 @@ main(){
     a=72;
     putchar(a);
     b=69;
-    putchar(b);
+    a=b;
+    putchar(a);
     putchar(76);
+    b=76;
+    putchar(b);
     a=79;
     foo(a);
     foo(10);
