@@ -1,5 +1,5 @@
 #include "lib/library.b"
 
-add(c){
+addi(c){
     putchar(99);
 }

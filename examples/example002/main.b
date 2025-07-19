@@ -6,6 +6,5 @@ c(d,e)
 {
     putchar(d);
     putchar(e);
-    putint(200);
-    add(300);
+    addi(300);
 }

@@ -34,7 +34,9 @@ struct FuncDecl{
 };
 
 
-struct ScopeBegin{};
+struct ScopeBegin{
+    std::string name;
+};
 struct ScopeClose{};
 
 struct Op{
@@ -82,7 +84,7 @@ struct DebugVisitor {
     }
     void operator()(const ScopeBegin& scope)
     {
-        std::cout << "Scope Begin\n";
+        std::cout << "Scope Begin " << scope.name << "\n";
     }
     void operator()(const ScopeClose& scope)
     {
@@ -121,8 +123,8 @@ public:
                     vars[consume().val]=count++;
                     if(peek().value().type==Tokentype::comma)consume();
                 }
-                ops.emplace_back(Op{ScopeBegin{}});
-                ops.emplace_back(Op{FuncDecl{func_name, count}});
+                ops.emplace_back(Op{ScopeBegin{func_name}});
+                ops.emplace_back(Op{FuncDecl{func_name,count}});
                 try_consume(Tokentype::close_paren,"expected ')'\n");
                 try_consume(Tokentype::open_curly,"expected '{'\n");
                 while(true)
