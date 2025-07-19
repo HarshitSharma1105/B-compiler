@@ -18,7 +18,8 @@ close_paren,
 open_curly,
 close_curly,
 comma,
-semicolon
+semicolon,
+plus
 };
 
 struct Token{
@@ -42,6 +43,7 @@ void debug(const Tokentype& tokentype)
         case identifier:        std::cout << "identifier "; break;
         case comma:             std::cout << "comma "; break;
         case semicolon:         std::cout << "semicolon ";break;
+        case plus:              std::cout << "plus";break;
         default:                std::cout << "Unknown token "; break;
     }
 }
@@ -109,6 +111,11 @@ public:
                     tokens.push_back({Tokentype::open_paren,"("});
                     consume();   
                 }
+            }
+            else if(peek().value()=='+')
+            {
+                tokens.push_back({Tokentype::plus,"+"});
+                consume();
             }
             else if(peek().value()=='"')   
             {

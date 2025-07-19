@@ -5,22 +5,27 @@
 
 
 struct AutoVar{
-    uint32_t count; 
+    size_t count; 
 };
 //TODO : Fix this bs
 // struct Arg{
-//     std::variant<uint32_t,int> val;
+//     std::variant<size_t,int> val;
 // };
-typedef std::variant<uint32_t,int> Arg;
+typedef std::variant<size_t,int> Arg;
 
 struct AutoAssign{
-    uint32_t offset;
+    size_t offset;
     Arg arg;
 };
 
 
 struct ExtrnDecl{
     std::string name;
+};
+
+struct AutoPlus{
+    size_t index;
+    Arg lhs,rhs;
 };
 
 struct Funcall{
@@ -31,7 +36,7 @@ struct Funcall{
 
 struct FuncDecl{
     std::string name;
-    uint32_t count;
+    size_t count;
 };
 
 
@@ -45,20 +50,20 @@ struct ScopeClose{};
 //     ScopeBegin,ScopeClose> op;
 // };
 
-typedef std::variant<AutoVar,AutoAssign,ExtrnDecl,Funcall,FuncDecl,
+typedef std::variant<AutoVar,AutoAssign,AutoPlus,ExtrnDecl,Funcall,FuncDecl,
     ScopeBegin,ScopeClose> Op;
 
 
 void print_arg(const Arg& arg) {
-    std::visit([](auto&& value) {
-        std::cout << value;
+    std::visit([&](auto&& value) {
+        std::cout << value << "," << arg.index() << "";
     }, arg);
 }
 
 struct DebugVisitor {
     void operator()(const AutoVar& autovar) 
     {
-        std::cout << "Auto variables (" << autovar.count << ")\n";
+        std::cout << " Auto variables (" << autovar.count << ")\n";
     }
 
     void operator()(const AutoAssign& autoassign) 
@@ -67,7 +72,15 @@ struct DebugVisitor {
         print_arg(autoassign.arg);
         std::cout << "\n";
     }
-
+    void operator()(const AutoPlus& autoplus) 
+    {
+        std::cout << "Auto Plus(index=" << autoplus.index << ",";
+        std::cout << " lhs=";
+        print_arg(autoplus.lhs);
+        std::cout << " ,rhs=";
+        print_arg(autoplus.rhs);
+        std::cout << ")\n";
+    }
     void operator()(const ExtrnDecl& extrndecl)
     {
         std::cout << "Extrn " << extrndecl.name << "\n";
@@ -95,6 +108,7 @@ struct DebugVisitor {
     {
         std::cout << "Scope End\n";
     }
+    
 };
 
 
@@ -103,6 +117,7 @@ void debug(const std::vector<Op>& ops)
     DebugVisitor debugvisitor;
     for(const Op& op:ops)
     {
+        std::cout << op.index() << " ";
         std::visit(debugvisitor,op);
     }
 }
@@ -120,8 +135,6 @@ public:
             {
                 std::string func_name=consume().val;
                 if(func_name=="main")ismainfuncpresent=true;
-                std::unordered_map<std::string,uint32_t> vars;
-                uint32_t count=0;
                 try_consume(Tokentype::open_paren,"expcted '('\n");
                 while(peek().value().type==Tokentype::identifier)
                 {
@@ -147,7 +160,7 @@ public:
                     }
                     else if(try_consume(Tokentype::auto_).has_value())
                     {
-                        uint32_t curr=count;
+                        size_t curr=count;
                         while(peek().value().type!=Tokentype::semicolon)
                         {
                             try_consume(Tokentype::comma);
@@ -168,9 +181,9 @@ public:
                             std::cerr << "variable not declared " << peek().value().val << "\n";
                             exit(EXIT_FAILURE);
                         }
-                        uint32_t offset = vars[consume().val];
+                        size_t offset = vars[consume().val];
                         try_consume(Tokentype::assignment,"expteced =\n");
-                        ops.emplace_back(AutoAssign{offset,compile_expression(vars).value()});
+                        ops.emplace_back(AutoAssign{offset,compile_expression().value()});
                         try_consume(Tokentype::semicolon,"Expected ;\n");//semicolon
                     }
                     else if(try_peek(Tokentype::funcall))
@@ -180,7 +193,7 @@ public:
                         std::vector<Arg> args;
                         while(try_peek(close_paren)==false)
                         {   
-                            args.push_back(compile_expression(vars).value());
+                            args.push_back(compile_expression().value());
                             try_consume(Tokentype::comma);
                         }
                         try_consume(Tokentype::close_paren,"expected ')'\n");
@@ -191,6 +204,7 @@ public:
                     {
                         ops.emplace_back(ScopeClose{});
                         count=0;
+                        vars.clear();
                         break;
                     }
                 }
@@ -206,15 +220,30 @@ public:
 
 
 private:
-    std::optional<Arg> compile_expression(std::unordered_map<std::string,uint32_t>& vars)
+    std::optional<Arg> compile_expression()
+    {
+        std::optional<Arg> lhs=compile_primary_expression(),rhs;
+        if(try_consume(Tokentype::plus).has_value()==false)return lhs;
+        rhs=compile_primary_expression();
+        ops.emplace_back(AutoVar{1});
+        ops.emplace_back(AutoPlus{count,lhs.value(),rhs.value()});
+        char temp_name[10];
+        sprintf(temp_name,"__temp__%ld",count);
+        vars[std::string(temp_name)]=count++;
+        std::cerr << temp_name << std::endl;
+        debug(ops);
+        assert(false && "Do something about Binops");//TODO!!!
+        return {};
+    }
+    std::optional<Arg> compile_primary_expression()
     {
         switch(peek().value().type)
         {
             case integer_lit:return (atoi(consume().val.c_str()));break;
-            //case string_lit: args.emplace_back(consume().val) ;break; 
-            //TODO: string lits;
-            //TODO: Binary Operations;
             case identifier:return Arg{(vars[consume().val])};break;
+            case string_lit: assert(false && "TODO:String Literals");
+            default : for(int i=-1;i<5;i++)debug ({peek(i).value()});
+            assert(false && "TODO : Expressions"); 
         }
         return {};
     }
@@ -253,6 +282,8 @@ private:
     std::vector<Op> ops;
     std::vector<Token> tokens;
     int index=0;
+    size_t count=0;
     std::unordered_set<std::string> extrns;
+    std::unordered_map<std::string,size_t> vars;
     bool ismainfuncpresent=false;
 };

@@ -10,6 +10,11 @@ int main(int argc,char* argv[])
     {
         std::stringstream contents_stream;
         std::fstream input(path, std::ios::in);
+        if (!input.is_open()) 
+        {
+            std::cerr << "Failed to open file   " << path << "\n";
+            exit(EXIT_FAILURE);
+        }
         contents_stream << input.rdbuf();
         b_sourcecode = contents_stream.str();
     }

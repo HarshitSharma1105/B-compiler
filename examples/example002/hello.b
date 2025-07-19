@@ -9,8 +9,8 @@ main(){
     putchar(76);
     b=76;
     putchar(b);
-    a=79;
-    foo(a);
+    a=78;
+    foo(a+1);
     foo(10);
 }
 
