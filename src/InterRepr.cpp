@@ -33,8 +33,12 @@ struct FuncDecl{
     int count;
 };
 
+
+struct ScopeBegin{};
+struct ScopeClose{};
+
 struct Op{
-    std::variant<AutoVar,AutoAssign,ExtrnDecl,Funcall,FuncDecl> op;
+    std::variant<AutoVar,AutoAssign,ExtrnDecl,Funcall,FuncDecl,ScopeBegin,ScopeClose> op;
 };
 
 
@@ -76,6 +80,14 @@ struct DebugVisitor {
     {
         std::cout << "Function declaration " << funcdecl.name << "(" << funcdecl.count << ")\n";
     }
+    void operator()(const ScopeBegin& scope)
+    {
+        std::cout << "Scope Begin\n";
+    }
+    void operator()(const ScopeClose& scope)
+    {
+        std::cout << "Scope End\n";
+    }
 };
 
 
@@ -109,9 +121,10 @@ public:
                     vars[consume().val]=count++;
                     if(peek().value().type==Tokentype::comma)consume();
                 }
+                ops.emplace_back(Op{ScopeBegin{}});
+                ops.emplace_back(Op{FuncDecl{func_name, count}});
                 try_consume(Tokentype::close_paren,"expected ')'\n");
                 try_consume(Tokentype::open_curly,"expected '{'\n");
-                ops.emplace_back(Op{FuncDecl{func_name, count}});
                 while(true)
                 {
                     if(peek().value().type==Tokentype::extrn)
@@ -183,6 +196,7 @@ public:
                     }
                     else if(peek().value().type==Tokentype::close_curly)
                     {
+                        ops.emplace_back(Op{ScopeClose{}});
                         count=0;
                         consume();
                         break;

@@ -199,16 +199,28 @@
 //     std::unordered_set<std::string> extrns;
 //     bool ismainfuncpresent=false;
 // };
+
+
+
 void visit_arg(std::stringstream& stream,const Arg& arg) {
-    std::visit([&](auto&& value) {
-        stream <<  "    mov rdi," << value << "\n";
-    }, arg.val);
+    struct ArgVisitor{
+            std::stringstream& streamm;
+            void operator()(int offset)
+            {
+                streamm << "[rbp-" << (offset+1)*8 << "]";
+            }
+
+            void operator()(const std::string& val)
+            {
+                streamm << val;
+            }
+    };
+    std::visit(ArgVisitor{stream},arg.val);
 }
 
 
 struct Visitor {
     std::stringstream& stream;
-    bool val=false;
     void operator()(const AutoVar& autovar) 
     {
         stream << "    sub rsp," << autovar.count*8 << "\n";
@@ -216,9 +228,10 @@ struct Visitor {
 
     void operator()(const AutoAssign& autoassign) 
     {
-        // stream << "    mov rsp,";
-        // visit_arg(stream,autoassign.arg);
-        // stream << "\n";
+        
+        stream << "    mov QWORD [rbp-" << (autoassign.offset+1)*8 << "],";
+        visit_arg(stream,autoassign.arg);
+        stream << "\n";
     }
 
     void operator()(const ExtrnDecl& extrndecl)
@@ -231,26 +244,36 @@ struct Visitor {
         
         for(size_t i=0;i<funcall.args.size();i++)
         {
+            stream << "    mov rdi,";
             visit_arg(stream,funcall.args[i]);
+            stream << "\n";
         }
         stream << "    call " << funcall.name << "\n";
     }
 
     void operator()(const FuncDecl& funcdecl) 
     {
-        //TODO: Fix epilogue prologs!!!!
-        if(val)
-        {
-        stream << "    mov rsp,rbp\n";
-        stream << "    pop rbp\n";
-        stream << "    xor rax,rax\n";
-        stream << "    ret\n";
-        }
         stream << "public " << funcdecl.name << "\n";
         stream << funcdecl.name << ":\n";
         stream << "    push rbp\n";
         stream << "    mov rbp,rsp\n";
-        val=true;
+        stream << "    sub rsp," << funcdecl.count*8 << "\n";
+        for (int i=0;i<funcdecl.count; i++)
+        {
+            stream << "    mov [rbp-" << (i+1)*8 << "],rdi\n";
+        }
+    }
+    void operator()(const ScopeBegin& scope)
+    {
+        //TODO: Wot use this if we not do anything :(
+    }
+
+    void operator()(const ScopeClose& scope)
+    {
+        stream << "    mov rsp,rbp\n";
+        stream << "    pop rbp\n";
+        stream << "    xor rax,rax\n";
+        stream << "    ret\n"; // TODO : You dont need to return out ot every scope!!
     }
 };
 
