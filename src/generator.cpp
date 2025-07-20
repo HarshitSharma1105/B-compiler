@@ -1,7 +1,7 @@
 #include"InterRepr.cpp"
 
 
-
+//TODO: Fix the Mips Generator
 class Generator_Mips{
 public:
     Generator_Mips(const std::vector<Op> &ops) : ops(ops){}
@@ -86,8 +86,8 @@ public:
         };
         struct Visitor {
             std::stringstream& stream;
+            ArgVisitor argvisitor{stream};
             std::string regs[3]={"rdi","rsi","rdx"};
-            
             void operator()(const AutoVar& autovar) 
             {
                 stream << "    sub rsp," << autovar.count*8 << "\n";
@@ -95,13 +95,16 @@ public:
 
             void operator()(const AutoAssign& autoassign) 
             {
-                std::visit(ArgVisitor{stream},autoassign.arg);
-                stream << "    mov QWORD [rbp-" << (autoassign.offset+1)*8 << "],rax;\n";
-                stream << "\n";
+                std::visit(argvisitor,autoassign.arg);
+                stream << "    mov QWORD [rbp-" << (autoassign.offset+1)*8 << "],rax\n";
             }
             void operator()(const AutoPlus& autoplus)
             {
-
+                std::visit(argvisitor,autoplus.lhs);
+                stream << "    mov rbx,rax\n";
+                std::visit(argvisitor,autoplus.rhs);
+                stream << "    add rax,rbx\n";
+                stream << "    mov QWORD [rbp-" << (autoplus.index+1)*8 << "],rax\n";
             }
 
             void operator()(const ExtrnDecl& extrndecl)
@@ -114,7 +117,7 @@ public:
                 
                 for(size_t i=0;i<funcall.args.size();i++)
                 {
-                    std::visit(ArgVisitor{stream},funcall.args[i]);
+                    std::visit(argvisitor,funcall.args[i]);
                     stream << "    mov " << regs[i] << ",rax\n";
                 }
                 stream << "    call " << funcall.name << "\n";

@@ -54,31 +54,38 @@ typedef std::variant<AutoVar,AutoAssign,AutoPlus,ExtrnDecl,Funcall,FuncDecl,
     ScopeBegin,ScopeClose> Op;
 
 
-void print_arg(const Arg& arg) {
-    std::visit([&](auto&& value) {
-        std::cout << value << "," << arg.index() << "";
-    }, arg);
-}
+
 
 struct DebugVisitor {
+        struct DebugArgVisitor{
+            void operator()(size_t offset)
+            {
+                std::cout << "AutoVar(" << offset << ")";
+            }
+
+            void operator()(int literal)
+            {
+                std::cout << "Literal(" << literal << ")";
+            }
+        };
     void operator()(const AutoVar& autovar) 
     {
-        std::cout << " Auto variables (" << autovar.count << ")\n";
+        std::cout << "Auto Variables (" << autovar.count << ")\n";
     }
 
     void operator()(const AutoAssign& autoassign) 
     {
-        std::cout << "Assign Var(" << autoassign.offset << ")";
-        print_arg(autoassign.arg);
+        std::cout << "Assign Var(" << autoassign.offset << ") = ";
+        std::visit(DebugArgVisitor{},autoassign.arg);
         std::cout << "\n";
     }
     void operator()(const AutoPlus& autoplus) 
     {
-        std::cout << "Auto Plus(index=" << autoplus.index << ",";
+        std::cout << "Auto Plus (index=" << autoplus.index << ",";
         std::cout << " lhs=";
-        print_arg(autoplus.lhs);
+        std::visit(DebugArgVisitor{},autoplus.lhs);
         std::cout << " ,rhs=";
-        print_arg(autoplus.rhs);
+        std::visit(DebugArgVisitor{},autoplus.rhs);
         std::cout << ")\n";
     }
     void operator()(const ExtrnDecl& extrndecl)
@@ -88,9 +95,9 @@ struct DebugVisitor {
 
     void operator()(const Funcall& funcall) 
     {
-        std::cout << "Function call " << funcall.name << "(";
+        std::cout << "Function Call " << funcall.name << "(";
         for (size_t i = 0; i < funcall.args.size(); ++i) {
-            print_arg(funcall.args[i]);
+            std::visit(DebugArgVisitor{},funcall.args[i]);
             if (i != funcall.args.size() - 1) std::cout << ", ";
         }
         std::cout << ")\n";
@@ -98,7 +105,7 @@ struct DebugVisitor {
 
     void operator()(const FuncDecl& funcdecl) 
     {
-        std::cout << "Function declaration " << funcdecl.name << "(" << funcdecl.count << ")\n";
+        std::cout << "Function Declaration " << funcdecl.name << "(" << funcdecl.count << ")\n";
     }
     void operator()(const ScopeBegin& scope)
     {
@@ -117,7 +124,6 @@ void debug(const std::vector<Op>& ops)
     DebugVisitor debugvisitor;
     for(const Op& op:ops)
     {
-        std::cout << op.index() << " ";
         std::visit(debugvisitor,op);
     }
 }
@@ -226,14 +232,21 @@ private:
         if(try_consume(Tokentype::plus).has_value()==false)return lhs;
         rhs=compile_primary_expression();
         ops.emplace_back(AutoVar{1});
-        ops.emplace_back(AutoPlus{count,lhs.value(),rhs.value()});
         char temp_name[10];
+        size_t index=count;
         sprintf(temp_name,"__temp__%ld",count);
         vars[std::string(temp_name)]=count++;
-        std::cerr << temp_name << std::endl;
-        debug(ops);
-        assert(false && "Do something about Binops");//TODO!!!
-        return {};
+        //std::cerr << temp_name << std::endl;
+        //debug(ops);
+        //assert(false && "Do something about Binops");//TODO!!!
+        ops.emplace_back(AutoPlus{index,lhs.value(),rhs.value()});
+        while(try_consume(Tokentype::plus).has_value())
+        {
+            lhs=Arg{index};
+            rhs=compile_primary_expression();
+            ops.emplace_back(AutoPlus{index,lhs.value(),rhs.value()});
+        }
+        return Arg{index};
     }
     std::optional<Arg> compile_primary_expression()
     {
@@ -242,8 +255,7 @@ private:
             case integer_lit:return (atoi(consume().val.c_str()));break;
             case identifier:return Arg{(vars[consume().val])};break;
             case string_lit: assert(false && "TODO:String Literals");
-            default : for(int i=-1;i<5;i++)debug ({peek(i).value()});
-            assert(false && "TODO : Expressions"); 
+            default : assert(false && "TODO : Expressions"); 
         }
         return {};
     }

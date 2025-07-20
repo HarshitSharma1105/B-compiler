@@ -44,7 +44,7 @@ int main(int argc,char* argv[])
     system(command.c_str());
     command = "builds/output";
     system(command.c_str());
-    if(true)
+    if(!debugging)
     {
         system(("rm -rf "+trash_path).c_str());
     }
