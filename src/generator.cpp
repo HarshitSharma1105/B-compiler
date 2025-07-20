@@ -76,12 +76,12 @@ public:
             std::stringstream& stream;
             void operator()(size_t offset)
             {
-                stream << "    mov rax,[rbp-" << (offset+1)*8 << "]\n";
+                stream << "[rbp-" << (offset+1)*8 << "]\n";
             }
 
             void operator()(int literal)
             {
-                stream << "    mov rax," << literal << "\n";
+                stream << literal << "\n";
             }
         };
         struct Visitor {
@@ -95,16 +95,21 @@ public:
 
             void operator()(const AutoAssign& autoassign) 
             {
+                stream << "    mov rax,";
                 std::visit(argvisitor,autoassign.arg);
                 stream << "    mov QWORD [rbp-" << (autoassign.offset+1)*8 << "],rax\n";
             }
-            void operator()(const AutoPlus& autoplus)
+            void operator()(const BinOp& binop)
             {
-                std::visit(argvisitor,autoplus.lhs);
-                stream << "    mov rbx,rax\n";
-                std::visit(argvisitor,autoplus.rhs);
-                stream << "    add rax,rbx\n";
-                stream << "    mov QWORD [rbp-" << (autoplus.index+1)*8 << "],rax\n";
+                stream << "    mov rax,";
+                std::visit(argvisitor,binop.lhs);
+                switch(binop.type)
+                {
+                    case BinOpType::add:stream << "    add rax,";break;
+                    case BinOpType::sub:stream << "    sub rax,";break;
+                }
+                std::visit(argvisitor,binop.rhs);
+                stream << "    mov QWORD [rbp-" << (binop.index+1)*8 << "],rax\n";
             }
 
             void operator()(const ExtrnDecl& extrndecl)
@@ -117,8 +122,8 @@ public:
                 
                 for(size_t i=0;i<funcall.args.size();i++)
                 {
+                    stream << "    mov " << regs[i] << ",";
                     std::visit(argvisitor,funcall.args[i]);
-                    stream << "    mov " << regs[i] << ",rax\n";
                 }
                 stream << "    call " << funcall.name << "\n";
             }
@@ -161,10 +166,6 @@ public:
 
 
 private:
-    void parse_func(const std::string& func_name,std::vector<std::string> args)
-    {
-        
-    }
     std::optional<Op> peek(int offset=0){
         if(index+offset>=ops.size()){
             return {};

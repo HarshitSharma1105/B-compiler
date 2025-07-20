@@ -10,11 +10,10 @@ main(){
     b=76;
     putchar(b);
     a=34;
-    b=a+1;
-    foo(a+b+10);
+    b=a+21;
+    foo(a+b-10);
     foo(10);
 }
-
 
 foo(a){
     putchar(a);

@@ -19,7 +19,8 @@ open_curly,
 close_curly,
 comma,
 semicolon,
-plus
+plus,
+minus
 };
 
 struct Token{
@@ -44,6 +45,7 @@ void debug(const Tokentype& tokentype)
         case comma:             std::cout << "comma "; break;
         case semicolon:         std::cout << "semicolon ";break;
         case plus:              std::cout << "plus";break;
+        case minus:             std::cout << "minus";break;
         default:                std::cout << "Unknown token "; break;
     }
 }
@@ -112,26 +114,31 @@ public:
                     consume();   
                 }
             }
+            else if(peek().value()==')')
+            {
+                tokens.push_back({Tokentype::close_paren,")"});
+                consume();
+            }
             else if(peek().value()=='+')
             {
                 tokens.push_back({Tokentype::plus,"+"});
                 consume();
             }
+            else if(peek().value()=='-')
+            {
+                tokens.push_back({Tokentype::minus,"-"});
+                consume();
+            }
             else if(peek().value()=='"')   
             {
-                buffer.push_back(consume());
+                consume();
                 while(peek().value()!='\"')
                 {
                     buffer.push_back(consume());
                 }
-                buffer.push_back(consume());
+                consume();
                 tokens.push_back({Tokentype::string_lit,buffer});
                 buffer.clear();
-            }
-            else if(peek().value()==')')
-            {
-                tokens.push_back({Tokentype::close_paren,")"});
-                consume();
             }
             else if (peek().value()=='{')
             {

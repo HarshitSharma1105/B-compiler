@@ -23,9 +23,17 @@ struct ExtrnDecl{
     std::string name;
 };
 
-struct AutoPlus{
+enum BinOpType{
+    add,
+    sub,
+    multiply,
+    divide
+};
+
+struct BinOp{
     size_t index;
     Arg lhs,rhs;
+    BinOpType type;
 };
 
 struct Funcall{
@@ -50,24 +58,24 @@ struct ScopeClose{};
 //     ScopeBegin,ScopeClose> op;
 // };
 
-typedef std::variant<AutoVar,AutoAssign,AutoPlus,ExtrnDecl,Funcall,FuncDecl,
+typedef std::variant<AutoVar,AutoAssign,BinOp,ExtrnDecl,Funcall,FuncDecl,
     ScopeBegin,ScopeClose> Op;
 
 
 
 
 struct DebugVisitor {
-        struct DebugArgVisitor{
-            void operator()(size_t offset)
-            {
-                std::cout << "AutoVar(" << offset << ")";
-            }
+    struct DebugArgVisitor{
+        void operator()(size_t offset)
+        {
+            std::cout << "AutoVar(" << offset << ")";
+        }
 
-            void operator()(int literal)
-            {
-                std::cout << "Literal(" << literal << ")";
-            }
-        };
+        void operator()(int literal)
+        {
+            std::cout << "Literal(" << literal << ")";
+        }
+    };
     void operator()(const AutoVar& autovar) 
     {
         std::cout << "Auto Variables (" << autovar.count << ")\n";
@@ -75,17 +83,18 @@ struct DebugVisitor {
 
     void operator()(const AutoAssign& autoassign) 
     {
-        std::cout << "Assign Var(" << autoassign.offset << ") = ";
+        std::cout << "Assign AutoVar(" << autoassign.offset << ") = ";
         std::visit(DebugArgVisitor{},autoassign.arg);
         std::cout << "\n";
     }
-    void operator()(const AutoPlus& autoplus) 
+    void operator()(const BinOp& binop) 
     {
-        std::cout << "Auto Plus (index=" << autoplus.index << ",";
-        std::cout << " lhs=";
-        std::visit(DebugArgVisitor{},autoplus.lhs);
+        std::cout << "BinOp (AutoVar(" << binop.index << ")";
+        std::cout << " ,lhs=";
+        std::visit(DebugArgVisitor{},binop.lhs);
         std::cout << " ,rhs=";
-        std::visit(DebugArgVisitor{},autoplus.rhs);
+        std::visit(DebugArgVisitor{},binop.rhs);
+        std::cout << " ,type=" << (binop.type==BinOpType::add?"Add":"Sub");
         std::cout << ")\n";
     }
     void operator()(const ExtrnDecl& extrndecl)
@@ -229,24 +238,28 @@ private:
     std::optional<Arg> compile_expression()
     {
         std::optional<Arg> lhs=compile_primary_expression(),rhs;
-        if(try_consume(Tokentype::plus).has_value()==false)return lhs;
-        rhs=compile_primary_expression();
-        ops.emplace_back(AutoVar{1});
-        char temp_name[10];
-        size_t index=count;
-        sprintf(temp_name,"__temp__%ld",count);
-        vars[std::string(temp_name)]=count++;
-        //std::cerr << temp_name << std::endl;
-        //debug(ops);
-        //assert(false && "Do something about Binops");//TODO!!!
-        ops.emplace_back(AutoPlus{index,lhs.value(),rhs.value()});
-        while(try_consume(Tokentype::plus).has_value())
+        if(try_peek(Tokentype::plus) || try_peek(Tokentype::minus))
         {
-            lhs=Arg{index};
+            Tokentype binop=consume().type;
             rhs=compile_primary_expression();
-            ops.emplace_back(AutoPlus{index,lhs.value(),rhs.value()});
+            ops.emplace_back(AutoVar{1});
+            size_t index=count++;
+            ops.emplace_back(BinOp{index,lhs.value(),rhs.value()});
+            lhs=Arg{index};
+            while(try_peek(Tokentype::plus) || try_peek(Tokentype::minus))
+            {
+                binop=consume().type;
+                rhs=compile_primary_expression();
+                switch(binop)
+                {
+                    case Tokentype::plus:
+                ops.emplace_back(BinOp{index,lhs.value(),rhs.value(),BinOpType::add});break;
+                    case Tokentype::minus: 
+                ops.emplace_back(BinOp{index,lhs.value(),rhs.value(),BinOpType::sub});break;
+                }
+            }
         }
-        return Arg{index};
+        return lhs;
     }
     std::optional<Arg> compile_primary_expression()
     {
