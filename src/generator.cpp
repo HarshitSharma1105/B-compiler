@@ -1,31 +1,117 @@
 #include"InterRepr.cpp"
 
 
-//TODO: Fix the Mips Generator
 class Generator_Mips{
 public:
     Generator_Mips(const std::vector<Op> &ops) : ops(ops){}
     std::string generate()
     {
+        struct ArgVisitor{
+            std::string reg;
+            std::stringstream& stream;
+            void operator()(size_t offset)
+            {
+                stream << "    lw " << reg << ",-" << (offset+1)*4 << "($s1)\n";
+            }
+
+            void operator()(int literal)
+            {
+                stream << "    li " << reg << "," << literal << "\n";
+            }
+        };
+        struct Visitor {
+            bool& ismainfuncpresent;
+            std::stringstream& stream;
+            ArgVisitor argvisitor{"",stream};
+            std::string regs[3]={"$a0","$a1","$a2"};
+            void operator()(const AutoVar& autovar) 
+            {
+                stream << "    addi $sp,$sp,-" << autovar.count*4 << "\n";
+            }
+
+            void operator()(const AutoAssign& autoassign) 
+            {
+                argvisitor.reg="$s0";
+                std::visit(argvisitor,autoassign.arg);
+                stream << "    sw $s0,-" << (autoassign.offset+1)*4 << "($s1)\n";
+            }
+            void operator()(const BinOp& binop)
+            {
+                argvisitor.reg="$s0";
+                std::visit(argvisitor,binop.lhs);
+                argvisitor.reg="$s2";
+                std::visit(argvisitor,binop.rhs);
+                switch(binop.type)
+                {
+                    case BinOpType::add:stream << "    add ";break;
+                    case BinOpType::sub:stream << "    sub ";break;
+                }
+                stream << " $s0,$s0,$s2\n";
+                stream << "    sw $s0,-" << (binop.index+1)*4 << "($s1)\n";
+            }
+
+            void operator()(const ExtrnDecl& extrndecl)
+            {
+                //stream << "    extrn " << extrndecl.name << "\n";
+                // nothing to do for extrn symbols for now
+            }
+
+            void operator()(const Funcall& funcall) 
+            {
+                
+                for(size_t i=0;i<funcall.args.size();i++)
+                {
+                    argvisitor.reg=regs[i];
+                    std::visit(argvisitor,funcall.args[i]);
+                }
+                stream << "    jal " << funcall.name << "\n";
+            }
+
+            void operator()(const FuncDecl& funcdecl) 
+            {
+                stream << "    addi $sp,$sp,-" << funcdecl.count*4 << "\n";
+                for (int i=0;i<funcdecl.count; i++)
+                {
+                    stream << "    sw " << regs[i] << ",-" << (i+1)*4 << "($s1)" << "\n";
+                }
+            }
+            void operator()(const ScopeBegin& scope)
+            {
+                if(scope.name=="main")ismainfuncpresent=true;
+                stream << scope.name << ":\n";
+                stream << "    addi $sp,$sp,-8\n";
+                stream << "    sw $ra,0($sp)\n";
+                stream << "    sw $s1,4($sp)\n";
+                stream << "    move $s1,$sp\n";
+            }
+
+            void operator()(const ScopeClose& scope)
+            {
+                stream << "    move $sp,$s1\n";
+                stream << "    lw $ra,0($sp)\n";
+                stream << "    lw $s1,4($sp)\n";
+                stream << "    addi $sp,$sp,8\n";
+                if(scope.name!="main")stream << "    jr $ra\n";
+                else stream << "    li $v0,10\n" << "    syscall\n";
+                // TODO : You dont need to return out of every scope!!
+            }
+        };
         textstream << ".text\n";
         textstream << "    .globl main\n";
-        datastream << ".data\n";
+        Visitor visitor{ismainfuncpresent,textstream};
+        while(peek().has_value())
+        {
+            std::visit(visitor,consume());
+        }
         generate_stdlib();
         if(ismainfuncpresent!=true){
             std::cerr << "Main function not declared\n";
             exit(EXIT_FAILURE);
         }
-        textstream << datastream.str();
         return textstream.str();
     }
 
-
-
 private:
-    void parse_func(const std::string& func_name,std::vector<std::string> args)
-    {
-        
-    }
     void generate_stdlib()
     {
         textstream << "putchar:\n";
@@ -37,7 +123,6 @@ private:
         textstream << "    li $v0,1\n";
         textstream << "    syscall\n";
         textstream << "    jr $ra\n";
-
 
         textstream << "putstr:\n";
         textstream << "    li $v0,4\n";

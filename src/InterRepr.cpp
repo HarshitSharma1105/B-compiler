@@ -51,7 +51,9 @@ struct FuncDecl{
 struct ScopeBegin{
     std::string name;
 };
-struct ScopeClose{};
+struct ScopeClose{
+    std::string name;
+};
 
 // struct Op{
 //     std::variant<AutoVar,AutoAssign,ExtrnDecl,Funcall,FuncDecl,
@@ -62,39 +64,39 @@ typedef std::variant<AutoVar,AutoAssign,BinOp,ExtrnDecl,Funcall,FuncDecl,
     ScopeBegin,ScopeClose> Op;
 
 
+struct DebugArgVisitor{
+    void operator()(size_t offset)
+    {
+        std::cout << "AutoVar(" << offset << ")";
+    }
 
+    void operator()(int literal)
+    {
+        std::cout << "Literal(" << literal << ")";
+    }
+};
 
 struct DebugVisitor {
-    struct DebugArgVisitor{
-        void operator()(size_t offset)
-        {
-            std::cout << "AutoVar(" << offset << ")";
-        }
-
-        void operator()(int literal)
-        {
-            std::cout << "Literal(" << literal << ")";
-        }
-    };
+    DebugArgVisitor debugargvisitor{};
     void operator()(const AutoVar& autovar) 
     {
-        std::cout << "Auto Variables (" << autovar.count << ")\n";
+        std::cout << "Auto Variables(" << autovar.count << ")\n";
     }
 
     void operator()(const AutoAssign& autoassign) 
     {
         std::cout << "Assign AutoVar(" << autoassign.offset << ") = ";
-        std::visit(DebugArgVisitor{},autoassign.arg);
+        std::visit(debugargvisitor,autoassign.arg);
         std::cout << "\n";
     }
     void operator()(const BinOp& binop) 
     {
         std::cout << "BinOp (AutoVar(" << binop.index << ")";
-        std::cout << " ,lhs=";
-        std::visit(DebugArgVisitor{},binop.lhs);
-        std::cout << " ,rhs=";
-        std::visit(DebugArgVisitor{},binop.rhs);
-        std::cout << " ,type=" << (binop.type==BinOpType::add?"Add":"Sub");
+        std::cout << ",lhs=";
+        std::visit(debugargvisitor,binop.lhs);
+        std::cout << ",rhs=";
+        std::visit(debugargvisitor,binop.rhs);
+        std::cout << ",type=" << (binop.type==BinOpType::add?"Add":"Sub");
         std::cout << ")\n";
     }
     void operator()(const ExtrnDecl& extrndecl)
@@ -106,7 +108,7 @@ struct DebugVisitor {
     {
         std::cout << "Function Call " << funcall.name << "(";
         for (size_t i = 0; i < funcall.args.size(); ++i) {
-            std::visit(DebugArgVisitor{},funcall.args[i]);
+            std::visit(debugargvisitor,funcall.args[i]);
             if (i != funcall.args.size() - 1) std::cout << ", ";
         }
         std::cout << ")\n";
@@ -122,7 +124,7 @@ struct DebugVisitor {
     }
     void operator()(const ScopeClose& scope)
     {
-        std::cout << "Scope End\n";
+        std::cout << "Scope End " << scope.name  << "\n";
     }
     
 };
@@ -217,7 +219,7 @@ public:
                     }
                     else if(try_consume(Tokentype::close_curly))
                     {
-                        ops.emplace_back(ScopeClose{});
+                        ops.emplace_back(ScopeClose{func_name});
                         count=0;
                         vars.clear();
                         break;
@@ -238,26 +240,30 @@ private:
     std::optional<Arg> compile_expression()
     {
         std::optional<Arg> lhs=compile_primary_expression(),rhs;
-        if(try_peek(Tokentype::plus) || try_peek(Tokentype::minus))
+        size_t var_index;
+        bool a=true;
+        while(try_peek(Tokentype::plus) || try_peek(Tokentype::minus))
         {
             Tokentype binop=consume().type;
-            rhs=compile_primary_expression();
-            ops.emplace_back(AutoVar{1});
-            size_t index=count++;
-            ops.emplace_back(BinOp{index,lhs.value(),rhs.value()});
-            lhs=Arg{index};
-            while(try_peek(Tokentype::plus) || try_peek(Tokentype::minus))
+            if(a)
             {
-                binop=consume().type;
-                rhs=compile_primary_expression();
-                switch(binop)
-                {
-                    case Tokentype::plus:
-                ops.emplace_back(BinOp{index,lhs.value(),rhs.value(),BinOpType::add});break;
-                    case Tokentype::minus: 
-                ops.emplace_back(BinOp{index,lhs.value(),rhs.value(),BinOpType::sub});break;
-                }
+                ops.emplace_back(AutoVar{1});
+                var_index=count++;
             }
+            rhs=compile_primary_expression();
+            switch(binop)
+            {
+                case Tokentype::plus:
+            ops.emplace_back(BinOp{var_index,lhs.value(),rhs.value(),BinOpType::add});break;
+                case Tokentype::minus: 
+            ops.emplace_back(BinOp{var_index,lhs.value(),rhs.value(),BinOpType::sub});break;
+            }
+            if(a)
+            {
+                lhs=Arg{var_index};
+                a=false;
+            }
+            
         }
         return lhs;
     }
@@ -273,13 +279,13 @@ private:
         return {};
     }
     std::optional<Token> peek(int offset=0){
-        if(index+offset>=tokens.size()){
+        if(token_index+offset>=tokens.size()){
             return {};
         }
-        return tokens[index+offset];
+        return tokens[token_index+offset];
     }
     Token consume(){
-        return tokens[index++];
+        return tokens[token_index++];
     }
     Token try_consume(const Tokentype& type, const std::string& err_msg)
     {
@@ -306,7 +312,7 @@ private:
     }
     std::vector<Op> ops;
     std::vector<Token> tokens;
-    int index=0;
+    int token_index=0;
     size_t count=0;
     std::unordered_set<std::string> extrns;
     std::unordered_map<std::string,size_t> vars;

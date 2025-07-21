@@ -23,7 +23,8 @@ int main(int argc,char* argv[])
     std::vector<Token> tokens=tokenizer.tokenize();
     IREmittor iremittor(tokens);
     std::vector<Op> ops=iremittor.EmitIR();
-    Generator_x86_64 generator(ops);
+    //TODO Fix this target situation with something!!!
+    Generator_Mips generator(ops);
     std::string assembly_sourcecode=generator.generate();
     if(debugging)
     {
@@ -32,19 +33,21 @@ int main(int argc,char* argv[])
         std::cout << finalb_sourcecode << std::endl;
         std::cout << assembly_sourcecode << std::endl; 
     }
-    std::string command = "mkdir " + trash_path;
+    std::string command = "mkdir " + trash_path;//TODO: Use smth like mkdir_if_not_exist
     system(command.c_str());
     {
         std::ofstream outFile(trash_path+ "/output.asm");  
         outFile << assembly_sourcecode;
     }
-    command = "fasm " + trash_path + "/output.asm";
+    // command = "assemblers/fasm " + trash_path + "/output.asm";
+    // system(command.c_str());
+    // command = "cc -no-pie " + trash_path +"/output.o -o "+"builds/output";
+    // system(command.c_str());
+    // command = "builds/output";
+    // system(command.c_str());
+    command="java -jar assemblers/Mars4_5.jar sm " + trash_path +"/output.asm";
     system(command.c_str());
-    command = "cc -no-pie " + trash_path +"/output.o -o "+"builds/output";
-    system(command.c_str());
-    command = "builds/output";
-    system(command.c_str());
-    if(!false)
+    if(!debugging)
     {
         system(("rm -rf "+trash_path).c_str());
     }
