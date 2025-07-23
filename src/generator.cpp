@@ -7,22 +7,24 @@ public:
     std::string generate()
     {
         struct ArgVisitor{
-            std::string reg;
             std::stringstream& stream;
-            void operator()(size_t offset)
+            void operator()(const Var& var)
             {
-                stream << "    lw " << reg << ",-" << (offset+1)*4 << "($s1)\n";
+                stream << "    lw $s0,-" << (var.offset+1)*4 << "($s1)\n";
             }
 
-            void operator()(int literal)
+            void operator()(const Literal& literal)
             {
-                stream << "    li " << reg << "," << literal << "\n";
+                stream << "    li $s0," << literal.literal << "\n";
+            }
+            void operator()(const DataOffset& data)
+            {
+
             }
         };
         struct Visitor {
-            bool& ismainfuncpresent;
             std::stringstream& stream;
-            ArgVisitor argvisitor{"",stream};
+            ArgVisitor argvisitor{stream};
             std::string regs[3]={"$a0","$a1","$a2"};
             void operator()(const AutoVar& autovar) 
             {
@@ -31,22 +33,20 @@ public:
 
             void operator()(const AutoAssign& autoassign) 
             {
-                argvisitor.reg="$s0";
                 std::visit(argvisitor,autoassign.arg);
                 stream << "    sw $s0,-" << (autoassign.offset+1)*4 << "($s1)\n";
             }
             void operator()(const BinOp& binop)
             {
-                argvisitor.reg="$s0";
                 std::visit(argvisitor,binop.lhs);
-                argvisitor.reg="$s2";
+                stream << "    move $s2,$s0\n";
                 std::visit(argvisitor,binop.rhs);
                 switch(binop.type)
                 {
                     case BinOpType::add:stream << "    add ";break;
                     case BinOpType::sub:stream << "    sub ";break;
                 }
-                stream << " $s0,$s0,$s2\n";
+                stream << " $s0,$s2,$s0\n";
                 stream << "    sw $s0,-" << (binop.index+1)*4 << "($s1)\n";
             }
 
@@ -61,8 +61,8 @@ public:
                 
                 for(size_t i=0;i<funcall.args.size();i++)
                 {
-                    argvisitor.reg=regs[i];
                     std::visit(argvisitor,funcall.args[i]);
+                    stream << "    move " << regs[i] << ",$s0\n";
                 }
                 stream << "    jal " << funcall.name << "\n";
             }
@@ -77,7 +77,6 @@ public:
             }
             void operator()(const ScopeBegin& scope)
             {
-                if(scope.name=="main")ismainfuncpresent=true;
                 stream << scope.name << ":\n";
                 stream << "    addi $sp,$sp,-8\n";
                 stream << "    sw $ra,0($sp)\n";
@@ -95,19 +94,19 @@ public:
                 else stream << "    li $v0,10\n" << "    syscall\n";
                 // TODO : You dont need to return out of every scope!!
             }
+            void operator()(const DataSection& data)
+            {
+
+            }
         };
         textstream << ".text\n";
         textstream << "    .globl main\n";
-        Visitor visitor{ismainfuncpresent,textstream};
+        Visitor visitor{textstream};
         while(peek().has_value())
         {
             std::visit(visitor,consume());
         }
         generate_stdlib();
-        if(ismainfuncpresent!=true){
-            std::cerr << "Main function not declared\n";
-            exit(EXIT_FAILURE);
-        }
         return textstream.str();
     }
 
@@ -119,12 +118,7 @@ private:
         textstream << "    syscall\n";
         textstream << "    jr $ra\n";
 
-        textstream << "putint:\n";
-        textstream << "    li $v0,1\n";
-        textstream << "    syscall\n";
-        textstream << "    jr $ra\n";
-
-        textstream << "putstr:\n";
+        textstream << "puts:\n";
         textstream << "    li $v0,4\n";
         textstream << "    syscall\n";
         textstream << "    jr $ra\n";
@@ -159,22 +153,28 @@ public:
     {
         struct ArgVisitor{
             std::stringstream& stream;
-            void operator()(size_t offset)
+            void operator()(const Var& var)
             {
-                stream << "[rbp-" << (offset+1)*8 << "]\n";
+                stream << "[rbp-" << (var.offset+1)*8 << "]\n";
             }
 
-            void operator()(int literal)
+            void operator()(const Literal& literal)
             {
-                stream << literal << "\n";
+                stream << literal.literal << "\n";
+            }
+            void operator()(const DataOffset& data)
+            {
+                stream << "data_" << data.start << "\n";
             }
         };
         struct Visitor {
+            int count=0;
             std::stringstream& stream;
             ArgVisitor argvisitor{stream};
             std::string regs[3]={"rdi","rsi","rdx"};
             void operator()(const AutoVar& autovar) 
             {
+                count+=autovar.count;
                 stream << "    sub rsp," << autovar.count*8 << "\n";
             }
 
@@ -210,11 +210,15 @@ public:
                     stream << "    mov " << regs[i] << ",";
                     std::visit(argvisitor,funcall.args[i]);
                 }
+                stream << "    xor rax,rax\n";
+                if(count%2)stream << "    sub rsp,8\n";
                 stream << "    call " << funcall.name << "\n";
+                if(count%2)stream << "    add rsp,8\n";
             }
 
             void operator()(const FuncDecl& funcdecl) 
             {
+                count+=funcdecl.count;
                 stream << "    sub rsp," << funcdecl.count*8 << "\n";
                 for (int i=0;i<funcdecl.count; i++)
                 {
@@ -237,10 +241,15 @@ public:
                 stream << "    ret\n"; 
                 // TODO : You dont need to return out of every scope!!
             }
+            void operator()(const DataSection& data)
+            {
+                stream << "section \"data\"\n";
+                stream << data.concatedstrings;
+            }
         };
         textstream << "format ELF64\n";
         textstream << "section \".text\" executable\n";
-        Visitor visitor{textstream};
+        Visitor visitor{0,textstream};
         while(peek().has_value())
         {
             std::visit(visitor,consume());
@@ -262,6 +271,6 @@ private:
     }
     std::vector<Op> ops;
     int index=0;
-    std::stringstream textstream,datastream;
+    std::stringstream textstream;
     std::unordered_set<std::string> extrns;
 };

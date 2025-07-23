@@ -2,6 +2,7 @@
 #include<variant>
 #include<unordered_map>
 #include<unordered_set>
+#include<algorithm>
 
 
 struct AutoVar{
@@ -11,7 +12,20 @@ struct AutoVar{
 // struct Arg{
 //     std::variant<size_t,int> val;
 // };
-typedef std::variant<size_t,int> Arg;
+struct Var{
+    size_t offset;
+};
+
+
+struct Literal{
+    int literal;
+};
+
+struct DataOffset{
+    size_t start;
+};
+
+typedef std::variant<Var,Literal,DataOffset> Arg;
 
 struct AutoAssign{
     size_t offset;
@@ -55,24 +69,32 @@ struct ScopeClose{
     std::string name;
 };
 
+struct DataSection{
+    std::string concatedstrings;
+};
+
 // struct Op{
 //     std::variant<AutoVar,AutoAssign,ExtrnDecl,Funcall,FuncDecl,
 //     ScopeBegin,ScopeClose> op;
 // };
 
 typedef std::variant<AutoVar,AutoAssign,BinOp,ExtrnDecl,Funcall,FuncDecl,
-    ScopeBegin,ScopeClose> Op;
+    ScopeBegin,ScopeClose,DataSection> Op;
 
 
 struct DebugArgVisitor{
-    void operator()(size_t offset)
+    void operator()(const Var& var)
     {
-        std::cout << "AutoVar(" << offset << ")";
+        std::cout << "AutoVar(" << var.offset << ")";
     }
 
-    void operator()(int literal)
+    void operator()(const Literal& literal)
     {
-        std::cout << "Literal(" << literal << ")";
+        std::cout << "Literal(" << literal.literal << ")";
+    }
+    void operator()(const DataOffset& data)
+    {
+        std::cout << "DataOffset[" << data.start << "]";
     }
 };
 
@@ -126,7 +148,11 @@ struct DebugVisitor {
     {
         std::cout << "Scope End " << scope.name  << "\n";
     }
-    
+
+    void operator()(const DataSection& datasection)
+    {
+        std::cout << "Data String:\n" << datasection.concatedstrings << "\n";
+    }
 };
 
 
@@ -155,12 +181,12 @@ public:
                 try_consume(Tokentype::open_paren,"expcted '('\n");
                 while(peek().value().type==Tokentype::identifier)
                 {
-                    vars[consume().val]=count++;
+                    vars[consume().val]=vars_count++;
                     try_consume(Tokentype::comma);
                     //"Expected comma between args\n";
                 }
                 ops.emplace_back(ScopeBegin{func_name});
-                ops.emplace_back(FuncDecl{func_name,count});
+                ops.emplace_back(FuncDecl{func_name,vars_count});
                 try_consume(Tokentype::close_paren,"expected ')'\n");
                 try_consume(Tokentype::open_curly,"expected '{'\n");
                 while(true)
@@ -177,7 +203,7 @@ public:
                     }
                     else if(try_consume(Tokentype::auto_).has_value())
                     {
-                        size_t curr=count;
+                        size_t curr=vars_count;
                         while(peek().value().type!=Tokentype::semicolon)
                         {
                             try_consume(Tokentype::comma);
@@ -186,9 +212,9 @@ public:
                                 std::cerr << "variable already declared\n";
                                 exit(EXIT_FAILURE);
                             }
-                            vars[consume().val]=count++;
+                            vars[consume().val]=vars_count++;
                         }
-                        ops.emplace_back(AutoVar{count-curr});
+                        ops.emplace_back(AutoVar{vars_count-curr});
                         try_consume(Tokentype::semicolon,"Expected ;\n");//semicolon
                     }
                     else if(try_peek(Tokentype::identifier))
@@ -220,7 +246,7 @@ public:
                     else if(try_consume(Tokentype::close_curly))
                     {
                         ops.emplace_back(ScopeClose{func_name});
-                        count=0;
+                        vars_count=0;
                         vars.clear();
                         break;
                     }
@@ -231,6 +257,7 @@ public:
             std::cerr << "Main function not declared\n";
             exit(EXIT_FAILURE);
         }
+        ops.emplace_back(DataSection{datastring.str()});
         return ops;
     }
 
@@ -241,29 +268,17 @@ private:
     {
         std::optional<Arg> lhs=compile_primary_expression(),rhs;
         size_t var_index;
-        bool a=true;
-        while(try_peek(Tokentype::plus) || try_peek(Tokentype::minus))
+        if(try_peek({Tokentype::plus,Tokentype::minus}))
+        {
+            var_index=vars_count++;
+            ops.emplace_back(AutoVar{1});
+        }
+        while(try_peek({Tokentype::plus,Tokentype::minus}))
         {
             Tokentype binop=consume().type;
-            if(a)
-            {
-                ops.emplace_back(AutoVar{1});
-                var_index=count++;
-            }
             rhs=compile_primary_expression();
-            switch(binop)
-            {
-                case Tokentype::plus:
-            ops.emplace_back(BinOp{var_index,lhs.value(),rhs.value(),BinOpType::add});break;
-                case Tokentype::minus: 
-            ops.emplace_back(BinOp{var_index,lhs.value(),rhs.value(),BinOpType::sub});break;
-            }
-            if(a)
-            {
-                lhs=Arg{var_index};
-                a=false;
-            }
-            
+            ops.emplace_back(BinOp{var_index,lhs.value(),rhs.value(),tokentype_to_binop(binop)});
+            lhs=Var{var_index};
         }
         return lhs;
     }
@@ -271,9 +286,13 @@ private:
     {
         switch(peek().value().type)
         {
-            case integer_lit:return (atoi(consume().val.c_str()));break;
-            case identifier:return Arg{(vars[consume().val])};break;
-            case string_lit: assert(false && "TODO:String Literals");
+            case integer_lit:return Literal{atoi(consume().val.c_str())};break;
+            case identifier:return Var{(vars[consume().val])};break;
+            case string_lit:{
+            datastring << "data_" << data_offset << " db ";
+            datastring << "\"" << consume().val << "\",0\n";
+            return DataOffset{data_offset++};
+        }
             default : assert(false && "TODO : Expressions"); 
         }
         return {};
@@ -295,7 +314,15 @@ private:
         std::cerr << err_msg << std::endl;
         exit(EXIT_FAILURE);
     }
-
+    BinOpType tokentype_to_binop(Tokentype type)
+    {
+        switch(type)
+        {
+            case Tokentype::plus: return BinOpType::add;
+            case Tokentype::minus: return BinOpType::sub;
+        }
+        assert(false && "Fix the Binops");
+    }
     std::optional<Token> try_consume(const Tokentype& type)
     {
         if (peek().value().type == type) {
@@ -303,18 +330,21 @@ private:
         }
         return {};
     }
+    bool try_peek(const std::vector<Tokentype>& types)
+    {
+        return std::any_of(types.begin(),types.end(),[&](Tokentype type){return peek().value().type==type;});
+    }
     bool try_peek(const Tokentype& type)
     {
-        if (peek().value().type == type) {
-            return true;
-        }
-        return false;
+        return peek().value().type == type;
     }
     std::vector<Op> ops;
     std::vector<Token> tokens;
     int token_index=0;
-    size_t count=0;
+    size_t data_offset=0;
+    size_t vars_count=0;
     std::unordered_set<std::string> extrns;
     std::unordered_map<std::string,size_t> vars;
+    std::stringstream datastring;
     bool ismainfuncpresent=false;
 };

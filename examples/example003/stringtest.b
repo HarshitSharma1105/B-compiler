@@ -1,9 +1,10 @@
 main(){
+    extrn putchar,printf;
     auto x,y,z;
     x="hello";
     z=2;
     y=103;
-    putint(z);
     putchar(y);
-    putstr("hello");
+    printf("hello world");
+    putchar(z+8);
 }
