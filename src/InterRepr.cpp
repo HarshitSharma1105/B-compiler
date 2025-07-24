@@ -151,7 +151,7 @@ struct DebugVisitor {
 
     void operator()(const DataSection& datasection)
     {
-        std::cout << "Data String:\n" << datasection.concatedstrings << "\n";
+        std::cout << "data:\n" << datasection.concatedstrings << "\n";
     }
 };
 
@@ -289,9 +289,22 @@ private:
             case integer_lit:return Literal{atoi(consume().val.c_str())};break;
             case identifier:return Var{(vars[consume().val])};break;
             case string_lit:{
-            datastring << "data_" << data_offset << " db ";
-            datastring << "\"" << consume().val << "\",0\n";
-            return DataOffset{data_offset++};
+                std::string lit=consume().val;
+                for(size_t i=0;i<lit.size();i++)
+                {
+                    if(lit[i]!='\\')datastring << int(lit[i]);
+                    else
+                    {
+                        i++;
+                        if(lit[i]=='n')datastring << 10;
+                        else if(lit[i]=='t')datastring << 9;
+                        else assert(false && "meesed up escape characters\n");
+                        i++;
+                    }
+                    datastring << ",";
+                }
+                datastring << "0\n";
+                return DataOffset{data_offset++};
         }
             default : assert(false && "TODO : Expressions"); 
         }

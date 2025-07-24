@@ -5,6 +5,8 @@ main(){
     z=2;
     y=103;
     putchar(y);
-    printf("hello world");
+    printf("hello world\n");
+    x=x+z;
+    printf("%s",x);
     putchar(z+8);
 }

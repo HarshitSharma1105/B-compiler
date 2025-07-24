@@ -19,7 +19,7 @@ public:
             }
             void operator()(const DataOffset& data)
             {
-
+                stream << "    la $s0,data_" << data.start << "\n";
             }
         };
         struct Visitor {
@@ -96,17 +96,36 @@ public:
             }
             void operator()(const DataSection& data)
             {
-
+                stream << ".data\n";
+                int count=0,idx=0;
+                while(idx<data.concatedstrings.size())
+                {
+                    stream << "data_" << count++ << ": .asciiz ";
+                    stream << "\"";
+                    while(!(data.concatedstrings[idx]=='0' && data.concatedstrings[idx+1]=='\n'))
+                    {
+                        int val=0;
+                        while(data.concatedstrings[idx]!=',')
+                        {
+                            val=val*10+(data.concatedstrings[idx++]-'0');
+                        }
+                        idx++;
+                        if(val==10)stream << "\\n";
+                        else stream << char(val);
+                    }
+                    idx+=2;
+                    stream << "\"\n";
+                }
             }
         };
         textstream << ".text\n";
         textstream << "    .globl main\n";
+        generate_stdlib();
         Visitor visitor{textstream};
         while(peek().has_value())
         {
             std::visit(visitor,consume());
         }
-        generate_stdlib();
         return textstream.str();
     }
 
@@ -244,7 +263,17 @@ public:
             void operator()(const DataSection& data)
             {
                 stream << "section \"data\"\n";
-                stream << data.concatedstrings;
+                int count=0,idx=0;
+                while(idx<data.concatedstrings.size())
+                {
+                    stream << "data_" << count++ << " db ";
+                    while(data.concatedstrings[idx]!='\n')
+                    {
+                        stream << data.concatedstrings[idx++];
+                    }
+                    idx++;
+                    stream << "\n";
+                }
             }
         };
         textstream << "format ELF64\n";

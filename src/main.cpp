@@ -27,13 +27,7 @@ int main(int argc,char* argv[])
     //Generator_Mips generator(ops);
     Generator_x86_64 generator(ops);
     std::string assembly_sourcecode=generator.generate();
-    if(debugging)
-    {
-        debug(tokens);
-        debug(ops);
-        std::cout << finalb_sourcecode << std::endl;
-        std::cout << assembly_sourcecode << std::endl; 
-    }
+    if(debugging)debug(ops);
     std::string command = "mkdir " + trash_path;//TODO: Use smth like mkdir_if_not_exist
     system(command.c_str());
     {
@@ -48,9 +42,6 @@ int main(int argc,char* argv[])
     system(command.c_str());
     // command="java -jar assemblers/Mars4_5.jar sm " + trash_path +"/output.asm";
     // system(command.c_str());
-    if(!debugging)
-    {
-        system(("rm -rf "+trash_path).c_str());
-    }
+    if(!debugging)system(("rm -rf "+trash_path).c_str());
     return 0;
 }
