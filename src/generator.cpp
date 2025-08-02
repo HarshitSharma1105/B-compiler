@@ -25,7 +25,7 @@ public:
         struct Visitor {
             std::stringstream& stream;
             ArgVisitor argvisitor{stream};
-            std::string regs[3]={"$a0","$a1","$a2"};
+            std::string regs[4]={"$a0","$a1","$a2","$a3"};
             void operator()(const AutoVar& autovar) 
             {
                 stream << "    addi $sp,$sp,-" << autovar.count*4 << "\n";
@@ -43,8 +43,8 @@ public:
                 std::visit(argvisitor,binop.rhs);
                 switch(binop.type)
                 {
-                    case BinOpType::add:stream << "    add ";break;
-                    case BinOpType::sub:stream << "    sub ";break;
+                    case Tokentype::add:stream << "    add ";break;
+                    case Tokentype::sub:stream << "    sub ";break;
                 }
                 stream << " $s0,$s2,$s0\n";
                 stream << "    sw $s0,-" << (binop.index+1)*4 << "($s1)\n";
@@ -58,7 +58,7 @@ public:
 
             void operator()(const Funcall& funcall) 
             {
-                
+                if(funcall.args.size()>4)assert(false && "too many arguments");
                 for(size_t i=0;i<funcall.args.size();i++)
                 {
                     std::visit(argvisitor,funcall.args[i]);
@@ -190,7 +190,7 @@ public:
             int count=0;
             std::stringstream& stream;
             ArgVisitor argvisitor{stream};
-            std::string regs[3]={"rdi","rsi","rdx"};
+            std::string regs[4]={"rdi","rsi","rdx","rcx"};
             void operator()(const AutoVar& autovar) 
             {
                 count+=autovar.count;
@@ -207,12 +207,16 @@ public:
             {
                 stream << "    mov rax,";
                 std::visit(argvisitor,binop.lhs);
+                stream << "    mov rbx,";
+                std::visit(argvisitor,binop.rhs);
                 switch(binop.type)
                 {
-                    case BinOpType::add:stream << "    add rax,";break;
-                    case BinOpType::sub:stream << "    sub rax,";break;
+                    case Tokentype::add:stream << "    add ";break;
+                    case Tokentype::sub:stream << "    sub ";break;
+                    case Tokentype::mult:stream << "   imul ";break;
+                    case Tokentype::divi :assert(false && "TODO:Division\n");break;
                 }
-                std::visit(argvisitor,binop.rhs);
+                stream << "    rax,rbx\n";
                 stream << "    mov QWORD [rbp-" << (binop.index+1)*8 << "],rax\n";
             }
 
@@ -223,7 +227,7 @@ public:
 
             void operator()(const Funcall& funcall) 
             {
-                
+                if(funcall.args.size()>4)assert(false && "too many args");
                 for(size_t i=0;i<funcall.args.size();i++)
                 {
                     stream << "    mov " << regs[i] << ",";

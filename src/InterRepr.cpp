@@ -37,17 +37,10 @@ struct ExtrnDecl{
     std::string name;
 };
 
-enum BinOpType{
-    add,
-    sub,
-    multiply,
-    divide
-};
-
 struct BinOp{
     size_t index;
     Arg lhs,rhs;
-    BinOpType type;
+    Tokentype type;
 };
 
 struct Funcall{
@@ -118,7 +111,8 @@ struct DebugVisitor {
         std::visit(debugargvisitor,binop.lhs);
         std::cout << ",rhs=";
         std::visit(debugargvisitor,binop.rhs);
-        std::cout << ",type=" << (binop.type==BinOpType::add?"Add":"Sub");
+        std::cout << ",type=";
+        debug(binop.type);
         std::cout << ")\n";
     }
     void operator()(const ExtrnDecl& extrndecl)
@@ -226,7 +220,7 @@ public:
                         }
                         size_t offset = vars[consume().val];
                         try_consume(Tokentype::assignment,"expteced =\n");
-                        ops.emplace_back(AutoAssign{offset,compile_expression().value()});
+                        ops.emplace_back(AutoAssign{offset,compile_add_or_sub_expression().value()});
                         try_consume(Tokentype::semicolon,"Expected ;\n");//semicolon
                     }
                     else if(try_peek(Tokentype::funcall))
@@ -236,7 +230,7 @@ public:
                         std::vector<Arg> args;
                         while(try_peek(close_paren)==false)
                         {   
-                            args.push_back(compile_expression().value());
+                            args.push_back(compile_add_or_sub_expression().value());
                             try_consume(Tokentype::comma);
                         }
                         try_consume(Tokentype::close_paren,"expected ')'\n");
@@ -264,20 +258,38 @@ public:
 
 
 private:
-    std::optional<Arg> compile_expression()
+    std::optional<Arg> compile_add_or_sub_expression()
     {
-        std::optional<Arg> lhs=compile_primary_expression(),rhs;
+        std::optional<Arg> lhs=compile_mult_divide_expression(),rhs;
         size_t var_index;
-        if(try_peek({Tokentype::plus,Tokentype::minus}))
+        if(try_peek({Tokentype::add,Tokentype::sub}))
         {
             var_index=vars_count++;
             ops.emplace_back(AutoVar{1});
         }
-        while(try_peek({Tokentype::plus,Tokentype::minus}))
+        while(try_peek({Tokentype::add,Tokentype::sub}))
         {
-            Tokentype binop=consume().type;
+            Tokentype type=consume().type;
+            rhs=compile_mult_divide_expression();
+            ops.emplace_back(BinOp{var_index,lhs.value(),rhs.value(),type});
+            lhs=Var{var_index};
+        }
+        return lhs;
+    }
+    std::optional<Arg> compile_mult_divide_expression()
+    {
+        std::optional<Arg> lhs=compile_primary_expression(),rhs;
+        size_t var_index;
+        if(try_peek({Tokentype::mult,Tokentype::divi}))
+        {
+            var_index=vars_count++;
+            ops.emplace_back(AutoVar{1});
+        }
+        while(try_peek({Tokentype::mult,Tokentype::divi}))
+        {
+            Tokentype type=consume().type;
             rhs=compile_primary_expression();
-            ops.emplace_back(BinOp{var_index,lhs.value(),rhs.value(),tokentype_to_binop(binop)});
+            ops.emplace_back(BinOp{var_index,lhs.value(),rhs.value(),type});
             lhs=Var{var_index};
         }
         return lhs;
@@ -326,15 +338,6 @@ private:
         }
         std::cerr << err_msg << std::endl;
         exit(EXIT_FAILURE);
-    }
-    BinOpType tokentype_to_binop(Tokentype type)
-    {
-        switch(type)
-        {
-            case Tokentype::plus: return BinOpType::add;
-            case Tokentype::minus: return BinOpType::sub;
-        }
-        assert(false && "Fix the Binops");
     }
     std::optional<Token> try_consume(const Tokentype& type)
     {
