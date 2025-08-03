@@ -220,7 +220,8 @@ public:
                         }
                         size_t offset = vars[consume().val];
                         try_consume(Tokentype::assignment,"expteced =\n");
-                        ops.emplace_back(AutoAssign{offset,compile_add_or_sub_expression().value()});
+                        size_t temp=vars_count++;
+                        ops.emplace_back(AutoAssign{offset,compile_expression(0,temp).value()});
                         try_consume(Tokentype::semicolon,"Expected ;\n");//semicolon
                     }
                     else if(try_peek(Tokentype::funcall))
@@ -228,9 +229,10 @@ public:
                         std::string funcall_name=consume().val;
                         try_consume(Tokentype::open_paren,"expected '('\n");
                         std::vector<Arg> args;
+                        size_t temp=vars_count++;
                         while(try_peek(close_paren)==false)
                         {   
-                            args.push_back(compile_add_or_sub_expression().value());
+                            args.push_back(compile_expression(0,temp).value());
                             try_consume(Tokentype::comma);
                         }
                         try_consume(Tokentype::close_paren,"expected ')'\n");
@@ -258,39 +260,16 @@ public:
 
 
 private:
-    std::optional<Arg> compile_add_or_sub_expression()
+    std::optional<Arg> compile_expression(int precedence,size_t temp_index)
     {
-        std::optional<Arg> lhs=compile_mult_divide_expression(),rhs;
-        size_t var_index;
-        if(try_peek({Tokentype::add,Tokentype::sub}))
-        {
-            var_index=vars_count++;
-            ops.emplace_back(AutoVar{1});
-        }
-        while(try_peek({Tokentype::add,Tokentype::sub}))
+        if(precedence==2)return compile_primary_expression();
+        std::optional<Arg> lhs=compile_expression(precedence+1,temp_index),rhs;
+        while(try_peek(getops(precedence)))
         {
             Tokentype type=consume().type;
-            rhs=compile_mult_divide_expression();
-            ops.emplace_back(BinOp{var_index,lhs.value(),rhs.value(),type});
-            lhs=Var{var_index};
-        }
-        return lhs;
-    }
-    std::optional<Arg> compile_mult_divide_expression()
-    {
-        std::optional<Arg> lhs=compile_primary_expression(),rhs;
-        size_t var_index;
-        if(try_peek({Tokentype::mult,Tokentype::divi}))
-        {
-            var_index=vars_count++;
-            ops.emplace_back(AutoVar{1});
-        }
-        while(try_peek({Tokentype::mult,Tokentype::divi}))
-        {
-            Tokentype type=consume().type;
-            rhs=compile_primary_expression();
-            ops.emplace_back(BinOp{var_index,lhs.value(),rhs.value(),type});
-            lhs=Var{var_index};
+            rhs=compile_expression(precedence+1,temp_index);
+            ops.emplace_back(BinOp{temp_index,lhs.value(),rhs.value(),type});
+            lhs=Var{temp_index};
         }
         return lhs;
     }
@@ -321,6 +300,16 @@ private:
             default : assert(false && "TODO : Expressions"); 
         }
         return {};
+    }
+
+    std::vector<Tokentype> getops(int precedence)
+    {
+        switch(precedence)
+        {
+            case 0:return {Tokentype::add,Tokentype::sub};
+            case 1:return {Tokentype::mult,Tokentype::divi};
+            default: assert(false && "TODO More binops");
+        }
     }
     std::optional<Token> peek(int offset=0){
         if(token_index+offset>=tokens.size()){
