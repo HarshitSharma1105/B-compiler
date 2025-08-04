@@ -8,10 +8,8 @@
 struct AutoVar{
     size_t count; 
 };
-//TODO : Fix this bs
-// struct Arg{
-//     std::variant<size_t,int> val;
-// };
+
+
 struct Var{
     size_t offset;
 };
@@ -297,7 +295,7 @@ private:
                 datastring << "0\n";
                 return DataOffset{data_offset++};
         }
-            default : assert(false && "TODO : Expressions"); 
+            default : assert(false && "UNREACHEABLE\n"); 
         }
         return {};
     }

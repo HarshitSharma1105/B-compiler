@@ -211,12 +211,11 @@ public:
                 std::visit(argvisitor,binop.rhs);
                 switch(binop.type)
                 {
-                    case Tokentype::add:stream << "    add ";break;
-                    case Tokentype::sub:stream << "    sub ";break;
-                    case Tokentype::mult:stream << "   imul ";break;
-                    case Tokentype::divi :assert(false && "TODO:Division\n");break;
+                    case Tokentype::add:stream << "    add rax,rbx\n";break;
+                    case Tokentype::sub:stream << "    sub rax,rbx\n";break;
+                    case Tokentype::mult:stream << "    imul rax,rbx\n";break;
+                    case Tokentype::divi :stream << "xor rdx,rdx\n    div rbx\n";break;
                 }
-                stream << "    rax,rbx\n";
                 stream << "    mov QWORD [rbp-" << (binop.index+1)*8 << "],rax\n";
             }
 
