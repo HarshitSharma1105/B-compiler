@@ -213,8 +213,8 @@ public:
                 {
                     case Tokentype::add:stream << "    add rax,rbx\n";break;
                     case Tokentype::sub:stream << "    sub rax,rbx\n";break;
-                    case Tokentype::mult:stream << "    imul rax,rbx\n";break;
-                    case Tokentype::divi :stream << "xor rdx,rdx\n    div rbx\n";break;
+                    case Tokentype::mult:stream << "    mul rbx\n";break;
+                    case Tokentype::divi :stream << "   xor rdx,rdx\n    div rbx\n";break;
                 }
                 stream << "    mov QWORD [rbp-" << (binop.index+1)*8 << "],rax\n";
             }

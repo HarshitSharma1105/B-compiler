@@ -22,7 +22,9 @@ semicolon,
 add,
 sub,
 mult,
-divi
+divi,
+post_incr,
+pre_incr
 };
 
 struct Token{

@@ -1,5 +1,5 @@
-file_name := "please give file name"
-mode := "nodebug"
+file_name := please give file name
+mode := nodebug
 
 SRC := src/*
 BIN := builds/compiler

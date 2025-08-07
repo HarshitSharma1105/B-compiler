@@ -287,7 +287,7 @@ private:
                         i++;
                         if(lit[i]=='n')datastring << 10;
                         else if(lit[i]=='t')datastring << 9;
-                        else assert(false && "meesed up escape characters\n");
+                        else assert(false && "messed up escape characters\n");
                         i++;
                     }
                     datastring << ",";

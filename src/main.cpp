@@ -5,7 +5,7 @@
 int main(int argc,char* argv[])
 {
    
-    std::string b_sourcecode,path=argv[1],parent_path=std::filesystem::absolute(path).parent_path().string(),trash_path=parent_path+"/trash";;
+    std::string b_sourcecode,path=argv[1],parent_path=std::filesystem::absolute(path).parent_path().string(),trash_path=parent_path+"/trash";
     bool debugging=(std::string)argv[2]=="debug";
     {
         std::stringstream contents_stream;
