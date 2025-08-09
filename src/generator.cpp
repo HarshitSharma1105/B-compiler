@@ -36,6 +36,10 @@ public:
                 std::visit(argvisitor,autoassign.arg);
                 stream << "    sw $s0,-" << (autoassign.offset+1)*4 << "($s1)\n";
             }
+            void operator()(const UnOp& unop)
+            {
+                assert(false && "TODO Unary Operations\n");
+            }
             void operator()(const BinOp& binop)
             {
                 std::visit(argvisitor,binop.lhs);
@@ -203,6 +207,18 @@ public:
                 std::visit(argvisitor,autoassign.arg);
                 stream << "    mov QWORD [rbp-" << (autoassign.offset+1)*8 << "],rax\n";
             }
+            void operator()(const UnOp& unop)
+            {
+                stream << "    mov rbx,";
+                std::visit(argvisitor,unop.arg);
+                stream << "    mov rax,0\n";
+                switch(unop.type)
+                {
+                    case Negate:stream << "    sub rax,rbx\n";
+                }
+                stream << "    mov QWORD [rbp-" << (unop.index+1)*8 << "],rax\n";
+
+            }
             void operator()(const BinOp& binop)
             {
                 stream << "    mov rax,";
@@ -214,7 +230,7 @@ public:
                     case Tokentype::add:stream << "    add rax,rbx\n";break;
                     case Tokentype::sub:stream << "    sub rax,rbx\n";break;
                     case Tokentype::mult:stream << "    mul rbx\n";break;
-                    case Tokentype::divi :stream << "   xor rdx,rdx\n    div rbx\n";break;
+                    case Tokentype::divi:stream << "    xor rdx,rdx\n    div rbx\n";break;
                 }
                 stream << "    mov QWORD [rbp-" << (binop.index+1)*8 << "],rax\n";
             }

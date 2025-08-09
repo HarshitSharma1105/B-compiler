@@ -35,6 +35,19 @@ struct ExtrnDecl{
     std::string name;
 };
 
+
+enum UnOpType{
+    Negate,
+    Not,
+};
+
+
+struct UnOp{
+    size_t index;
+    Arg arg;
+    UnOpType type;
+};
+
 struct BinOp{
     size_t index;
     Arg lhs,rhs;
@@ -69,7 +82,7 @@ struct DataSection{
 //     ScopeBegin,ScopeClose> op;
 // };
 
-typedef std::variant<AutoVar,AutoAssign,BinOp,ExtrnDecl,Funcall,FuncDecl,
+typedef std::variant<AutoVar,AutoAssign,UnOp,BinOp,ExtrnDecl,Funcall,FuncDecl,
     ScopeBegin,ScopeClose,DataSection> Op;
 
 
@@ -101,6 +114,13 @@ struct DebugVisitor {
         std::cout << "Assign AutoVar(" << autoassign.offset << ") = ";
         std::visit(debugargvisitor,autoassign.arg);
         std::cout << "\n";
+    }
+    void operator()(const UnOp& unop)
+    {
+        std::cout << "UnOp (AutoVar(" << unop.index << ")";
+        std::cout << ",arg=";
+        std::visit(debugargvisitor,unop.arg);
+        std::cout << ",type=negate)\n";
     }
     void operator()(const BinOp& binop) 
     {
@@ -260,7 +280,7 @@ public:
 private:
     std::optional<Arg> compile_expression(int precedence,size_t temp_index)
     {
-        if(precedence==2)return compile_primary_expression();
+        if(precedence==2)return compile_primary_expression(temp_index);
         std::optional<Arg> lhs=compile_expression(precedence+1,temp_index),rhs;
         while(try_peek(getops(precedence)))
         {
@@ -271,12 +291,12 @@ private:
         }
         return lhs;
     }
-    std::optional<Arg> compile_primary_expression()
+    std::optional<Arg> compile_primary_expression(size_t temp_index)
     {
         switch(peek().value().type)
         {
-            case integer_lit:return Literal{atoi(consume().val.c_str())};break;
-            case identifier:return Var{(vars[consume().val])};break;
+            case integer_lit:return Literal{atoi(consume().val.c_str())};
+            case identifier:return Var{(vars[consume().val])};
             case string_lit:{
                 std::string lit=consume().val;
                 for(size_t i=0;i<lit.size();i++)
@@ -294,8 +314,14 @@ private:
                 }
                 datastring << "0\n";
                 return DataOffset{data_offset++};
-        }
-            default : assert(false && "UNREACHEABLE\n"); 
+            }
+            case sub: {
+                consume();
+                std::optional<Arg> arg=compile_primary_expression(temp_index);
+                ops.emplace_back(UnOp{temp_index,arg.value(),Negate});
+                return Arg{Var{temp_index}};
+            }
+            default: debug(ops); assert(false && "UNREACHEABLE\n"); 
         }
         return {};
     }
