@@ -198,10 +198,10 @@ public:
                     //"Expected comma between args\n";
                 }
                 ops.emplace_back(ScopeBegin{func_name});
-                ops.emplace_back(FuncDecl{func_name,vars_count-2});
+                ops.emplace_back(FuncDecl{func_name,vars_count});
                 try_consume(Tokentype::close_paren,"expected ')'\n");
                 try_consume(Tokentype::open_curly,"expected '{'\n");
-                ops.emplace_back(AutoVar{1});
+                ops.emplace_back(AutoVar{++vars_count});
                 while(true)
                 {
                     if(try_peek(Tokentype::extrn))
@@ -259,7 +259,7 @@ public:
                     else if(try_consume(Tokentype::close_curly))
                     {
                         ops.emplace_back(ScopeClose{func_name});
-                        vars_count=2;
+                        vars_count=1;
                         vars.clear();
                         break;
                     }
@@ -285,8 +285,8 @@ private:
         {
             Tokentype type=consume().type;
             rhs=compile_expression(precedence+1);
-            ops.emplace_back(BinOp{1,lhs.value(),rhs.value(),type});
-            lhs=Var{1};
+            ops.emplace_back(BinOp{0,lhs.value(),rhs.value(),type});
+            lhs=Var{0};
         }
         return lhs;
     }
@@ -317,8 +317,8 @@ private:
             case sub: {
                 consume();
                 std::optional<Arg> arg=compile_primary_expression();
-                ops.emplace_back(UnOp{1,arg.value(),Negate});
-                return Var{1};
+                ops.emplace_back(UnOp{0,arg.value(),Negate});
+                return Var{0};
             }
             case open_paren:{
                 consume();
@@ -377,7 +377,7 @@ private:
     std::vector<Token> tokens;
     int token_index=0;
     size_t data_offset=0;
-    size_t vars_count=2;
+    size_t vars_count=0;
     std::unordered_set<std::string> extrns;
     std::unordered_map<std::string,size_t> vars;
     std::stringstream datastring;
