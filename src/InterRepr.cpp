@@ -198,9 +198,10 @@ public:
                     //"Expected comma between args\n";
                 }
                 ops.emplace_back(ScopeBegin{func_name});
-                ops.emplace_back(FuncDecl{func_name,vars_count});
+                ops.emplace_back(FuncDecl{func_name,vars_count-2});
                 try_consume(Tokentype::close_paren,"expected ')'\n");
                 try_consume(Tokentype::open_curly,"expected '{'\n");
+                ops.emplace_back(AutoVar{1});
                 while(true)
                 {
                     if(try_peek(Tokentype::extrn))
@@ -238,8 +239,7 @@ public:
                         }
                         size_t offset = vars[consume().val];
                         try_consume(Tokentype::assignment,"expteced =\n");
-                        size_t temp=vars_count++;
-                        ops.emplace_back(AutoAssign{offset,compile_expression(0,temp).value()});
+                        ops.emplace_back(AutoAssign{offset,compile_expression(0).value()});
                         try_consume(Tokentype::semicolon,"Expected ;\n");//semicolon
                     }
                     else if(try_peek(Tokentype::funcall))
@@ -247,10 +247,9 @@ public:
                         std::string funcall_name=consume().val;
                         try_consume(Tokentype::open_paren,"expected '('\n");
                         std::vector<Arg> args;
-                        size_t temp=vars_count++;
                         while(try_peek(close_paren)==false)
                         {   
-                            args.push_back(compile_expression(0,temp).value());
+                            args.push_back(compile_expression(0).value());
                             try_consume(Tokentype::comma);
                         }
                         try_consume(Tokentype::close_paren,"expected ')'\n");
@@ -260,7 +259,7 @@ public:
                     else if(try_consume(Tokentype::close_curly))
                     {
                         ops.emplace_back(ScopeClose{func_name});
-                        vars_count=0;
+                        vars_count=2;
                         vars.clear();
                         break;
                     }
@@ -278,20 +277,20 @@ public:
 
 
 private:
-    std::optional<Arg> compile_expression(int precedence,size_t temp_index)
+    std::optional<Arg> compile_expression(int precedence)
     {
-        if(precedence==2)return compile_primary_expression(temp_index);
-        std::optional<Arg> lhs=compile_expression(precedence+1,temp_index),rhs;
+        if(precedence==2)return compile_primary_expression();
+        std::optional<Arg> lhs=compile_expression(precedence+1),rhs;
         while(try_peek(getops(precedence)))
         {
             Tokentype type=consume().type;
-            rhs=compile_expression(precedence+1,temp_index);
-            ops.emplace_back(BinOp{temp_index,lhs.value(),rhs.value(),type});
-            lhs=Var{temp_index};
+            rhs=compile_expression(precedence+1);
+            ops.emplace_back(BinOp{1,lhs.value(),rhs.value(),type});
+            lhs=Var{1};
         }
         return lhs;
     }
-    std::optional<Arg> compile_primary_expression(size_t temp_index)
+    std::optional<Arg> compile_primary_expression()
     {
         switch(peek().value().type)
         {
@@ -317,13 +316,13 @@ private:
             }
             case sub: {
                 consume();
-                std::optional<Arg> arg=compile_primary_expression(temp_index);
-                ops.emplace_back(UnOp{temp_index,arg.value(),Negate});
-                return Arg{Var{temp_index}};
+                std::optional<Arg> arg=compile_primary_expression();
+                ops.emplace_back(UnOp{1,arg.value(),Negate});
+                return Var{1};
             }
             case open_paren:{
                 consume();
-                std::optional<Arg> arg=compile_expression(0,temp_index);
+                std::optional<Arg> arg=compile_expression(0);
                 try_consume(Tokentype::close_paren,"expected )\n");
                 return arg;
             }
@@ -378,7 +377,7 @@ private:
     std::vector<Token> tokens;
     int token_index=0;
     size_t data_offset=0;
-    size_t vars_count=0;
+    size_t vars_count=2;
     std::unordered_set<std::string> extrns;
     std::unordered_map<std::string,size_t> vars;
     std::stringstream datastring;

@@ -178,7 +178,7 @@ public:
             std::stringstream& stream;
             void operator()(const Var& var)
             {
-                stream << "[rbp-" << (var.offset+1)*8 << "]\n";
+                stream << "[rbp-" << var.offset*8 << "]\n";
             }
 
             void operator()(const Literal& literal)
@@ -191,7 +191,7 @@ public:
             }
         };
         struct Visitor {
-            int count=0;
+            int count=1;
             std::stringstream& stream;
             ArgVisitor argvisitor{stream};
             std::string regs[4]={"rdi","rsi","rdx","rcx"};
@@ -205,7 +205,7 @@ public:
             {
                 stream << "    mov rax,";
                 std::visit(argvisitor,autoassign.arg);
-                stream << "    mov QWORD [rbp-" << (autoassign.offset+1)*8 << "],rax\n";
+                stream << "    mov QWORD [rbp-" << autoassign.offset*8 << "],rax\n";
             }
             void operator()(const UnOp& unop)
             {
@@ -216,7 +216,7 @@ public:
                 {
                     case Negate:stream << "    sub rax,rbx\n";
                 }
-                stream << "    mov QWORD [rbp-" << (unop.index+1)*8 << "],rax\n";
+                stream << "    mov QWORD [rbp-" << unop.index*8 << "],rax\n";
 
             }
             void operator()(const BinOp& binop)
@@ -232,7 +232,7 @@ public:
                     case Tokentype::mult:stream << "    mul rbx\n";break;
                     case Tokentype::divi:stream << "    xor rdx,rdx\n    div rbx\n";break;
                 }
-                stream << "    mov QWORD [rbp-" << (binop.index+1)*8 << "],rax\n";
+                stream << "    mov QWORD [rbp-" << binop.index*8 << "],rax\n";
             }
 
             void operator()(const ExtrnDecl& extrndecl)
