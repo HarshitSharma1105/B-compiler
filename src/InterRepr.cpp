@@ -201,7 +201,8 @@ public:
                 ops.emplace_back(FuncDecl{func_name,vars_count});
                 try_consume(Tokentype::close_paren,"expected ')'\n");
                 try_consume(Tokentype::open_curly,"expected '{'\n");
-                ops.emplace_back(AutoVar{++vars_count});
+                ops.emplace_back(AutoVar{1});
+                vars_count++;
                 while(true)
                 {
                     if(try_peek(Tokentype::extrn))
