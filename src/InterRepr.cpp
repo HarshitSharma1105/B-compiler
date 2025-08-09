@@ -321,6 +321,13 @@ private:
                 ops.emplace_back(UnOp{temp_index,arg.value(),Negate});
                 return Arg{Var{temp_index}};
             }
+            case open_paren:{
+                consume();
+                std::optional<Arg> arg=compile_expression(0,temp_index);
+                try_consume(Tokentype::close_paren,"expected )\n");
+                return arg;
+            }
+
             default: debug(ops); assert(false && "UNREACHEABLE\n"); 
         }
         return {};

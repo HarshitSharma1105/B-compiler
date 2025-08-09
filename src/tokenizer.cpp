@@ -116,9 +116,9 @@ public:
                     while(peek(curr++)!=')'){}
                     while(std::isspace(peek(curr).value())){curr++;}
                     if(peek(curr)=='{')tokens.back().type=Tokentype::funcdecl;
-                    tokens.push_back({Tokentype::open_paren,"("});
-                    consume();   
                 }
+                tokens.push_back({Tokentype::open_paren,"("});
+                consume();   
             }
             else if(peek().value()==')')
             {
