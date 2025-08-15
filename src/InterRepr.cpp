@@ -205,7 +205,7 @@ public:
                 vars_count++;
                 while(true)
                 {
-                    if(try_peek(Tokentype::extrn))
+                    if(try_peek(Tokentype::extrn).has_value())
                     {
                         while(peek().value().type!=Tokentype::semicolon)
                         {
@@ -231,7 +231,7 @@ public:
                         ops.emplace_back(AutoVar{vars_count-curr});
                         try_consume(Tokentype::semicolon,"Expected ;\n");//semicolon
                     }
-                    else if(try_peek(Tokentype::identifier))
+                    else if(try_peek(Tokentype::identifier).has_value())
                     {
                         if(vars.count(peek().value().val)==0)
                         {
@@ -243,12 +243,12 @@ public:
                         ops.emplace_back(AutoAssign{offset,compile_expression(0).value()});
                         try_consume(Tokentype::semicolon,"Expected ;\n");//semicolon
                     }
-                    else if(try_peek(Tokentype::funcall))
+                    else if(try_peek(Tokentype::funcall).has_value())
                     {
                         std::string funcall_name=consume().val;
                         try_consume(Tokentype::open_paren,"expected '('\n");
                         std::vector<Arg> args;
-                        while(try_peek(close_paren)==false)
+                        while(try_peek(close_paren).has_value()==false)
                         {   
                             args.push_back(compile_expression(0).value());
                             try_consume(Tokentype::comma);
@@ -260,7 +260,7 @@ public:
                     else if(try_consume(Tokentype::close_curly))
                     {
                         ops.emplace_back(ScopeClose{func_name});
-                        vars_count=1;
+                        vars_count=0;
                         vars.clear();
                         break;
                     }
@@ -293,12 +293,29 @@ private:
     }
     std::optional<Arg> compile_primary_expression()
     {
-        switch(peek().value().type)
+        Token token=consume();
+        switch(token.type)
         {
-            case integer_lit:return Literal{atoi(consume().val.c_str())};
-            case identifier:return Var{(vars[consume().val])};
-            case string_lit:{
-                std::string lit=consume().val;
+            case Tokentype::identifier:
+            {
+                Var var=Var{(vars[token.val])};
+                if(try_peek({Tokentype::incr,Tokentype::decr}).has_value()==false)return var;
+                Tokentype type=consume().type;
+                size_t curr=vars_count++;
+                ops.emplace_back(AutoVar{1});
+                ops.emplace_back(AutoAssign{curr,var});
+                switch(type)
+                {
+                    case Tokentype::incr:ops.emplace_back(BinOp{var.offset,var,Literal{1},Tokentype::add});break;
+                    case Tokentype::decr:ops.emplace_back(BinOp{var.offset,var,Literal{1},Tokentype::sub});break;
+                    default: assert(false && "add more post ops\n");
+                }
+                return Var{curr};
+            }
+            case Tokentype::integer_lit:return Literal{atoi(token.val.c_str())};
+            case Tokentype::string_lit:
+            {
+                std::string lit=token.val;
                 for(size_t i=0;i<lit.size();i++)
                 {
                     if(lit[i]!='\\')datastring << int(lit[i]);
@@ -315,19 +332,32 @@ private:
                 datastring << "0\n";
                 return DataOffset{data_offset++};
             }
-            case sub: {
-                consume();
+            case Tokentype::sub: 
+            {
                 std::optional<Arg> arg=compile_primary_expression();
-                ops.emplace_back(UnOp{0,arg.value(),Negate});
-                return Var{0};
+                size_t curr=vars_count++;
+                ops.emplace_back(AutoVar{1});
+                ops.emplace_back(UnOp{curr,arg.value(),Negate});
+                return Var{curr};
             }
-            case open_paren:{
-                consume();
+            case Tokentype::open_paren:
+            {
                 std::optional<Arg> arg=compile_expression(0);
                 try_consume(Tokentype::close_paren,"expected )\n");
                 return arg;
             }
-
+            case Tokentype::incr:
+            {
+                size_t val=vars[try_consume(Tokentype::identifier,"expected identifier after pre increment\n").val];
+                ops.emplace_back(BinOp{val,Var{val},Literal{1},Tokentype::add});
+                return Var{val};
+            }
+            case Tokentype::decr:
+            {
+                size_t val=vars[try_consume(Tokentype::identifier,"expected identifier after pre increment\n").val];
+                ops.emplace_back(BinOp{val,Var{val},Literal{1},Tokentype::sub});
+                return Var{val};
+            }
             default: debug(ops); assert(false && "UNREACHEABLE\n"); 
         }
         return {};
@@ -366,13 +396,18 @@ private:
         }
         return {};
     }
-    bool try_peek(const std::vector<Tokentype>& types)
+    std::optional<Tokentype> try_peek(const std::vector<Tokentype>& types)
     {
-        return std::any_of(types.begin(),types.end(),[&](Tokentype type){return peek().value().type==type;});
+        for(const Tokentype type:types)
+        {
+            if(peek().value().type==type)return type;
+        }
+        return {};
     }
-    bool try_peek(const Tokentype& type)
+    std::optional<Tokentype> try_peek(const Tokentype& type)
     {
-        return peek().value().type == type;
+        std::vector<Tokentype> t={type};
+        return try_peek(t);
     }
     std::vector<Op> ops;
     std::vector<Token> tokens;

@@ -23,8 +23,8 @@ add,
 sub,
 mult,
 divi,
-post_incr,
-pre_incr
+incr,
+decr
 };
 
 struct Token{
@@ -48,10 +48,12 @@ void debug(const Tokentype& tokentype)
         case identifier:        std::cout << "identifier "; break;
         case comma:             std::cout << "comma "; break;
         case semicolon:         std::cout << "semicolon ";break;
-        case add:              std::cout << "add";break;
-        case sub:             std::cout << "sub";break;
-        case mult:              std::cout << "mult";break;
-        case divi:               std::cout << "divi";break;
+        case add:               std::cout << "add ";break;
+        case sub:               std::cout << "sub ";break;
+        case mult:              std::cout << "mult ";break;
+        case divi:              std::cout << "divi ";break;
+        case incr:              std::cout << "incr ";break;
+        case decr:              std::cout << "decr ";break;
         default:                std::cout << "Unknown token "; break;
     }
 }
@@ -127,12 +129,22 @@ public:
             }
             else if(peek().value()=='+')
             {
-                tokens.push_back({Tokentype::add,"+"});
+                if(peek(1).value()=='+')
+                {
+                    tokens.push_back({Tokentype::incr,"++"});
+                    consume();
+                }
+                else tokens.push_back({Tokentype::add,"+"});
                 consume();
             }
             else if(peek().value()=='-')
             {
-                tokens.push_back({Tokentype::sub,"-"});
+                if(peek(1).value()=='-')
+                {
+                    tokens.push_back({Tokentype::decr,"--"});
+                    consume();
+                }
+                else tokens.push_back({Tokentype::sub,"-"});
                 consume();
             }
             else if(peek().value()=='*')

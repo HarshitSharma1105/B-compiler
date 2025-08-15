@@ -4,6 +4,7 @@ main(){
     a=20+10;
     c=a-100;
     b=5*(c-20)+65;
-    c=-b-10;
-    printf("%d,%d,%d\n",a,-b,c);
+    c=-b+(-a);
+    printf("%d,%d,%d\n",a++,-b,-c);
+    printf("%d\n",a);
 }
