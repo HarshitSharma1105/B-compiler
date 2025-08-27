@@ -201,8 +201,6 @@ public:
                 ops.emplace_back(FuncDecl{func_name,vars_count});
                 try_consume(Tokentype::close_paren,"expected ')'\n");
                 try_consume(Tokentype::open_curly,"expected '{'\n");
-                ops.emplace_back(AutoVar{1});
-                vars_count++;
                 while(true)
                 {
                     if(try_peek(Tokentype::extrn).has_value())
@@ -240,7 +238,8 @@ public:
                         }
                         size_t offset = vars[consume().val];
                         try_consume(Tokentype::assignment,"expteced =\n");
-                        ops.emplace_back(AutoAssign{offset,compile_expression(0).value()});
+                        ops.emplace_back(AutoVar{1});
+                        ops.emplace_back(AutoAssign{offset,compile_expression(0,vars_count++).value()});
                         try_consume(Tokentype::semicolon,"Expected ;\n");//semicolon
                     }
                     else if(try_peek(Tokentype::funcall).has_value())
@@ -250,7 +249,8 @@ public:
                         std::vector<Arg> args;
                         while(try_peek(close_paren).has_value()==false)
                         {   
-                            args.push_back(compile_expression(0).value());
+                            ops.emplace_back(AutoVar{1});
+                            args.push_back(compile_expression(0,vars_count++).value());
                             try_consume(Tokentype::comma);
                         }
                         try_consume(Tokentype::close_paren,"expected ')'\n");
@@ -278,20 +278,20 @@ public:
 
 
 private:
-    std::optional<Arg> compile_expression(int precedence)
+    std::optional<Arg> compile_expression(int precedence,size_t index)
     {
-        if(precedence==2)return compile_primary_expression();
-        std::optional<Arg> lhs=compile_expression(precedence+1),rhs;
+        if(precedence==2)return compile_primary_expression(index);
+        std::optional<Arg> lhs=compile_expression(precedence+1,index),rhs;
         while(try_peek(getops(precedence)))
         {
             Tokentype type=consume().type;
-            rhs=compile_expression(precedence+1);
-            ops.emplace_back(BinOp{0,lhs.value(),rhs.value(),type});
-            lhs=Var{0};
+            rhs=compile_expression(precedence+1,index);
+            ops.emplace_back(BinOp{index,lhs.value(),rhs.value(),type});
+            lhs=Var{index};
         }
         return lhs;
     }
-    std::optional<Arg> compile_primary_expression()
+    std::optional<Arg> compile_primary_expression(size_t index)
     {
         Token token=consume();
         switch(token.type)
@@ -301,16 +301,14 @@ private:
                 Var var=Var{(vars[token.val])};
                 if(try_peek({Tokentype::incr,Tokentype::decr}).has_value()==false)return var;
                 Tokentype type=consume().type;
-                size_t curr=vars_count++;
-                ops.emplace_back(AutoVar{1});
-                ops.emplace_back(AutoAssign{curr,var});
+                ops.emplace_back(AutoAssign{index,var});
                 switch(type)
                 {
                     case Tokentype::incr:ops.emplace_back(BinOp{var.offset,var,Literal{1},Tokentype::add});break;
                     case Tokentype::decr:ops.emplace_back(BinOp{var.offset,var,Literal{1},Tokentype::sub});break;
                     default: assert(false && "add more post ops\n");
                 }
-                return Var{curr};
+                return Var{index};
             }
             case Tokentype::integer_lit:return Literal{atoi(token.val.c_str())};
             case Tokentype::string_lit:
@@ -334,15 +332,15 @@ private:
             }
             case Tokentype::sub: 
             {
-                std::optional<Arg> arg=compile_primary_expression();
                 size_t curr=vars_count++;
                 ops.emplace_back(AutoVar{1});
+                std::optional<Arg> arg=compile_primary_expression(index);
                 ops.emplace_back(UnOp{curr,arg.value(),Negate});
                 return Var{curr};
             }
             case Tokentype::open_paren:
             {
-                std::optional<Arg> arg=compile_expression(0);
+                std::optional<Arg> arg=compile_expression(0,index);
                 try_consume(Tokentype::close_paren,"expected )\n");
                 return arg;
             }
