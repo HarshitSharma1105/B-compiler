@@ -204,86 +204,7 @@ public:
     {   
         while(peek().has_value())
         {
-            if(peek().value().type==Tokentype::funcdecl)
-            {
-                std::string func_name=consume().val;
-                if(func_name=="main")ismainfuncpresent=true;
-                try_consume(Tokentype::open_paren,"expcted '('\n");
-                while(peek().value().type==Tokentype::identifier)
-                {
-                    vars.push_back(Variable{consume().val,vars_count++});
-                    try_consume(Tokentype::comma);
-                    //"Expected comma between args\n";
-                }
-                ops.emplace_back(ScopeBegin{func_name});
-                ops.emplace_back(FuncDecl{func_name,vars_count});
-                try_consume(Tokentype::close_paren,"expected ')'\n");
-                try_consume(Tokentype::open_curly,"expected '{'\n");
-                while(true)
-                {
-                    if(try_peek(Tokentype::extrn).has_value())
-                    {
-                        while(peek().value().type!=Tokentype::semicolon)
-                        {
-                            std::string extrn_name=consume().val;
-                            extrns.insert(extrn_name);
-                            ops.emplace_back(ExtrnDecl{extrn_name});
-                        }
-                        try_consume(Tokentype::semicolon,"Expected ;\n");//semicolon
-                    }
-                    else if(try_consume(Tokentype::auto_).has_value())
-                    {
-                        size_t curr=vars_count;
-                        while(peek().value().type!=Tokentype::semicolon)
-                        {
-                            try_consume(Tokentype::comma);
-                            if(get(peek().value().val)!=-1)
-                            {
-                                std::cerr << "variable already declared\n";
-                                exit(EXIT_FAILURE);
-                            }
-                            vars.push_back(Variable{consume().val,vars_count++});
-                        }
-                        ops.emplace_back(AutoVar{vars_count-curr});
-                        try_consume(Tokentype::semicolon,"Expected ;\n");//semicolon
-                    }
-                    else if(try_peek(Tokentype::identifier).has_value())
-                    {
-                        if(get(peek().value().val)==-1)
-                        {
-                            std::cerr << "variable not declared " << peek().value().val << "\n";
-                            exit(EXIT_FAILURE);
-                        }
-                        size_t offset = get(consume().val);
-                        try_consume(Tokentype::assignment,"expteced =\n");
-                        ops.emplace_back(AutoVar{1});
-                        ops.emplace_back(AutoAssign{offset,compile_expression(0,vars_count++).value()});
-                        try_consume(Tokentype::semicolon,"Expected ;\n");//semicolon
-                    }
-                    else if(try_peek(Tokentype::funcall).has_value())
-                    {
-                        std::string funcall_name=consume().val;
-                        try_consume(Tokentype::open_paren,"expected '('\n");
-                        std::vector<Arg> args;
-                        while(try_peek(close_paren).has_value()==false)
-                        {   
-                            ops.emplace_back(AutoVar{1});
-                            args.push_back(compile_expression(0,vars_count++).value());
-                            try_consume(Tokentype::comma);
-                        }
-                        try_consume(Tokentype::close_paren,"expected ')'\n");
-                        ops.emplace_back(Funcall{funcall_name,args});
-                        try_consume(Tokentype::semicolon,"Expected ;\n");//semicolon
-                    }
-                    else if(try_consume(Tokentype::close_curly))
-                    {
-                        ops.emplace_back(ScopeClose{func_name});
-                        vars_count=0;
-                        vars.clear();
-                        break;
-                    }
-                }
-            } 
+            compile_statement();
         }
         if(ismainfuncpresent!=true){
             std::cerr << "Main function not declared\n";
@@ -296,7 +217,7 @@ public:
 
 
 private:
-    size_t get(const std::string& name)
+    size_t get_var_offset(const std::string& name)
     {
         for(size_t i=0;i<vars.size();i++)
         {
@@ -308,7 +229,24 @@ private:
 
     void compile_statement()
     {
-        if(try_peek(Tokentype::extrn).has_value())
+        if(peek().value().type==Tokentype::funcdecl)
+        {
+            std::string func_name=consume().val;
+            if(func_name=="main")ismainfuncpresent=true;
+            try_consume(Tokentype::open_paren,"expcted '('\n");
+            scopes.push(Scope{ScopeType::Function,func_name,vars_count});
+            while(peek().value().type==Tokentype::identifier)
+            {
+                vars.push_back(Variable{consume().val,vars_count++});
+                try_consume(Tokentype::comma);
+                //"Expected comma between args\n";
+            }
+            ops.emplace_back(ScopeBegin{func_name});
+            ops.emplace_back(FuncDecl{func_name,vars_count});
+            try_consume(Tokentype::close_paren,"expected ')'\n");
+            try_consume(Tokentype::open_curly,"expected '{'\n");
+        }
+        else if(try_peek(Tokentype::extrn).has_value())
         {
             while(peek().value().type!=Tokentype::semicolon)
             {
@@ -324,9 +262,9 @@ private:
             while(peek().value().type!=Tokentype::semicolon)
             {
                 try_consume(Tokentype::comma);
-                if(get(peek().value().val)!=-1)
+                if(get_var_offset(peek().value().val)!=-1)
                 {
-                    std::cerr << "variable already declared\n";
+                    std::cerr << "variable already declared" << peek().value().val << "\n";
                     exit(EXIT_FAILURE);
                 }
                 vars.push_back(Variable{consume().val,vars_count++});
@@ -336,12 +274,12 @@ private:
         }
         else if(try_peek(Tokentype::identifier).has_value())
         {
-            if(get(peek().value().val)==-1)
+            if(get_var_offset(peek().value().val)==-1)
             {
                 std::cerr << "variable not declared " << peek().value().val << "\n";
                 exit(EXIT_FAILURE);
             }
-            size_t offset = get(consume().val);
+            size_t offset = get_var_offset(consume().val);
             try_consume(Tokentype::assignment,"expteced =\n");
             ops.emplace_back(AutoVar{1});
             ops.emplace_back(AutoAssign{offset,compile_expression(0,vars_count++).value()});
@@ -364,16 +302,20 @@ private:
         }
         else if(try_consume(Tokentype::close_curly))
         {
-            ops.emplace_back(ScopeClose{});
-            vars_count=0;
-            vars.clear();
+            Scope scope=scopes.top();
+            std::string name=scope.scope_name;
+            vars_count=scope.vars_count;
+            scopes.pop();
+            ops.emplace_back(ScopeClose{name});
+            vars.resize(vars_count);
         }
+        return;
     }
     std::optional<Arg> compile_expression(int precedence,size_t index)
     {
         if(precedence==2)return compile_primary_expression(index);
         std::optional<Arg> lhs=compile_expression(precedence+1,index),rhs;
-        while(try_peek(getops(precedence)))
+        while(try_peek(get_ops(precedence)))
         {
             Tokentype type=consume().type;
             rhs=compile_expression(precedence+1,index);
@@ -389,7 +331,7 @@ private:
         {
             case Tokentype::identifier:
             {
-                Var var=Var{get(token.val)};
+                Var var=Var{get_var_offset(token.val)};
                 if(try_peek({Tokentype::incr,Tokentype::decr}).has_value()==false)return var;
                 Tokentype type=consume().type;
                 ops.emplace_back(AutoAssign{index,var});
@@ -437,13 +379,13 @@ private:
             }
             case Tokentype::incr:
             {
-                size_t val=get(try_consume(Tokentype::identifier,"expected identifier after pre increment\n").val);
+                size_t val=get_var_offset(try_consume(Tokentype::identifier,"expected identifier after pre increment\n").val);
                 ops.emplace_back(BinOp{val,Var{val},Literal{1},Tokentype::add});
                 return Var{val};
             }
             case Tokentype::decr:
             {
-                size_t val=get(try_consume(Tokentype::identifier,"expected identifier after pre increment\n").val);
+                size_t val=get_var_offset(try_consume(Tokentype::identifier,"expected identifier after pre decrement\n").val);
                 ops.emplace_back(BinOp{val,Var{val},Literal{1},Tokentype::sub});
                 return Var{val};
             }
@@ -452,7 +394,7 @@ private:
         return {};
     }
 
-    std::vector<Tokentype> getops(int precedence)
+    std::vector<Tokentype> get_ops(int precedence)
     {
         switch(precedence)
         {
