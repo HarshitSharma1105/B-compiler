@@ -270,7 +270,6 @@ public:
                 stream << "    push rbp\n";
                 stream << "    mov rbp,rsp\n";
             }
-
             void operator()(const ScopeClose& scope)
             {
                 stream << "    mov rsp,rbp\n";

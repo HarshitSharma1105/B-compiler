@@ -3,6 +3,14 @@
 #include<unordered_map>
 #include<unordered_set>
 #include<algorithm>
+#include<stack>
+
+struct Variable{
+    std::string var_name;
+    size_t offset;
+};
+
+
 
 
 struct AutoVar{
@@ -77,10 +85,20 @@ struct DataSection{
     std::string concatedstrings;
 };
 
-// struct Op{
-//     std::variant<AutoVar,AutoAssign,ExtrnDecl,Funcall,FuncDecl,
-//     ScopeBegin,ScopeClose> op;
-// };
+
+
+enum ScopeType{
+    Global,
+    Function,
+    Local
+};
+
+struct Scope{
+    ScopeType typ;
+    std::string scope_name;
+    size_t vars_count;
+};
+
 
 typedef std::variant<AutoVar,AutoAssign,UnOp,BinOp,ExtrnDecl,Funcall,FuncDecl,
     ScopeBegin,ScopeClose,DataSection> Op;
@@ -193,7 +211,7 @@ public:
                 try_consume(Tokentype::open_paren,"expcted '('\n");
                 while(peek().value().type==Tokentype::identifier)
                 {
-                    vars[consume().val]=vars_count++;
+                    vars.push_back(Variable{consume().val,vars_count++});
                     try_consume(Tokentype::comma);
                     //"Expected comma between args\n";
                 }
@@ -219,24 +237,24 @@ public:
                         while(peek().value().type!=Tokentype::semicolon)
                         {
                             try_consume(Tokentype::comma);
-                            if(vars.count(peek().value().val))
+                            if(get(peek().value().val)!=-1)
                             {
                                 std::cerr << "variable already declared\n";
                                 exit(EXIT_FAILURE);
                             }
-                            vars[consume().val]=vars_count++;
+                            vars.push_back(Variable{consume().val,vars_count++});
                         }
                         ops.emplace_back(AutoVar{vars_count-curr});
                         try_consume(Tokentype::semicolon,"Expected ;\n");//semicolon
                     }
                     else if(try_peek(Tokentype::identifier).has_value())
                     {
-                        if(vars.count(peek().value().val)==0)
+                        if(get(peek().value().val)==-1)
                         {
                             std::cerr << "variable not declared " << peek().value().val << "\n";
                             exit(EXIT_FAILURE);
                         }
-                        size_t offset = vars[consume().val];
+                        size_t offset = get(consume().val);
                         try_consume(Tokentype::assignment,"expteced =\n");
                         ops.emplace_back(AutoVar{1});
                         ops.emplace_back(AutoAssign{offset,compile_expression(0,vars_count++).value()});
@@ -278,6 +296,79 @@ public:
 
 
 private:
+    size_t get(const std::string& name)
+    {
+        for(size_t i=0;i<vars.size();i++)
+        {
+            if(vars[i].var_name==name)return vars[i].offset;
+        }
+        return -1;
+    }
+
+
+    void compile_statement()
+    {
+        if(try_peek(Tokentype::extrn).has_value())
+        {
+            while(peek().value().type!=Tokentype::semicolon)
+            {
+                std::string extrn_name=consume().val;
+                extrns.insert(extrn_name);
+                ops.emplace_back(ExtrnDecl{extrn_name});
+            }
+            try_consume(Tokentype::semicolon,"Expected ;\n");//semicolon
+        }
+        else if(try_consume(Tokentype::auto_).has_value())
+        {
+            size_t curr=vars_count;
+            while(peek().value().type!=Tokentype::semicolon)
+            {
+                try_consume(Tokentype::comma);
+                if(get(peek().value().val)!=-1)
+                {
+                    std::cerr << "variable already declared\n";
+                    exit(EXIT_FAILURE);
+                }
+                vars.push_back(Variable{consume().val,vars_count++});
+            }
+            ops.emplace_back(AutoVar{vars_count-curr});
+            try_consume(Tokentype::semicolon,"Expected ;\n");//semicolon
+        }
+        else if(try_peek(Tokentype::identifier).has_value())
+        {
+            if(get(peek().value().val)==-1)
+            {
+                std::cerr << "variable not declared " << peek().value().val << "\n";
+                exit(EXIT_FAILURE);
+            }
+            size_t offset = get(consume().val);
+            try_consume(Tokentype::assignment,"expteced =\n");
+            ops.emplace_back(AutoVar{1});
+            ops.emplace_back(AutoAssign{offset,compile_expression(0,vars_count++).value()});
+            try_consume(Tokentype::semicolon,"Expected ;\n");//semicolon
+        }
+        else if(try_peek(Tokentype::funcall).has_value())
+        {
+            std::string funcall_name=consume().val;
+            try_consume(Tokentype::open_paren,"expected '('\n");
+            std::vector<Arg> args;
+            while(try_peek(close_paren).has_value()==false)
+            {   
+                ops.emplace_back(AutoVar{1});
+                args.push_back(compile_expression(0,vars_count++).value());
+                try_consume(Tokentype::comma);
+            }
+            try_consume(Tokentype::close_paren,"expected ')'\n");
+            ops.emplace_back(Funcall{funcall_name,args});
+            try_consume(Tokentype::semicolon,"Expected ;\n");//semicolon
+        }
+        else if(try_consume(Tokentype::close_curly))
+        {
+            ops.emplace_back(ScopeClose{});
+            vars_count=0;
+            vars.clear();
+        }
+    }
     std::optional<Arg> compile_expression(int precedence,size_t index)
     {
         if(precedence==2)return compile_primary_expression(index);
@@ -298,7 +389,7 @@ private:
         {
             case Tokentype::identifier:
             {
-                Var var=Var{(vars[token.val])};
+                Var var=Var{get(token.val)};
                 if(try_peek({Tokentype::incr,Tokentype::decr}).has_value()==false)return var;
                 Tokentype type=consume().type;
                 ops.emplace_back(AutoAssign{index,var});
@@ -346,13 +437,13 @@ private:
             }
             case Tokentype::incr:
             {
-                size_t val=vars[try_consume(Tokentype::identifier,"expected identifier after pre increment\n").val];
+                size_t val=get(try_consume(Tokentype::identifier,"expected identifier after pre increment\n").val);
                 ops.emplace_back(BinOp{val,Var{val},Literal{1},Tokentype::add});
                 return Var{val};
             }
             case Tokentype::decr:
             {
-                size_t val=vars[try_consume(Tokentype::identifier,"expected identifier after pre increment\n").val];
+                size_t val=get(try_consume(Tokentype::identifier,"expected identifier after pre increment\n").val);
                 ops.emplace_back(BinOp{val,Var{val},Literal{1},Tokentype::sub});
                 return Var{val};
             }
@@ -409,11 +500,12 @@ private:
     }
     std::vector<Op> ops;
     std::vector<Token> tokens;
+    std::stack<Scope> scopes;
     int token_index=0;
     size_t data_offset=0;
     size_t vars_count=0;
     std::unordered_set<std::string> extrns;
-    std::unordered_map<std::string,size_t> vars;
+    std::vector<Variable> vars;
     std::stringstream datastring;
     bool ismainfuncpresent=false;
 };
