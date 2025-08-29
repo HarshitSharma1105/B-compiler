@@ -73,20 +73,6 @@ struct FuncDecl{
     size_t count;
 };
 
-
-struct ScopeBegin{
-    std::string name;
-};
-struct ScopeClose{
-    std::string name;
-};
-
-struct DataSection{
-    std::string concatedstrings;
-};
-
-
-
 enum ScopeType{
     Global,
     Function,
@@ -96,8 +82,24 @@ enum ScopeType{
 struct Scope{
     ScopeType typ;
     std::string scope_name;
-    size_t vars_count;
+    size_t vars_count,vars_size;
 };
+
+struct ScopeBegin{
+    std::string name;
+    ScopeType type;
+};
+struct ScopeClose{
+    std::string name;
+    ScopeType type;
+};
+
+struct DataSection{
+    std::string concatedstrings;
+};
+
+
+
 
 
 typedef std::variant<AutoVar,AutoAssign,UnOp,BinOp,ExtrnDecl,Funcall,FuncDecl,
@@ -225,8 +227,6 @@ private:
         }
         return -1;
     }
-
-
     void compile_statement()
     {
         if(peek().value().type==Tokentype::funcdecl)
@@ -234,14 +234,14 @@ private:
             std::string func_name=consume().val;
             if(func_name=="main")ismainfuncpresent=true;
             try_consume(Tokentype::open_paren,"expcted '('\n");
-            scopes.push(Scope{ScopeType::Function,func_name,vars_count});
+            scopes.push(Scope{ScopeType::Function,func_name,vars_count,vars.size()});
             while(peek().value().type==Tokentype::identifier)
             {
                 vars.push_back(Variable{consume().val,vars_count++});
                 try_consume(Tokentype::comma);
                 //"Expected comma between args\n";
             }
-            ops.emplace_back(ScopeBegin{func_name});
+            ops.emplace_back(ScopeBegin{func_name,ScopeType::Function});
             ops.emplace_back(FuncDecl{func_name,vars_count});
             try_consume(Tokentype::close_paren,"expected ')'\n");
             try_consume(Tokentype::open_curly,"expected '{'\n");
@@ -264,7 +264,7 @@ private:
                 try_consume(Tokentype::comma);
                 if(get_var_offset(peek().value().val)!=-1)
                 {
-                    std::cerr << "variable already declared" << peek().value().val << "\n";
+                    std::cerr << "variable already declared " << peek().value().val << "\n";
                     exit(EXIT_FAILURE);
                 }
                 vars.push_back(Variable{consume().val,vars_count++});
@@ -281,8 +281,7 @@ private:
             }
             size_t offset = get_var_offset(consume().val);
             try_consume(Tokentype::assignment,"expteced =\n");
-            ops.emplace_back(AutoVar{1});
-            ops.emplace_back(AutoAssign{offset,compile_expression(0,vars_count++).value()});
+            ops.emplace_back(AutoAssign{offset,compile_expression(0).value()});
             try_consume(Tokentype::semicolon,"Expected ;\n");//semicolon
         }
         else if(try_peek(Tokentype::funcall).has_value())
@@ -292,39 +291,49 @@ private:
             std::vector<Arg> args;
             while(try_peek(close_paren).has_value()==false)
             {   
-                ops.emplace_back(AutoVar{1});
-                args.push_back(compile_expression(0,vars_count++).value());
+                args.push_back(compile_expression(0).value());
                 try_consume(Tokentype::comma);
             }
             try_consume(Tokentype::close_paren,"expected ')'\n");
             ops.emplace_back(Funcall{funcall_name,args});
             try_consume(Tokentype::semicolon,"Expected ;\n");//semicolon
         }
-        else if(try_consume(Tokentype::close_curly))
+        else if(try_consume(Tokentype::close_curly).has_value())
         {
             Scope scope=scopes.top();
             std::string name=scope.scope_name;
             vars_count=scope.vars_count;
             scopes.pop();
-            ops.emplace_back(ScopeClose{name});
-            vars.resize(vars_count);
+            ops.emplace_back(ScopeClose{name,scope.typ});
+            vars.resize(scope.vars_size);
+        }
+        else if(try_consume(Tokentype::open_curly).has_value())
+        {
+            scopes.push(Scope{ScopeType::Local,"",vars_count,vars.size()});
+            ops.emplace_back(ScopeBegin{"",ScopeType::Local});
         }
         return;
     }
-    std::optional<Arg> compile_expression(int precedence,size_t index)
+    std::optional<Arg> compile_expression(int precedence)
     {
-        if(precedence==2)return compile_primary_expression(index);
-        std::optional<Arg> lhs=compile_expression(precedence+1,index),rhs;
+
+        if(precedence==2)return compile_primary_expression();
+        std::optional<Arg> lhs=compile_expression(precedence+1),rhs;
+        size_t index=vars_count;
+        if(try_peek(get_ops(precedence))){
+            vars_count++;
+            ops.emplace_back(AutoVar{1});
+        }
         while(try_peek(get_ops(precedence)))
         {
             Tokentype type=consume().type;
-            rhs=compile_expression(precedence+1,index);
+            rhs=compile_expression(precedence+1);
             ops.emplace_back(BinOp{index,lhs.value(),rhs.value(),type});
             lhs=Var{index};
         }
         return lhs;
     }
-    std::optional<Arg> compile_primary_expression(size_t index)
+    std::optional<Arg> compile_primary_expression()
     {
         Token token=consume();
         switch(token.type)
@@ -332,16 +341,21 @@ private:
             case Tokentype::identifier:
             {
                 Var var=Var{get_var_offset(token.val)};
+                if(var.offset==-1)
+                {
+                    std::cerr << "variable not declared " << token.val << "\n";
+                    exit(EXIT_FAILURE);
+                }
                 if(try_peek({Tokentype::incr,Tokentype::decr}).has_value()==false)return var;
                 Tokentype type=consume().type;
-                ops.emplace_back(AutoAssign{index,var});
+                ops.emplace_back(AutoAssign{vars_count,var});
                 switch(type)
                 {
                     case Tokentype::incr:ops.emplace_back(BinOp{var.offset,var,Literal{1},Tokentype::add});break;
                     case Tokentype::decr:ops.emplace_back(BinOp{var.offset,var,Literal{1},Tokentype::sub});break;
                     default: assert(false && "add more post ops\n");
                 }
-                return Var{index};
+                return Var{vars_count++};
             }
             case Tokentype::integer_lit:return Literal{atoi(token.val.c_str())};
             case Tokentype::string_lit:
@@ -367,25 +381,35 @@ private:
             {
                 size_t curr=vars_count++;
                 ops.emplace_back(AutoVar{1});
-                std::optional<Arg> arg=compile_primary_expression(index);
+                std::optional<Arg> arg=compile_primary_expression();
                 ops.emplace_back(UnOp{curr,arg.value(),Negate});
                 return Var{curr};
             }
             case Tokentype::open_paren:
             {
-                std::optional<Arg> arg=compile_expression(0,index);
+                std::optional<Arg> arg=compile_expression(0);
                 try_consume(Tokentype::close_paren,"expected )\n");
                 return arg;
             }
             case Tokentype::incr:
             {
                 size_t val=get_var_offset(try_consume(Tokentype::identifier,"expected identifier after pre increment\n").val);
+                if(val==-1)
+                {
+                    std::cerr << "variable not declared " << token.val << "\n";
+                    exit(EXIT_FAILURE);
+                }
                 ops.emplace_back(BinOp{val,Var{val},Literal{1},Tokentype::add});
                 return Var{val};
             }
             case Tokentype::decr:
             {
                 size_t val=get_var_offset(try_consume(Tokentype::identifier,"expected identifier after pre decrement\n").val);
+                if(val==-1)
+                {
+                    std::cerr << "variable not declared " << token.val << "\n";
+                    exit(EXIT_FAILURE);
+                }
                 ops.emplace_back(BinOp{val,Var{val},Literal{1},Tokentype::sub});
                 return Var{val};
             }
@@ -408,7 +432,7 @@ private:
             return {};
         }
         return tokens[token_index+offset];
-    }
+    } 
     Token consume(){
         return tokens[token_index++];
     }

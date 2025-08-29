@@ -8,6 +8,11 @@ main(){
     printf("%d,%d,%d\n",(a+10)*20,(b+30),-c);
     foo(a++);
     foo(a);
+    {
+        auto e;
+        e=2;
+        printf("%d\n",e++);
+    }
 }
 foo(a)
 {

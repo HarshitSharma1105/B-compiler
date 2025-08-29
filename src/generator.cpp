@@ -265,8 +265,7 @@ public:
             }
             void operator()(const ScopeBegin& scope)
             {
-                stream << "public " << scope.name << "\n";
-                stream << scope.name << ":\n";
+                if(scope.type==ScopeType::Function) stream << "public " << scope.name << "\n" << scope.name << ":\n";
                 stream << "    push rbp\n";
                 stream << "    mov rbp,rsp\n";
             }
@@ -274,9 +273,7 @@ public:
             {
                 stream << "    mov rsp,rbp\n";
                 stream << "    pop rbp\n";
-                stream << "    xor rax,rax\n";
-                stream << "    ret\n"; 
-                // TODO : You dont need to return out of every scope!!
+                if(scope.type==ScopeType::Function)stream << "    xor rax,rax\n" << "    ret\n";
             }
             void operator()(const DataSection& data)
             {
