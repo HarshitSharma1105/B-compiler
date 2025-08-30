@@ -21,6 +21,10 @@ public:
             {
                 stream << "    la $s0,data_" << data.start << "\n";
             }
+            void operator()(const FuncResult& funcresult)
+            {
+                stream << "    move $s0,$a0\n";
+            }
         };
         struct Visitor {
             std::stringstream& stream;
@@ -49,6 +53,8 @@ public:
                 {
                     case Tokentype::add:stream << "    add ";break;
                     case Tokentype::sub:stream << "    sub ";break;
+                    case Tokentype::mult:stream << "   mul ";break;
+                    default: assert(false && "TODO: MIPS DIVISIO\n");
                 }
                 stream << " $s0,$s2,$s0\n";
                 stream << "    sw $s0,-" << (binop.index+1)*4 << "($s1)\n";
@@ -81,7 +87,7 @@ public:
             }
             void operator()(const ScopeBegin& scope)
             {
-                stream << scope.name << ":\n";
+                if(scope.type== ScopeType::Function)stream << scope.name << ":\n";
                 stream << "    addi $sp,$sp,-8\n";
                 stream << "    sw $ra,0($sp)\n";
                 stream << "    sw $s1,4($sp)\n";
@@ -94,9 +100,11 @@ public:
                 stream << "    lw $ra,0($sp)\n";
                 stream << "    lw $s1,4($sp)\n";
                 stream << "    addi $sp,$sp,8\n";
-                if(scope.name!="main")stream << "    jr $ra\n";
-                else stream << "    li $v0,10\n" << "    syscall\n";
-                // TODO : You dont need to return out of every scope!!
+                if(scope.type== ScopeType::Function)
+                {
+                    if(scope.name!="main")stream << "    jr $ra\n";
+                    else stream << "    li $v0,10\n" << "    syscall\n";
+                }
             }
             void operator()(const DataSection& data)
             {
@@ -121,6 +129,12 @@ public:
                     stream << "\"\n";
                 }
             }
+
+            void operator()(const ReturnValue& retval)
+            {
+                std::visit(argvisitor,retval.arg.value());
+                stream << "    move $a0,$s0\n";
+            }
         };
         textstream << ".text\n";
         textstream << "    .globl main\n";
@@ -138,6 +152,11 @@ private:
     {
         textstream << "putchar:\n";
         textstream << "    li $v0,11\n";
+        textstream << "    syscall\n";
+        textstream << "    jr $ra\n";
+
+        textstream << "putint:\n";
+        textstream << "    li $v0,1\n";
         textstream << "    syscall\n";
         textstream << "    jr $ra\n";
 
@@ -189,6 +208,10 @@ public:
             {
                 stream << "data_" << data.start << "\n";
             }
+            void operator()(const FuncResult& funcresult)
+            {
+                stream << "rax\n";
+            }
         };
         struct Visitor {
             int count=1;
@@ -203,36 +226,35 @@ public:
 
             void operator()(const AutoAssign& autoassign) 
             {
-                stream << "    mov rax,";
+                stream << "    mov rcx,";
                 std::visit(argvisitor,autoassign.arg);
-                stream << "    mov QWORD [rbp-" << (autoassign.offset+1)*8 << "],rax\n";
+                stream << "    mov QWORD [rbp-" << (autoassign.offset+1)*8 << "],rcx\n";
             }
             void operator()(const UnOp& unop)
             {
                 stream << "    mov rbx,";
                 std::visit(argvisitor,unop.arg);
-                stream << "    mov rax,0\n";
+                stream << "    mov rcx,0\n";
                 switch(unop.type)
                 {
-                    case Negate:stream << "    sub rax,rbx\n";
+                    case Negate:stream << "    sub rcx,rbx\n";
                 }
-                stream << "    mov QWORD [rbp-" << (unop.index+1)*8 << "],rax\n";
-
+                stream << "    mov QWORD [rbp-" << (unop.index+1)*8 << "],rcx\n";
             }
             void operator()(const BinOp& binop)
             {
-                stream << "    mov rax,";
+                stream << "    mov rcx,";
                 std::visit(argvisitor,binop.lhs);
                 stream << "    mov rbx,";
                 std::visit(argvisitor,binop.rhs);
                 switch(binop.type)
                 {
-                    case Tokentype::add:stream << "    add rax,rbx\n";break;
-                    case Tokentype::sub:stream << "    sub rax,rbx\n";break;
-                    case Tokentype::mult:stream << "    mul rbx\n";break;
-                    case Tokentype::divi:stream << "    xor rdx,rdx\n    div rbx\n";break;
+                    case Tokentype::add:stream << "    add rcx,rbx\n";break;
+                    case Tokentype::sub:stream << "    sub rcx,rbx\n";break;
+                    case Tokentype::mult:stream << "    imul rcx,rbx\n";break;
+                    case Tokentype::divi:stream << "    xor rdx,rdx\n    div rbx\n";assert(false && "MAKE DIVISION TO RCX ALSO\n");
                 }
-                stream << "    mov QWORD [rbp-" << (binop.index+1)*8 << "],rax\n";
+                stream << "    mov QWORD [rbp-" << (binop.index+1)*8 << "],rcx\n";
             }
 
             void operator()(const ExtrnDecl& extrndecl)
@@ -273,7 +295,7 @@ public:
             {
                 stream << "    mov rsp,rbp\n";
                 stream << "    pop rbp\n";
-                if(scope.type==ScopeType::Function)stream << "    xor rax,rax\n" << "    ret\n";
+                if(scope.type==ScopeType::Function)stream <<"    ret\n";
             }
             void operator()(const DataSection& data)
             {
@@ -289,6 +311,11 @@ public:
                     idx++;
                     stream << "\n";
                 }
+            }
+            void operator()(const ReturnValue& retval)
+            {
+                stream << "    mov rax,";
+                std::visit(argvisitor,retval.arg.value());
             }
         };
         textstream << "format ELF64\n";

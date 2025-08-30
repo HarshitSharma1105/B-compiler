@@ -31,7 +31,12 @@ struct DataOffset{
     size_t start;
 };
 
-typedef std::variant<Var,Literal,DataOffset> Arg;
+struct FuncResult{
+    std::string func_name;
+};
+
+
+typedef std::variant<Var,Literal,DataOffset,FuncResult> Arg;
 
 struct AutoAssign{
     size_t offset;
@@ -98,12 +103,14 @@ struct DataSection{
     std::string concatedstrings;
 };
 
-
+struct ReturnValue{
+    std::optional<Arg> arg;
+};
 
 
 
 typedef std::variant<AutoVar,AutoAssign,UnOp,BinOp,ExtrnDecl,Funcall,FuncDecl,
-    ScopeBegin,ScopeClose,DataSection> Op;
+    ScopeBegin,ScopeClose,DataSection,ReturnValue> Op;
 
 
 struct DebugArgVisitor{
@@ -119,6 +126,10 @@ struct DebugArgVisitor{
     void operator()(const DataOffset& data)
     {
         std::cout << "DataOffset[" << data.start << "]";
+    }
+    void operator()(const FuncResult& funcresult)
+    {
+        std::cout << "FuncResult("  << funcresult.func_name << ")";
     }
 };
 
@@ -185,6 +196,13 @@ struct DebugVisitor {
     {
         std::cout << "data:\n" << datasection.concatedstrings << "\n";
     }
+
+    void operator()(const ReturnValue& retval)
+    {
+        std::cout << "Return Value (";
+        if(retval.arg.has_value())std::visit(debugargvisitor,retval.arg.value());
+        std::cout << ")\n";
+    }
 };
 
 
@@ -229,7 +247,7 @@ private:
     }
     void compile_statement()
     {
-        if(peek().value().type==Tokentype::funcdecl)
+        if(try_peek(Tokentype::funcdecl).has_value())
         {
             std::string func_name=consume().val;
             if(func_name=="main")ismainfuncpresent=true;
@@ -312,7 +330,12 @@ private:
             scopes.push(Scope{ScopeType::Local,"",vars_count,vars.size()});
             ops.emplace_back(ScopeBegin{"",ScopeType::Local});
         }
-        return;
+        else if(try_consume(Tokentype::return_).has_value())
+        {
+            std::optional<Arg> arg=compile_expression(0);
+            try_consume(Tokentype::semicolon,"Expected ;\n");
+            ops.emplace_back(ReturnValue{arg});
+        }
     }
     std::optional<Arg> compile_expression(int precedence)
     {
@@ -412,6 +435,20 @@ private:
                 }
                 ops.emplace_back(BinOp{val,Var{val},Literal{1},Tokentype::sub});
                 return Var{val};
+            }
+            case Tokentype::funcall:
+            {
+                std::string funcall_name=token.val;
+                try_consume(Tokentype::open_paren,"expected '('\n");
+                std::vector<Arg> args;
+                while(try_peek(close_paren).has_value()==false)
+                {   
+                    args.push_back(compile_expression(0).value());
+                    try_consume(Tokentype::comma);
+                }
+                try_consume(Tokentype::close_paren,"expected ')'\n");
+                ops.emplace_back(Funcall{funcall_name,args});
+                return FuncResult{funcall_name};
             }
             default: debug(ops); assert(false && "UNREACHEABLE\n"); 
         }

@@ -24,7 +24,8 @@ sub,
 mult,
 divi,
 incr,
-decr
+decr,
+return_
 };
 
 struct Token{
@@ -54,6 +55,7 @@ void debug(const Tokentype& tokentype)
         case divi:              std::cout << "divi ";break;
         case incr:              std::cout << "incr ";break;
         case decr:              std::cout << "decr ";break;
+        case return_:           std::cout << "return ";break;
         default:                std::cout << "Unknown token "; break;
     }
 }
@@ -102,6 +104,11 @@ public:
                         tokens.push_back({Tokentype::extrn,buffer});
                         buffer.clear();
                     }
+                }
+                else if(buffer=="return")
+                {
+                    tokens.push_back({Tokentype::return_,buffer});
+                    buffer.clear();
                 }
                 else 
                 { 
