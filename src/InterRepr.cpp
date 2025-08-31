@@ -247,34 +247,79 @@ private:
     }
     void compile_statement()
     {
-        if(try_peek(Tokentype::funcdecl).has_value())
+        
+        if(compile_funcdecl())return;
+        else if(compile_extrn())return;
+        else if(autovar_dec())return;
+        else if(compile_varinit())return;
+        else if(compile_funcall())return;
+        else if(scope_end())return;
+        else if(scope_open())return;
+        else if(compile_return())return;
+        assert(false && "UNREACHEABLE\n");
+    }
+
+    bool compile_return()
+    {
+        if(try_consume(Tokentype::return_).has_value())
         {
-            std::string func_name=consume().val;
-            if(func_name=="main")ismainfuncpresent=true;
-            try_consume(Tokentype::open_paren,"expcted '('\n");
-            scopes.push(Scope{ScopeType::Function,func_name,vars_count,vars.size()});
-            while(peek().value().type==Tokentype::identifier)
-            {
-                vars.push_back(Variable{consume().val,vars_count++});
+            std::optional<Arg> arg=compile_expression(0);
+            try_consume(Tokentype::semicolon,"Expected ;\n");
+            ops.emplace_back(ReturnValue{arg});
+            return true;
+        }
+        return false;
+    }
+
+    bool scope_open()
+    {
+        if(try_consume(Tokentype::open_curly).has_value())
+        {
+            scopes.push(Scope{ScopeType::Local,"",vars_count,vars.size()});
+            ops.emplace_back(ScopeBegin{"",ScopeType::Local});
+            return true;
+        }
+        return false;
+    }
+
+    bool scope_end()
+    {
+        if(try_consume(Tokentype::close_curly).has_value())
+        {
+            Scope scope=scopes.top();
+            std::string name=scope.scope_name;
+            vars_count=scope.vars_count;
+            scopes.pop();
+            ops.emplace_back(ScopeClose{name,scope.typ});
+            vars.resize(scope.vars_size);
+            return true;
+        }
+        return false;
+    }
+
+
+    bool compile_funcall()
+    {
+        if(try_peek(Tokentype::funcall).has_value())
+        {
+            std::string funcall_name=consume().val;
+            try_consume(Tokentype::open_paren,"expected '('\n");
+            std::vector<Arg> args;
+            while(try_peek(close_paren).has_value()==false)
+            {   
+                args.push_back(compile_expression(0).value());
                 try_consume(Tokentype::comma);
-                //"Expected comma between args\n";
             }
-            ops.emplace_back(ScopeBegin{func_name,ScopeType::Function});
-            ops.emplace_back(FuncDecl{func_name,vars_count});
             try_consume(Tokentype::close_paren,"expected ')'\n");
-            try_consume(Tokentype::open_curly,"expected '{'\n");
-        }
-        else if(try_peek(Tokentype::extrn).has_value())
-        {
-            while(peek().value().type!=Tokentype::semicolon)
-            {
-                std::string extrn_name=consume().val;
-                extrns.insert(extrn_name);
-                ops.emplace_back(ExtrnDecl{extrn_name});
-            }
+            ops.emplace_back(Funcall{funcall_name,args});
             try_consume(Tokentype::semicolon,"Expected ;\n");//semicolon
+            return true;
         }
-        else if(try_consume(Tokentype::auto_).has_value())
+        return false;
+    }
+    bool autovar_dec()
+    {
+        if(try_consume(Tokentype::auto_).has_value())
         {
             size_t curr=vars_count;
             while(peek().value().type!=Tokentype::semicolon)
@@ -289,8 +334,13 @@ private:
             }
             ops.emplace_back(AutoVar{vars_count-curr});
             try_consume(Tokentype::semicolon,"Expected ;\n");//semicolon
+            return true;
         }
-        else if(try_peek(Tokentype::identifier).has_value())
+        return false;
+    }
+    bool compile_varinit()
+    {
+        if(try_peek(Tokentype::identifier).has_value())
         {
             if(get_var_offset(peek().value().val)==-1)
             {
@@ -301,41 +351,50 @@ private:
             try_consume(Tokentype::assignment,"expteced =\n");
             ops.emplace_back(AutoAssign{offset,compile_expression(0).value()});
             try_consume(Tokentype::semicolon,"Expected ;\n");//semicolon
+            return true;
         }
-        else if(try_peek(Tokentype::funcall).has_value())
+        return false;
+    }
+
+    bool compile_extrn()
+    {
+        if(try_peek(Tokentype::extrn).has_value())
         {
-            std::string funcall_name=consume().val;
-            try_consume(Tokentype::open_paren,"expected '('\n");
-            std::vector<Arg> args;
-            while(try_peek(close_paren).has_value()==false)
-            {   
-                args.push_back(compile_expression(0).value());
-                try_consume(Tokentype::comma);
+            while(peek().value().type!=Tokentype::semicolon)
+            {
+                std::string extrn_name=consume().val;
+                extrns.insert(extrn_name);
+                ops.emplace_back(ExtrnDecl{extrn_name});
             }
-            try_consume(Tokentype::close_paren,"expected ')'\n");
-            ops.emplace_back(Funcall{funcall_name,args});
             try_consume(Tokentype::semicolon,"Expected ;\n");//semicolon
+            return true;
         }
-        else if(try_consume(Tokentype::close_curly).has_value())
+        return false;
+    }
+
+
+    bool compile_funcdecl()
+    {
+        if(try_peek(Tokentype::funcdecl).has_value())
         {
-            Scope scope=scopes.top();
-            std::string name=scope.scope_name;
-            vars_count=scope.vars_count;
-            scopes.pop();
-            ops.emplace_back(ScopeClose{name,scope.typ});
-            vars.resize(scope.vars_size);
+            std::string func_name=consume().val;
+            if(func_name=="main")ismainfuncpresent=true;
+            try_consume(Tokentype::open_paren,"expcted '('\n");
+            scopes.push(Scope{ScopeType::Function,func_name,vars_count,vars.size()});
+            size_t curr=vars_count;
+            while(peek().value().type==Tokentype::identifier)
+            {
+                vars.push_back(Variable{consume().val,vars_count++});
+                try_consume(Tokentype::comma);
+                //"Expected comma between args\n";
+            }
+            ops.emplace_back(ScopeBegin{func_name,ScopeType::Function});
+            ops.emplace_back(FuncDecl{func_name,vars_count-curr});
+            try_consume(Tokentype::close_paren,"expected ')'\n");
+            try_consume(Tokentype::open_curly,"expected '{'\n");
+            return true;
         }
-        else if(try_consume(Tokentype::open_curly).has_value())
-        {
-            scopes.push(Scope{ScopeType::Local,"",vars_count,vars.size()});
-            ops.emplace_back(ScopeBegin{"",ScopeType::Local});
-        }
-        else if(try_consume(Tokentype::return_).has_value())
-        {
-            std::optional<Arg> arg=compile_expression(0);
-            try_consume(Tokentype::semicolon,"Expected ;\n");
-            ops.emplace_back(ReturnValue{arg});
-        }
+        return false;
     }
     std::optional<Arg> compile_expression(int precedence)
     {
