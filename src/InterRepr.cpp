@@ -85,7 +85,7 @@ enum ScopeType{
 };
 
 struct Scope{
-    ScopeType typ;
+    ScopeType type;
     std::string scope_name;
     size_t vars_count,vars_size;
 };
@@ -276,7 +276,7 @@ private:
         if(try_consume(Tokentype::open_curly).has_value())
         {
             scopes.push(Scope{ScopeType::Local,"",vars_count,vars.size()});
-            ops.emplace_back(ScopeBegin{"",ScopeType::Local});
+            //ops.emplace_back(ScopeBegin{"",ScopeType::Local});
             return true;
         }
         return false;
@@ -286,11 +286,12 @@ private:
     {
         if(try_consume(Tokentype::close_curly).has_value())
         {
+            
             Scope scope=scopes.top();
             std::string name=scope.scope_name;
             vars_count=scope.vars_count;
             scopes.pop();
-            ops.emplace_back(ScopeClose{name,scope.typ});
+            if(scope.type==ScopeType::Function)ops.emplace_back(ScopeClose{name,scope.type});
             vars.resize(scope.vars_size);
             return true;
         }

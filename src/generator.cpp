@@ -42,7 +42,14 @@ public:
             }
             void operator()(const UnOp& unop)
             {
-                assert(false && "TODO Unary Operations\n");
+                std::visit(argvisitor,unop.arg);
+                stream << "    li $s2,0\n";
+                switch(unop.type)
+                {
+                    case Negate:stream << "    sub $s0,$s2,$s0\n";break;
+                    default: assert(false && "TODO More Unary Operations\n");
+                } 
+                stream << "    sw $s0,-" << (unop.index+1)*4 << "($s1)\n";
             }
             void operator()(const BinOp& binop)
             {
