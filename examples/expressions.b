@@ -5,15 +5,18 @@ main(){
     c=a-100;
     b=5*(c-20)+65;
     c=-b++ + (-a);
+    auto f;
+    f=c++ + ++c;
     printf("%d,%d,%d\n",(a+10)*20,(b+30),-c);
     foo(a++);
     foo(a);
     {
         auto e;
         e=foo(3)*10-20;
-        bar(e);
+        bar(f);
         printf("hi from scope %d %d\n",++a,e);
     }
+    return 0;
 }
 foo(a)
 {

@@ -247,7 +247,6 @@ private:
     }
     void compile_statement()
     {
-        
         if(compile_funcdecl())return;
         else if(compile_extrn())return;
         else if(autovar_dec())return;
@@ -286,7 +285,6 @@ private:
     {
         if(try_consume(Tokentype::close_curly).has_value())
         {
-            
             Scope scope=scopes.top();
             std::string name=scope.scope_name;
             vars_count=scope.vars_count;
@@ -431,6 +429,7 @@ private:
                 }
                 if(try_peek({Tokentype::incr,Tokentype::decr}).has_value()==false)return var;
                 Tokentype type=consume().type;
+                ops.emplace_back(AutoVar{1});
                 ops.emplace_back(AutoAssign{vars_count,var});
                 switch(type)
                 {
