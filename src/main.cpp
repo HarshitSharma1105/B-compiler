@@ -7,17 +7,7 @@ int main(int argc,char* argv[])
    
     std::string b_sourcecode,path=argv[1],parent_path=std::filesystem::absolute(path).parent_path().string(),trash_path=parent_path+"/trash";
     bool debugging=(std::string)argv[2]=="debug";
-    {
-        std::stringstream contents_stream;
-        std::fstream input(path, std::ios::in);
-        if (!input.is_open()) 
-        {
-            std::cerr << "Failed to open file   " << path << "\n";
-            exit(EXIT_FAILURE);
-        }
-        contents_stream << input.rdbuf();
-        b_sourcecode = contents_stream.str();
-    }
+    open_file(path,b_sourcecode);
     std::string finalb_sourcecode=preprocessor(path,b_sourcecode);
     Tokenizer tokenizer(finalb_sourcecode);
     std::vector<Token> tokens=tokenizer.tokenize();
@@ -36,9 +26,9 @@ int main(int argc,char* argv[])
     }
     command = "assemblers/fasm " + trash_path + "/output.asm";
     system(command.c_str());
-    command = "cc -no-pie " + trash_path +"/output.o -o "+"builds/output";
+    command = "cc -no-pie " + trash_path +"/output.o -l:raylib/libraylib.so -o "+"builds/output";
     system(command.c_str());
-    command = "builds/output";
+    command = "LD_LIBRARY_PATH=\"/usr/lib/raylib\"    builds/output";
     system(command.c_str());
     // command="java -jar assemblers/Mars4_5.jar sm " + trash_path +"/output.asm";
     // system(command.c_str());
