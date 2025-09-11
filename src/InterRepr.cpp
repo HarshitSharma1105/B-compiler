@@ -320,18 +320,23 @@ private:
     {
         if(try_consume(Tokentype::auto_).has_value())
         {
-            size_t curr=vars_count;
             while(peek().value().type!=Tokentype::semicolon)
             {
                 try_consume(Tokentype::comma);
-                if(get_var_offset(peek().value().val)!=-1)
+                std::string var_name=consume().val;
+                if(get_var_offset(var_name)!=-1)
                 {
                     std::cerr << "variable already declared " << peek().value().val << "\n";
                     exit(EXIT_FAILURE);
                 }
-                vars.push_back(Variable{consume().val,vars_count++});
+                ops.emplace_back(AutoVar{1});
+                vars.push_back(Variable{var_name,vars_count++});
+                if(try_consume(Tokentype::assignment).has_value())
+                {
+                    Arg arg=compile_expression(0).value();
+                    ops.emplace_back(AutoAssign{get_var_offset(var_name),arg});
+                }
             }
-            ops.emplace_back(AutoVar{vars_count-curr});
             try_consume(Tokentype::semicolon,"Expected ;\n");//semicolon
             return true;
         }

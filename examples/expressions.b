@@ -1,8 +1,7 @@
 main(){
     extrn printf;
-    auto a,b,c;
-    a=20+10;
-    c=a-100;
+    auto a=30,b,c=a-100;
+    a=a+10;
     b=5*(c-20)+65;
     c=-b++ + (-a);
     auto f;
