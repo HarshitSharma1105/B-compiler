@@ -4,34 +4,28 @@
 
 int main(int argc,char* argv[])
 {
-   
-    std::string b_sourcecode,path=argv[1],parent_path=std::filesystem::absolute(path).parent_path().string(),trash_path=parent_path+"/trash";
+    if(argc<4)
+    {
+        std::cerr << "Incorrect Usage\n";
+        exit(EXIT_FAILURE);
+    }
+    std::string b_sourcecode,path=argv[1],parent_path=std::filesystem::absolute(path).parent_path().string();
     bool debugging=(std::string)argv[2]=="debug";
     open_file(path,b_sourcecode);
+
     std::string finalb_sourcecode=preprocessor(path,b_sourcecode);
+
     Tokenizer tokenizer(finalb_sourcecode);
     std::vector<Token> tokens=tokenizer.tokenize();
+
     IREmittor iremittor(tokens);
     std::vector<Op> ops=iremittor.EmitIR();
-    //TODO Fix this target situation with something!!!
-    //Generator_Mips generator(ops);
-    Generator_x86_64 generator(ops);
-    std::string assembly_sourcecode=generator.generate();
+
+    std::string target_lang=argv[3];
+    Runner runner(target_lang,parent_path);
+    runner.compile(ops);
+    runner.run();
     if(debugging)debug(ops);
-    std::string command = "mkdir " + trash_path;//TODO: Use smth like mkdir_if_not_exist
-    system(command.c_str());
-    {
-        std::ofstream outFile(trash_path+ "/output.asm");  
-        outFile << assembly_sourcecode;
-    }
-    command = "assemblers/fasm " + trash_path + "/output.asm";
-    system(command.c_str());
-    command = "cc -no-pie " + trash_path +"/output.o -l:raylib/libraylib.so -o "+"builds/output";
-    system(command.c_str());
-    command = "LD_LIBRARY_PATH=\"/usr/lib/raylib\"    builds/output";
-    system(command.c_str());
-    // command="java -jar assemblers/Mars4_5.jar sm " + trash_path +"/output.asm";
-    // system(command.c_str());
-    if(!debugging)system(("rm -rf "+trash_path).c_str());
+    else system(("rm -rf "+parent_path+"/trash/").c_str());
     return 0;
 }
