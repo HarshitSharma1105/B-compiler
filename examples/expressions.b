@@ -4,15 +4,12 @@ main(){
     a=a+10;
     b=5*(c-20)+65;
     c=-b++ + (-a);
-    auto f;
-    f=c++ + ++c;
+    auto f=c++ + ++c;
     printf("%d,%d,%d\n",(a+10)*20,(b+30),-c);
     foo(a++);
-    foo(a);
+    foo(a);;;;;;;
     {
-        auto e;
-        e=foo(3)*10-20;
-        bar(f);
+        auto e=foo(3)*10-20;
         printf("hi from scope %d %d\n",++a,e);
     }
     return 0;
@@ -25,7 +22,6 @@ foo(a)
 
 bar(a)
 {
-    auto d;
-    d=a*a;
+    auto d=a*a;
     printf("hello from bar %d\n",d);
 }

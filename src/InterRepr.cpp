@@ -260,6 +260,7 @@ private:
 
     bool compile_return()
     {
+        if(try_consume(Tokentype::semicolon).has_value())return true;
         if(try_consume(Tokentype::return_).has_value())
         {
             std::optional<Arg> arg=compile_expression(0);
@@ -272,6 +273,7 @@ private:
 
     bool scope_open()
     {
+        if(try_consume(Tokentype::semicolon).has_value())return true;
         if(try_consume(Tokentype::open_curly).has_value())
         {
             scopes.push(Scope{ScopeType::Local,"",vars_count,vars.size()});
@@ -283,6 +285,7 @@ private:
 
     bool scope_end()
     {
+        if(try_consume(Tokentype::semicolon).has_value())return true;
         if(try_consume(Tokentype::close_curly).has_value())
         {
             Scope scope=scopes.top();
@@ -299,6 +302,7 @@ private:
 
     bool compile_funcall()
     {
+        if(try_consume(Tokentype::semicolon).has_value())return true;
         if(try_peek(Tokentype::funcall).has_value())
         {
             std::string funcall_name=consume().val;
@@ -318,6 +322,7 @@ private:
     }
     bool autovar_dec()
     {
+        if(try_consume(Tokentype::semicolon).has_value())return true;
         if(try_consume(Tokentype::auto_).has_value())
         {
             while(peek().value().type!=Tokentype::semicolon)
@@ -344,6 +349,7 @@ private:
     }
     bool compile_varinit()
     {
+        if(try_consume(Tokentype::semicolon).has_value())return true;
         if(try_peek(Tokentype::identifier).has_value())
         {
             if(get_var_offset(peek().value().val)==-1)
@@ -362,6 +368,7 @@ private:
 
     bool compile_extrn()
     {
+        if(try_consume(Tokentype::semicolon).has_value())return true;
         if(try_peek(Tokentype::extrn).has_value())
         {
             while(peek().value().type!=Tokentype::semicolon)
@@ -379,6 +386,7 @@ private:
 
     bool compile_funcdecl()
     {
+        if(try_consume(Tokentype::semicolon).has_value())return true;
         if(try_peek(Tokentype::funcdecl).has_value())
         {
             std::string func_name=consume().val;
