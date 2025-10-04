@@ -217,7 +217,8 @@ void debug(const std::vector<Op>& ops)
 
 
 
-class IREmittor{
+class IREmittor
+{
 public:
     IREmittor(const std::vector<Token> &tokens) : tokens(tokens){}
     std::vector<Op>   EmitIR()

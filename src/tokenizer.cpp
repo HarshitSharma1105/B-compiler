@@ -59,7 +59,7 @@ void debug(const Tokentype& tokentype)
         default:                std::cout << "Unknown token "; break;
     }
 }
-void debug(const std::vector<Token> tokens)
+void debug(const std::vector<Token>& tokens)
 {
     for(const Token& token:tokens)
     {

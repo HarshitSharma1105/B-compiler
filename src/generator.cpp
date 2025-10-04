@@ -1,7 +1,8 @@
 #include"InterRepr.cpp"
 
 
-class Generator_Mips{
+class Generator_Mips
+{
 public:
     Generator_Mips(const std::vector<Op> &ops) : ops(ops){}
     std::string generate()
@@ -195,7 +196,8 @@ private:
 
 
 
-class Generator_x86_64{
+class Generator_x86_64
+{
 public:
     Generator_x86_64(const std::vector<Op> &ops) : ops(ops){}
     std::string generate()
@@ -245,6 +247,7 @@ public:
                 switch(unop.type)
                 {
                     case Negate:stream << "    sub rcx,rbx\n";
+                    default: assert(false && "TODO More Unary Operations\n");
                 }
                 stream << "    mov QWORD [rbp-" << (unop.index+1)*8 << "],rcx\n";
             }

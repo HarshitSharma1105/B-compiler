@@ -12,6 +12,7 @@ main(){
         auto e=foo(3)*10-20;
         printf("hi from scope %d %d\n",++a,e);
     }
+    printf("%d %d\n",foo(11),bar(10));
     return 0;
 }
 foo(a)
@@ -24,4 +25,5 @@ bar(a)
 {
     auto d=a*a;
     printf("hello from bar %d\n",d);
+    return a++;
 }
