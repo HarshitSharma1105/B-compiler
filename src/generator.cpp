@@ -246,7 +246,7 @@ public:
                 stream << "    mov rcx,0\n";
                 switch(unop.type)
                 {
-                    case Negate:stream << "    sub rcx,rbx\n";
+                    case Negate:stream << "    sub rcx,rbx\n";break;
                     default: assert(false && "TODO More Unary Operations\n");
                 }
                 stream << "    mov QWORD [rbp-" << (unop.index+1)*8 << "],rcx\n";
