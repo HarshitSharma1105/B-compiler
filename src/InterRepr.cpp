@@ -409,12 +409,12 @@ private:
     {
         if(try_peek(Tokentype::identifier).has_value())
         {
+            if(compile_expression(0).has_value())return true;
             if(get_var_offset(peek().value().val)==-1)
             {
                 std::cerr << "variable not declared " << peek().value().val << "\n";
                 exit(EXIT_FAILURE);
             }
-            if(compile_expression(0).has_value())return true;
             size_t offset = get_var_offset(consume().val);
             try_consume(Tokentype::assignment,"expected =\n");
             ops.emplace_back(AutoAssign{offset,compile_expression(0).value()});
