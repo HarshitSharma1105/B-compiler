@@ -108,9 +108,21 @@ struct ReturnValue{
 };
 
 
+struct JmpIfZero{
+    Arg arg;
+    size_t idx;
+};
+
+struct Jmp{
+    size_t idx;
+};
+
+struct JmpInfo{
+    size_t skip_idx,jmp_idx;
+};
 
 typedef std::variant<AutoVar,AutoAssign,UnOp,BinOp,ExtrnDecl,Funcall,FuncDecl,
-    ScopeBegin,ScopeClose,DataSection,ReturnValue> Op;
+    ScopeBegin,ScopeClose,DataSection,ReturnValue,JmpIfZero,Jmp> Op;
 
 
 struct DebugArgVisitor{
@@ -203,6 +215,16 @@ struct DebugVisitor {
         if(retval.arg.has_value())std::visit(debugargvisitor,retval.arg.value());
         std::cout << ")\n";
     }
+    void operator()(const JmpIfZero& jz)
+    {
+        std::cout << "Jump To "  << jz.idx << " If (";
+        std::visit(debugargvisitor,jz.arg);
+        std::cout << "==0)\n";
+    }
+    void operator()(const Jmp& jmp)
+    {
+        std::cout << "Jump To " << jmp.idx << "\n";
+    }
 };
 
 
@@ -215,7 +237,12 @@ void debug(const std::vector<Op>& ops)
     }
 }
 
-
+static std::vector<std::vector<Tokentype>> precedences =
+{
+    {Tokentype::less,Tokentype::greater},
+    {Tokentype::add,Tokentype::sub},
+    {Tokentype::mult,Tokentype::divi}
+};
 
 class IREmittor
 {
@@ -248,8 +275,8 @@ private:
     }
     void compile_statement()
     {
-	if(try_consume(Tokentype::semicolon).has_value())return;
-	else if(compile_funcdecl())return;
+        if(try_consume(Tokentype::semicolon).has_value())return;
+        else if(compile_funcdecl())return;
         else if(compile_extrn())return;
         else if(autovar_dec())return;
         else if(compile_varinit())return;
@@ -257,8 +284,23 @@ private:
         else if(scope_end())return;
         else if(scope_open())return;
         else if(compile_return())return;
+        else if(compile_while_loops())return;
         assert(false && "UNREACHEABLE\n");
     }
+
+    bool compile_while_loops()
+    {
+        if(try_consume(Tokentype::while_).has_value())
+        {
+            loops.emplace(JmpInfo{.skip_idx=0,.jmp_idx=ops.size()}); // wanna jump at the checking of condition  instruction 
+            Arg arg=compile_expression(0).value();  
+            ops.emplace_back(JmpIfZero{arg,0});
+            loops.top().skip_idx=ops.size()-1;
+            return true;
+        }
+        return false;
+    }
+
 
     bool compile_return()
     {
@@ -285,8 +327,27 @@ private:
 
     bool scope_end()
     {
+        // TODO : Merge the loops stack and the scopes stack
+        // As something like this code will break the compiler
+        //  while()
+        //{
+        //  {
+        //     
+        //   
+        //   } <- this will close both the scope and loops scope 
+        //}
+        //
         if(try_consume(Tokentype::close_curly).has_value())
         {
+            if(!loops.empty())
+            {
+                JmpInfo info=loops.top();
+                loops.pop();
+                ops.emplace_back(Jmp{info.jmp_idx});
+                JmpIfZero jz = std::get<JmpIfZero>(ops[info.skip_idx]);
+                jz.idx=ops.size();
+                ops[info.skip_idx]=jz;
+            }
             Scope scope=scopes.top();
             std::string name=scope.scope_name;
             vars_count=scope.vars_count;
@@ -353,8 +414,9 @@ private:
                 std::cerr << "variable not declared " << peek().value().val << "\n";
                 exit(EXIT_FAILURE);
             }
+            if(compile_expression(0).has_value())return true;
             size_t offset = get_var_offset(consume().val);
-            try_consume(Tokentype::assignment,"expteced =\n");
+            try_consume(Tokentype::assignment,"expected =\n");
             ops.emplace_back(AutoAssign{offset,compile_expression(0).value()});
             try_consume(Tokentype::semicolon,"Expected ;\n");//semicolon
             return true;
@@ -405,7 +467,7 @@ private:
     std::optional<Arg> compile_expression(int precedence)
     {
 
-        if(precedence==2)return compile_primary_expression();
+        if(precedence==precedences.size())return compile_primary_expression();
         std::optional<Arg> lhs=compile_expression(precedence+1),rhs;
         size_t index=vars_count;
         if(try_peek(get_ops(precedence))){
@@ -477,6 +539,8 @@ private:
             case Tokentype::open_paren:
             {
                 std::optional<Arg> arg=compile_expression(0);
+                // debug(ops);
+                // debug({peek().value()});
                 try_consume(Tokentype::close_paren,"expected )\n");
                 return arg;
             }
@@ -514,7 +578,10 @@ private:
                 }
                 try_consume(Tokentype::close_paren,"expected ')'\n");
                 ops.emplace_back(Funcall{funcall_name,args});
-                return FuncResult{funcall_name};
+                ops.emplace_back(AutoVar{1});
+                FuncResult res= {funcall_name};
+                ops.emplace_back(AutoAssign{vars_count,res});
+                return Var{vars_count++};
             }
             default: debug(ops); assert(false && "UNREACHEABLE\n"); 
         }
@@ -523,12 +590,7 @@ private:
 
     std::vector<Tokentype> get_ops(int precedence)
     {
-        switch(precedence)
-        {
-            case 0:return {Tokentype::add,Tokentype::sub};
-            case 1:return {Tokentype::mult,Tokentype::divi};
-            default: assert(false && "TODO More binops");
-        }
+        return precedences[precedence];
     }
     std::optional<Token> peek(int offset=0){
         if(token_index+offset>=tokens.size()){
@@ -570,6 +632,7 @@ private:
     std::vector<Op> ops;
     std::vector<Token> tokens;
     std::stack<Scope> scopes;
+    std::stack<JmpInfo> loops;
     int token_index=0;
     size_t data_offset=0;
     size_t vars_count=0;

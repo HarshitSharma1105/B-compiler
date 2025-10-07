@@ -23,9 +23,12 @@ add,
 sub,
 mult,
 divi,
+less,
+greater,
 incr,
 decr,
-return_
+return_,
+while_
 };
 
 struct Token{
@@ -56,6 +59,9 @@ void debug(const Tokentype& tokentype)
         case incr:              std::cout << "incr ";break;
         case decr:              std::cout << "decr ";break;
         case return_:           std::cout << "return ";break;
+        case while_:            std::cout << "while ";break;
+        case less:              std::cout << "less ";break;
+        case greater:           std::cout << "greater ";break;
         default:                std::cout << "Unknown token "; break;
     }
 }
@@ -108,6 +114,11 @@ public:
                 else if(buffer=="return")
                 {
                     tokens.push_back({Tokentype::return_,buffer});
+                    buffer.clear();
+                }
+                else if(buffer=="while")
+                {
+                    tokens.push_back({Tokentype::while_,buffer});
                     buffer.clear();
                 }
                 else 
@@ -194,6 +205,16 @@ public:
             else if(peek().value()==',')
             {
                 tokens.push_back({Tokentype::comma,","});
+                consume();
+            }
+            else if(peek().value()=='<')
+            {
+                tokens.push_back({Tokentype::less,"<"});  // TODO : Lesser Equals
+                consume();
+            }
+            else if(peek().value()=='>')
+            {
+                tokens.push_back({Tokentype::greater,">"}); // TODO : Greater Equals
                 consume();
             }
             else if (std::isdigit(peek().value())) 

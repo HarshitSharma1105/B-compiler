@@ -143,6 +143,14 @@ public:
                 std::visit(argvisitor,retval.arg.value());
                 stream << "    move $a0,$s0\n";
             }
+            void operator()(const JmpIfZero& jz)
+            {
+                assert(false && "TODO Mips jumps\n");
+            }
+            void operator()(const Jmp& jmp)
+            {
+                assert(false && "TODO Mips jumps\n");
+            }
         };
         textstream << ".text\n";
         textstream << "    .globl main\n";
@@ -259,10 +267,12 @@ public:
                 std::visit(argvisitor,binop.rhs);
                 switch(binop.type)
                 {
-                    case Tokentype::add:stream << "    add rcx,rbx\n";break;
-                    case Tokentype::sub:stream << "    sub rcx,rbx\n";break;
+                    case Tokentype::add:stream <<  "    add rcx,rbx\n";break;
+                    case Tokentype::sub:stream <<  "    sub rcx,rbx\n";break;
                     case Tokentype::mult:stream << "    imul rcx,rbx\n";break;
                     case Tokentype::divi:stream << "    xor rdx,rdx\n    div rbx\n";assert(false && "MAKE DIVISION TO RCX ALSO\n");
+                    case Tokentype::less:stream << "    cmp rcx,rbx\n    setl al\n    movzx rcx,al\n";break;
+                    default: assert(false && "Unknown Binary Operand type\n");
                 }
                 stream << "    mov QWORD [rbp-" << (binop.index+1)*8 << "],rcx\n";
             }
@@ -327,12 +337,25 @@ public:
                 stream << "    mov rax,";
                 std::visit(argvisitor,retval.arg.value());
             }
+            void operator()(const JmpIfZero& jz)
+            {
+                stream << "    mov rcx,";
+                std::visit(argvisitor,jz.arg);
+                stream << "    test rcx,rcx\n";
+                stream << "    jz op_" << jz.idx << "\n";
+            }
+            void operator()(const Jmp& jmp)
+            {
+                stream << "    jmp op_" << jmp.idx << "\n";
+            }
         };
         textstream << "format ELF64\n";
         textstream << "section \".text\" executable\n";
+        int idx=0;
         Visitor visitor{0,textstream};
         while(peek().has_value())
         {
+            textstream << "op_" << idx++ << ":\n";
             std::visit(visitor,consume());
         }
         return textstream.str();
