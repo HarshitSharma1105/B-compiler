@@ -409,7 +409,7 @@ private:
     {
         if(try_peek(Tokentype::identifier).has_value())
         {
-            if(compile_expression(0).has_value())return true;
+            //if(compile_expression(0).has_value())return true; TODO : How to ignore a statement!
             if(get_var_offset(peek().value().val)==-1)
             {
                 std::cerr << "variable not declared " << peek().value().val << "\n";
@@ -530,17 +530,21 @@ private:
             }
             case Tokentype::sub: 
             {
-                size_t curr=vars_count++;
-                ops.emplace_back(AutoVar{1});
                 std::optional<Arg> arg=compile_primary_expression();
-                ops.emplace_back(UnOp{curr,arg.value(),Negate});
-                return Var{curr};
+                ops.emplace_back(AutoVar{1});
+                ops.emplace_back(UnOp{vars_count,arg.value(),UnOpType::Negate});
+                return Var{vars_count++};
+            }
+            case Tokentype::not_:
+            {
+                std::optional<Arg> arg=compile_primary_expression();
+                ops.emplace_back(AutoVar{1});
+                ops.emplace_back(UnOp{vars_count,arg.value(),UnOpType::Not});
+                return Var{vars_count++};
             }
             case Tokentype::open_paren:
             {
                 std::optional<Arg> arg=compile_expression(0);
-                // debug(ops);
-                // debug({peek().value()});
                 try_consume(Tokentype::close_paren,"expected )\n");
                 return arg;
             }

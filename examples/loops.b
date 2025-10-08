@@ -2,8 +2,7 @@ main(){
     extrn printf;
     auto x=0;
     while(x < 10){
-        printf("%d %d\n",foo(x),bar(x));
-        x++;
+        printf("%d %d\n",foo(x),bar(x++));
     }
     return 0;
 }

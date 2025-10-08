@@ -251,10 +251,10 @@ public:
             {
                 stream << "    mov rbx,";
                 std::visit(argvisitor,unop.arg);
-                stream << "    mov rcx,0\n";
                 switch(unop.type)
                 {
-                    case Negate:stream << "    sub rcx,rbx\n";break;
+                    case UnOpType::Negate:stream << "    xor rcx,rcx\n    sub rcx,rbx\n";break;
+                    case UnOpType::Not:   stream << "    cmp rbx,0\n    sete al\n    movzx rcx,al\n";break;
                     default: assert(false && "TODO More Unary Operations\n");
                 }
                 stream << "    mov QWORD [rbp-" << (unop.index+1)*8 << "],rcx\n";

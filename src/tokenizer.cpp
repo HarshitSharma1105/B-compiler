@@ -28,7 +28,8 @@ greater,
 incr,
 decr,
 return_,
-while_
+while_,
+not_
 };
 
 struct Token{
@@ -62,6 +63,7 @@ void debug(const Tokentype& tokentype)
         case while_:            std::cout << "while ";break;
         case less:              std::cout << "less ";break;
         case greater:           std::cout << "greater ";break;
+        case not_:            std::cout << "negate ";break;
         default:                std::cout << "Unknown token "; break;
     }
 }
@@ -201,7 +203,11 @@ public:
                 tokens.push_back({Tokentype::assignment,"="});
                 consume();
             }
-            
+            else if(peek().value()=='!')
+            {
+                tokens.push_back({Tokentype::not_,"!"});
+                consume();
+            }
             else if(peek().value()==',')
             {
                 tokens.push_back({Tokentype::comma,","});
