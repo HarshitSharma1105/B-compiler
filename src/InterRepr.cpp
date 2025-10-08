@@ -78,26 +78,7 @@ struct FuncDecl{
     size_t count;
 };
 
-enum ScopeType{
-    Global,
-    Function,
-    Local
-};
 
-struct Scope{
-    ScopeType type;
-    std::string scope_name;
-    size_t vars_count,vars_size;
-};
-
-struct ScopeBegin{
-    std::string name;
-    ScopeType type;
-};
-struct ScopeClose{
-    std::string name;
-    ScopeType type;
-};
 
 struct DataSection{
     std::string concatedstrings;
@@ -119,6 +100,29 @@ struct Jmp{
 
 struct JmpInfo{
     size_t skip_idx,jmp_idx;
+};
+
+enum ScopeType{
+    Global,
+    Function,
+    Local,
+    Loop
+};
+
+struct Scope{
+    ScopeType type;
+    std::string scope_name;
+    size_t vars_count,vars_size;
+    std::optional<JmpInfo> info;
+};
+
+struct ScopeBegin{
+    std::string name;
+    ScopeType type;
+};
+struct ScopeClose{
+    std::string name;
+    ScopeType type;
 };
 
 typedef std::variant<AutoVar,AutoAssign,UnOp,BinOp,ExtrnDecl,Funcall,FuncDecl,
@@ -293,10 +297,13 @@ private:
     {
         if(try_consume(Tokentype::while_).has_value())
         {
-            loops.emplace(JmpInfo{.skip_idx=0,.jmp_idx=ops.size()}); // wanna jump at the checking of condition  instruction 
+            JmpInfo info= {.skip_idx=0,.jmp_idx=ops.size()}; // wanna jump at the checking of condition  instruction
+            Scope scope={ScopeType::Loop,"",vars_count,vars.size(),info};
+            scopes.push(scope);
             Arg arg=compile_expression(0).value();  
             ops.emplace_back(JmpIfZero{arg,0});
-            loops.top().skip_idx=ops.size()-1;
+            scopes.top().info.value().skip_idx=ops.size()-1;
+            try_consume(Tokentype::open_curly,"expected {\n");
             return true;
         }
         return false;
@@ -329,7 +336,7 @@ private:
     {
         if(try_consume(Tokentype::open_curly).has_value())
         {
-            scopes.push(Scope{ScopeType::Local,"",vars_count,vars.size()});
+            scopes.push(Scope{ScopeType::Local,"",vars_count,vars.size(),{}});
             //ops.emplace_back(ScopeBegin{"",ScopeType::Local});
             return true;
         }
@@ -338,29 +345,18 @@ private:
 
     bool scope_end()
     {
-        // TODO : Merge the loops stack and the scopes stack
-        // As something like this code will break the compiler
-        //  while()
-        //{
-        //  {
-        //     
-        //   
-        //   } <- this will close both the scope and loops scope 
-        //}
-        //
         if(try_consume(Tokentype::close_curly).has_value())
         {
-            if(!loops.empty())
-            {
-                JmpInfo info=loops.top();
-                loops.pop();
-                ops.emplace_back(Jmp{info.jmp_idx});
-                std::get<JmpIfZero>(ops[info.skip_idx]).idx=ops.size();
-            }
             Scope scope=scopes.top();
             std::string name=scope.scope_name;
             vars_count=scope.vars_count;
             scopes.pop();
+            if(scope.type==ScopeType::Loop)
+            {
+                JmpInfo info=scope.info.value();
+                ops.emplace_back(Jmp{info.jmp_idx});
+                std::get<JmpIfZero>(ops[info.skip_idx]).idx=ops.size();
+            }
             if(scope.type==ScopeType::Function)ops.emplace_back(ScopeClose{name,scope.type});
             vars.resize(scope.vars_size);
             return true;
@@ -458,7 +454,7 @@ private:
             std::string func_name=consume().val;
             if(func_name=="main")ismainfuncpresent=true;
             try_consume(Tokentype::open_paren,"expcted '('\n");
-            scopes.push(Scope{ScopeType::Function,func_name,vars_count,vars.size()});
+            scopes.push(Scope{ScopeType::Function,func_name,vars_count,vars.size(),{}});
             size_t curr=vars_count;
             while(peek().value().type==Tokentype::identifier)
             {

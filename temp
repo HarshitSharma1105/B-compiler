@@ -1,0 +1,77 @@
+flat assembler  version 1.73.32  (16384 kilobytes memory)
+3 passes, 1224 bytes.
+hello from foo 0
+hello from bar 0
+0 0
+hello from foo 1
+hello from bar 1
+1 1
+hello from foo 2
+hello from bar 4
+4 2
+hello from foo 3
+hello from bar 9
+9 3
+hello from foo 4
+hello from bar 16
+16 4
+hello from foo 5
+hello from bar 25
+25 5
+hello from foo 6
+hello from bar 36
+36 6
+hello from foo 7
+hello from bar 49
+49 7
+hello from foo 8
+hello from bar 64
+64 8
+hello from foo 9
+hello from bar 81
+81 9
+Scope Begin main
+Function Declaration main(0)
+Extrn printf
+Auto Variables(1)
+Assign AutoVar(0) = Literal(0)
+Auto Variables(1)
+BinOp (AutoVar(1),lhs=AutoVar(0),rhs=Literal(10),type=less )
+Jump To 19 If (AutoVar(1)==0)
+Function Call foo(AutoVar(0))
+Auto Variables(1)
+Assign AutoVar(2) = FuncResult(foo)
+Function Call bar(AutoVar(0))
+Auto Variables(1)
+Assign AutoVar(3) = FuncResult(bar)
+Function Call printf(DataOffset[0], AutoVar(2), AutoVar(3))
+Auto Variables(1)
+Assign AutoVar(4) = AutoVar(0)
+BinOp (AutoVar(0),lhs=AutoVar(0),rhs=Literal(1),type=add )
+Jump To 5
+Return Value (Literal(0))
+Scope End main
+Scope Begin foo
+Function Declaration foo(1)
+Function Call printf(DataOffset[1], AutoVar(0))
+Auto Variables(1)
+BinOp (AutoVar(1),lhs=AutoVar(0),rhs=AutoVar(0),type=mult )
+Return Value (AutoVar(1))
+Scope End foo
+Scope Begin bar
+Function Declaration bar(1)
+Auto Variables(1)
+Auto Variables(1)
+BinOp (AutoVar(2),lhs=AutoVar(0),rhs=AutoVar(0),type=mult )
+Assign AutoVar(1) = AutoVar(2)
+Function Call printf(DataOffset[2], AutoVar(1))
+Auto Variables(1)
+Assign AutoVar(3) = AutoVar(0)
+BinOp (AutoVar(0),lhs=AutoVar(0),rhs=Literal(1),type=add )
+Return Value (AutoVar(3))
+Scope End bar
+data:
+37,100,32,37,100,10,0
+104,101,108,108,111,32,102,114,111,109,32,102,111,111,32,37,100,10,0
+104,101,108,108,111,32,102,114,111,109,32,98,97,114,32,37,100,10,0
+
