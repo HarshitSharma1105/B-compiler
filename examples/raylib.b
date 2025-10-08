@@ -2,7 +2,7 @@ main()
 {
     extrn InitWindow,WindowShouldClose,BeginDrawing,EndDrawing,ClearBackground;
     auto a=800,b=600,c="hello from B";
-    InitWindow(a*2,b+700,c+1);
+    InitWindow(a,b,c);
     while(!WindowShouldClose())
     {
         BeginDrawing();

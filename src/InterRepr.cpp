@@ -285,6 +285,7 @@ private:
         else if(scope_open())return;
         else if(compile_return())return;
         else if(compile_while_loops())return;
+        else if(compile_stmt())return;
         assert(false && "UNREACHEABLE\n");
     }
 
@@ -309,6 +310,16 @@ private:
             std::optional<Arg> arg=compile_expression(0);
             try_consume(Tokentype::semicolon,"Expected ;\n");
             ops.emplace_back(ReturnValue{arg});
+            return true;
+        }
+        return false;
+    }
+
+    bool compile_stmt()
+    {
+        if(compile_expression(0).has_value())
+        {
+            try_consume(Tokentype::semicolon,"Expected ;\n");
             return true;
         }
         return false;
@@ -344,9 +355,7 @@ private:
                 JmpInfo info=loops.top();
                 loops.pop();
                 ops.emplace_back(Jmp{info.jmp_idx});
-                JmpIfZero jz = std::get<JmpIfZero>(ops[info.skip_idx]);
-                jz.idx=ops.size();
-                ops[info.skip_idx]=jz;
+                std::get<JmpIfZero>(ops[info.skip_idx]).idx=ops.size();
             }
             Scope scope=scopes.top();
             std::string name=scope.scope_name;
@@ -415,8 +424,9 @@ private:
                 std::cerr << "variable not declared " << peek().value().val << "\n";
                 exit(EXIT_FAILURE);
             }
+            if(peek(1).value().type!=Tokentype::assignment)return false;
             size_t offset = get_var_offset(consume().val);
-            try_consume(Tokentype::assignment,"expected =\n");
+            consume();// for the assignment operator
             ops.emplace_back(AutoAssign{offset,compile_expression(0).value()});
             try_consume(Tokentype::semicolon,"Expected ;\n");//semicolon
             return true;
