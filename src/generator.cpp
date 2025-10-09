@@ -11,7 +11,7 @@ public:
             std::stringstream& stream;
             void operator()(const Var& var)
             {
-                stream << "    lw $s0,-" << (var.offset+1)*4 << "($s1)\n";
+                stream << "    lw $s0,-" << (var.index+1)*4 << "($s1)\n";
             }
 
             void operator()(const Literal& literal)
@@ -39,7 +39,7 @@ public:
             void operator()(const AutoAssign& autoassign) 
             {
                 std::visit(argvisitor,autoassign.arg);
-                stream << "    sw $s0,-" << (autoassign.offset+1)*4 << "($s1)\n";
+                stream << "    sw $s0,-" << (autoassign.index+1)*4 << "($s1)\n";
             }
             void operator()(const UnOp& unop)
             {
@@ -151,6 +151,10 @@ public:
             {
                 assert(false && "TODO Mips jumps\n");
             }
+            void operator()(const Store& store)
+            {
+                assert(false && "TODO Mips Pointers");
+            }
         };
         textstream << ".text\n";
         textstream << "    .globl main\n";
@@ -214,20 +218,20 @@ public:
             std::stringstream& stream;
             void operator()(const Var& var)
             {
-                stream << "[rbp-" << (var.offset+1)*8 << "]\n";
+                stream << "    mov rcx,[rbp-" << (var.index+1)*8 << "]\n";
             }
 
             void operator()(const Literal& literal)
             {
-                stream << literal.literal << "\n";
+                stream << "    mov rcx," << literal.literal << "\n";
             }
             void operator()(const DataOffset& data)
             {
-                stream << "data_" << data.start << "\n";
+                stream << "    mov rcx,data_" << data.start << "\n";
             }
             void operator()(const FuncResult& funcresult)
             {
-                stream << "rax\n";
+                stream << "    mov rcx,rax\n";
             }
         };
         struct Visitor {
@@ -243,29 +247,27 @@ public:
 
             void operator()(const AutoAssign& autoassign) 
             {
-                stream << "    mov rcx,";
                 std::visit(argvisitor,autoassign.arg);
-                stream << "    mov QWORD [rbp-" << (autoassign.offset+1)*8 << "],rcx\n";
+                stream << "    mov QWORD [rbp-" << (autoassign.index+1)*8 << "],rcx\n";
             }
             void operator()(const UnOp& unop)
             {
-                stream << "    mov rbx,";
                 std::visit(argvisitor,unop.arg);
+                stream << "    mov rbx,rcx\n";
                 switch(unop.type)
                 {
                     case UnOpType::Negate:stream << "    xor rcx,rcx\n    sub rcx,rbx\n";break;
                     case UnOpType::Not:   stream << "    cmp rbx,0\n    sete al\n    movzx rcx,al\n";break;
-                    case UnOpType::Deref: stream << "    ";break;
+                    case UnOpType::Deref: stream << "    mov rcx,[rcx]\n";break;
                     default: assert(false && "TODO More Unary Operations\n");
                 }
                 stream << "    mov QWORD [rbp-" << (unop.index+1)*8 << "],rcx\n";
             }
             void operator()(const BinOp& binop)
             {
-                stream << "    mov rcx,";
-                std::visit(argvisitor,binop.lhs);
-                stream << "    mov rbx,";
                 std::visit(argvisitor,binop.rhs);
+                stream << "    mov rbx,rcx\n";
+                std::visit(argvisitor,binop.lhs);
                 switch(binop.type)
                 {
                     case Tokentype::assignment:stream << "    mov rcx,rbx\n";break;
@@ -290,8 +292,8 @@ public:
                 if(funcall.args.size()>4)assert(false && "too many args");
                 for(size_t i=0;i<funcall.args.size();i++)
                 {
-                    stream << "    mov " << regs[i] << ",";
                     std::visit(argvisitor,funcall.args[i]);
+                    stream << "    mov " << regs[i] << ",rcx\n";
                 }
                 stream << "    xor rax,rax\n";
                 if(count%2)stream << "    sub rsp,8\n";
@@ -337,12 +339,11 @@ public:
             }
             void operator()(const ReturnValue& retval)
             {
-                stream << "    mov rax,";
                 std::visit(argvisitor,retval.arg.value());
+                stream << "    mov rax,rcx\n";
             }
             void operator()(const JmpIfZero& jz)
             {
-                stream << "    mov rcx,";
                 std::visit(argvisitor,jz.arg);
                 stream << "    test rcx,rcx\n";
                 stream << "    jz op_" << jz.idx << "\n";
@@ -350,6 +351,13 @@ public:
             void operator()(const Jmp& jmp)
             {
                 stream << "    jmp op_" << jmp.idx << "\n";
+            }
+            void operator()(const Store& store)
+            {
+                std::visit(argvisitor,store.val);
+                stream << "    mov rbx,rcx\n";
+                std::visit(argvisitor,store.addr);
+                stream << "    mov [rcx],rbx\n";
             }
         };
         textstream << "format ELF64\n";

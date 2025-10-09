@@ -7,7 +7,7 @@
 
 struct Variable{
     std::string var_name;
-    size_t offset;
+    size_t index;
 };
 
 
@@ -19,7 +19,7 @@ struct AutoVar{
 
 
 struct Var{
-    size_t offset;
+    size_t index;
 };
 
 
@@ -35,14 +35,11 @@ struct FuncResult{
     std::string func_name;
 };
 
-struct Ref{
-    size_t index;
-};
 
 typedef std::variant<Var,Literal,DataOffset,FuncResult> Arg;
 
 struct AutoAssign{
-    size_t offset;
+    size_t index;
     Arg arg;
 };
 
@@ -82,7 +79,9 @@ struct FuncDecl{
     size_t count;
 };
 
-
+struct Store{
+    Arg addr,val;
+};
 
 struct DataSection{
     std::string concatedstrings;
@@ -130,13 +129,13 @@ struct ScopeClose{
 };
 
 typedef std::variant<AutoVar,AutoAssign,UnOp,BinOp,ExtrnDecl,Funcall,FuncDecl,
-    ScopeBegin,ScopeClose,DataSection,ReturnValue,JmpIfZero,Jmp> Op;
+    ScopeBegin,ScopeClose,DataSection,ReturnValue,JmpIfZero,Jmp,Store> Op;
 
 
 struct DebugArgVisitor{
     void operator()(const Var& var)
     {
-        std::cout << "AutoVar(" << var.offset << ")";
+        std::cout << "AutoVar(" << var.index << ")";
     }
 
     void operator()(const Literal& literal)
@@ -162,7 +161,7 @@ struct DebugVisitor {
 
     void operator()(const AutoAssign& autoassign) 
     {
-        std::cout << "Assign AutoVar(" << autoassign.offset << ") = ";
+        std::cout << "Assign AutoVar(" << autoassign.index << ") = ";
         std::visit(debugargvisitor,autoassign.arg);
         std::cout << "\n";
     }
@@ -171,7 +170,14 @@ struct DebugVisitor {
         std::cout << "UnOp (AutoVar(" << unop.index << ")";
         std::cout << ",arg=";
         std::visit(debugargvisitor,unop.arg);
-        std::cout << ",type=negate)\n";
+        std::cout << ",type=";
+        switch(unop.type)
+        {
+            case Negate:std::cout << "negate";break;
+            case Not:   std::cout << "not";break;
+            case Deref: std::cout << "derefernce";break;
+        }
+        std::cout << " )\n";
     }
     void operator()(const BinOp& binop) 
     {
@@ -233,6 +239,14 @@ struct DebugVisitor {
     {
         std::cout << "Jump To " << jmp.idx << "\n";
     }
+    void operator()(const Store& store)
+    {
+        std::cout << "Store ";
+        std::visit(debugargvisitor,store.val);
+        std::cout << " at address in ";
+        std::visit(debugargvisitor,store.addr);
+        std::cout << "\n";  
+    }
 };
 
 
@@ -274,11 +288,11 @@ public:
 
 
 private:
-    size_t get_var_offset(const std::string& name)
+    size_t get_var_index(const std::string& name)
     {
         for(size_t i=0;i<vars.size();i++)
         {
-            if(vars[i].var_name==name)return vars[i].offset;
+            if(vars[i].var_name==name)return vars[i].index;
         }
         return -1;
     }
@@ -395,15 +409,15 @@ private:
     //     if(try_peek(Tokentype::identifier).has_value())
     //     {
     //         //if(compile_expression(0).has_value())return true; TODO : How to ignore a statement!
-    //         if(get_var_offset(peek().value().val)==-1)
+    //         if(get_var_index(peek().value().val)==-1)
     //         {
     //             std::cerr << "variable not declared " << peek().value().val << "\n";
     //             exit(EXIT_FAILURE);
     //         }
     //         if(peek(1).value().type!=Tokentype::assignment)return false;
-    //         size_t offset = get_var_offset(consume().val);
+    //         size_t index = get_var_index(consume().val);
     //         consume();// for the assignment operator
-    //         ops.emplace_back(AutoAssign{offset,compile_expression(0).value()});
+    //         ops.emplace_back(AutoAssign{index,compile_expression(0).value()});
     //         try_consume(Tokentype::semicolon,"Expected ;\n");//semicolon
     //         return true;
     //     }
@@ -417,7 +431,7 @@ private:
             {
                 try_consume(Tokentype::comma);
                 std::string var_name=consume().val;
-                if(get_var_offset(var_name)!=-1)
+                if(get_var_index(var_name)!=-1)
                 {
                     std::cerr << "variable already declared " << peek().value().val << "\n";
                     exit(EXIT_FAILURE);
@@ -427,7 +441,7 @@ private:
                 if(try_consume(Tokentype::assignment).has_value())
                 {
                     Arg arg=compile_expression(1).value();
-                    ops.emplace_back(AutoAssign{get_var_offset(var_name),arg});
+                    ops.emplace_back(AutoAssign{get_var_index(var_name),arg});
                 }
             }
             try_consume(Tokentype::semicolon,"Expected ;\n");//semicolon
@@ -490,7 +504,9 @@ private:
         
         while(try_peek(get_ops(precedence)))
         {
-            if(precedence==0)index=std::get<Var>(lhs.value()).offset;
+            if(precedence==0)index=std::get<Var>(lhs.value()).index;//
+            // TODO : Make this a variant to allow smooth compilation of all statmenets like *p=20,p[1]=20,
+            // and to also check at compile time things like 20=3+5 which should be an error as you can't assign to an lvalue
             Tokentype type=consume().type;
             rhs=compile_expression(precedence+1);
             ops.emplace_back(BinOp{index,lhs.value(),rhs.value(),type});
@@ -505,8 +521,8 @@ private:
         {
             case Tokentype::identifier:
             {
-                Var var=Var{get_var_offset(token.val)};
-                if(var.offset==-1)
+                Var var=Var{get_var_index(token.val)};
+                if(var.index==-1)
                 {
                     std::cerr << "variable not declared " << token.val << "\n";
                     exit(EXIT_FAILURE);
@@ -517,8 +533,8 @@ private:
                 ops.emplace_back(AutoAssign{vars_count,var});
                 switch(type)
                 {
-                    case Tokentype::incr:ops.emplace_back(BinOp{var.offset,var,Literal{1},Tokentype::add});break;
-                    case Tokentype::decr:ops.emplace_back(BinOp{var.offset,var,Literal{1},Tokentype::sub});break;
+                    case Tokentype::incr:ops.emplace_back(BinOp{var.index,var,Literal{1},Tokentype::add});break;
+                    case Tokentype::decr:ops.emplace_back(BinOp{var.index,var,Literal{1},Tokentype::sub});break;
                     default: assert(false && "add more post ops\n");
                 }
                 return Var{vars_count++};
@@ -561,7 +577,14 @@ private:
             {
                 std::optional<Arg> arg=compile_primary_expression();
                 ops.emplace_back(AutoVar{1});
-                ops.emplace_back(UnOp{vars_count,arg.value(),UnOpType::Deref});
+                if(try_consume(Tokentype::assignment).has_value())
+                {
+                    Arg val=compile_expression(0).value();
+                    ops.emplace_back(Store{arg.value(),val});
+                    // TODO : Same as the get<Var> TODO fix this ugly code
+                    return val;
+                }
+                else ops.emplace_back(UnOp{vars_count,arg.value(),UnOpType::Deref});
                 return Var{vars_count++};
             }
             case Tokentype::open_paren:
@@ -572,7 +595,7 @@ private:
             }
             case Tokentype::incr:
             {
-                size_t val=get_var_offset(try_consume(Tokentype::identifier,"expected identifier after pre increment\n").val);
+                size_t val=get_var_index(try_consume(Tokentype::identifier,"expected identifier after pre increment\n").val);
                 if(val==-1)
                 {
                     std::cerr << "variable not declared " << token.val << "\n";
@@ -583,7 +606,7 @@ private:
             }
             case Tokentype::decr:
             {
-                size_t val=get_var_offset(try_consume(Tokentype::identifier,"expected identifier after pre decrement\n").val);
+                size_t val=get_var_index(try_consume(Tokentype::identifier,"expected identifier after pre decrement\n").val);
                 if(val==-1)
                 {
                     std::cerr << "variable not declared " << token.val << "\n";
@@ -662,7 +685,6 @@ private:
     std::vector<Op> ops;
     std::vector<Token> tokens;
     std::stack<Scope> scopes;
-    std::stack<JmpInfo> loops;
     int token_index=0;
     size_t data_offset=0;
     size_t vars_count=0;
