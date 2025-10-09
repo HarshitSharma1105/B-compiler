@@ -493,20 +493,14 @@ private:
     }
     std::optional<Arg> compile_expression(int precedence)
     {
-
         if(precedence==precedences.size())return compile_primary_expression();
         std::optional<Arg> lhs=compile_expression(precedence+1),rhs;
-        size_t index=vars_count;
-        if(try_peek(get_ops(precedence)) && precedence>0){
-            vars_count++;
-            ops.emplace_back(AutoVar{1});
-        }
-        
-        while(try_peek(get_ops(precedence)))
-        {
-            if(precedence==0)index=std::get<Var>(lhs.value()).index;//
+        if(try_peek(get_ops(precedence))){
+            size_t index=vars_count++;
+            if(precedence==0)index=std::get<Var>(lhs.value()).index;           
             // TODO : Make this a variant to allow smooth compilation of all statmenets like *p=20,p[1]=20,
-            // and to also check at compile time things like 20=3+5 which should be an error as you can't assign to an lvalue
+            // and to also check at compile time things like 20=3+5 which should be an error as you can't assign to an rvalue
+            ops.emplace_back(AutoVar{1});
             Tokentype type=consume().type;
             rhs=compile_expression(precedence+1);
             ops.emplace_back(BinOp{index,lhs.value(),rhs.value(),type});
