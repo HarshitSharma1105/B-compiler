@@ -62,7 +62,7 @@ public:
                     case Tokentype::add:stream << "    add ";break;
                     case Tokentype::sub:stream << "    sub ";break;
                     case Tokentype::mult:stream << "   mul ";break;
-                    default: assert(false && "TODO: MIPS DIVISIO\n");
+                    default: assert(false && "TODO: MIPS DIVISION\n");
                 }
                 stream << " $s0,$s2,$s0\n";
                 stream << "    sw $s0,-" << (binop.index+1)*4 << "($s1)\n";
@@ -255,6 +255,7 @@ public:
                 {
                     case UnOpType::Negate:stream << "    xor rcx,rcx\n    sub rcx,rbx\n";break;
                     case UnOpType::Not:   stream << "    cmp rbx,0\n    sete al\n    movzx rcx,al\n";break;
+                    case UnOpType::Deref: stream << "    ";break;
                     default: assert(false && "TODO More Unary Operations\n");
                 }
                 stream << "    mov QWORD [rbp-" << (unop.index+1)*8 << "],rcx\n";
@@ -267,11 +268,13 @@ public:
                 std::visit(argvisitor,binop.rhs);
                 switch(binop.type)
                 {
-                    case Tokentype::add:stream <<  "    add rcx,rbx\n";break;
-                    case Tokentype::sub:stream <<  "    sub rcx,rbx\n";break;
-                    case Tokentype::mult:stream << "    imul rcx,rbx\n";break;
-                    case Tokentype::divi:stream << "    xor rdx,rdx\n    div rbx\n";assert(false && "MAKE DIVISION TO RCX ALSO\n");
-                    case Tokentype::less:stream << "    cmp rcx,rbx\n    setl al\n    movzx rcx,al\n";break;
+                    case Tokentype::assignment:stream << "    mov rcx,rbx\n";break;
+                    case Tokentype::less:stream       << "    cmp rcx,rbx\n    setl al\n    movzx rcx,al\n";break;
+                    case Tokentype::greater:stream    << "    cmp rcx,rbx\n    setg al\n    movzx rcx,al\n";break;
+                    case Tokentype::add:stream        << "    add rcx,rbx\n";break;
+                    case Tokentype::sub:stream        << "    sub rcx,rbx\n";break;
+                    case Tokentype::mult:stream       << "    imul rcx,rbx\n";break;
+                    case Tokentype::divi:stream       << "    xor rdx,rdx\n    div rbx\n";assert(false && "MAKE DIVISION TO RCX ALSO\n");
                     default: assert(false && "Unknown Binary Operand type\n");
                 }
                 stream << "    mov QWORD [rbp-" << (binop.index+1)*8 << "],rcx\n";

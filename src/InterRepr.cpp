@@ -24,7 +24,7 @@ struct Var{
 
 
 struct Literal{
-    int literal;
+   size_t literal;
 };
 
 struct DataOffset{
@@ -35,6 +35,9 @@ struct FuncResult{
     std::string func_name;
 };
 
+struct Ref{
+    size_t index;
+};
 
 typedef std::variant<Var,Literal,DataOffset,FuncResult> Arg;
 
@@ -52,6 +55,7 @@ struct ExtrnDecl{
 enum UnOpType{
     Negate,
     Not,
+    Deref
 };
 
 
@@ -243,6 +247,7 @@ void debug(const std::vector<Op>& ops)
 
 static std::vector<std::vector<Tokentype>> precedences =
 {
+    {Tokentype::assignment},   // we can put plus equals,minus equals,mult equals,assignment everything here
     {Tokentype::less,Tokentype::greater},
     {Tokentype::add,Tokentype::sub},
     {Tokentype::mult,Tokentype::divi}
@@ -283,8 +288,8 @@ private:
         else if(compile_funcdecl())return;
         else if(compile_extrn())return;
         else if(autovar_dec())return;
-        else if(compile_varinit())return;
-        else if(compile_funcall())return;
+        //else if(compile_varinit())return;
+        //else if(compile_funcall())return;
         else if(scope_end())return;
         else if(scope_open())return;
         else if(compile_return())return;
@@ -365,25 +370,45 @@ private:
     }
 
 
-    bool compile_funcall()
-    {
-        if(try_peek(Tokentype::funcall).has_value())
-        {
-            std::string funcall_name=consume().val;
-            try_consume(Tokentype::open_paren,"expected '('\n");
-            std::vector<Arg> args;
-            while(try_peek(close_paren).has_value()==false)
-            {   
-                args.push_back(compile_expression(0).value());
-                try_consume(Tokentype::comma);
-            }
-            try_consume(Tokentype::close_paren,"expected ')'\n");
-            ops.emplace_back(Funcall{funcall_name,args});
-            try_consume(Tokentype::semicolon,"Expected ;\n");//semicolon
-            return true;
-        }
-        return false;
-    }
+    // bool compile_funcall()
+    // {
+    //     if(try_peek(Tokentype::funcall).has_value())
+    //     {
+    //         std::string funcall_name=consume().val;
+    //         try_consume(Tokentype::open_paren,"expected '('\n");
+    //         std::vector<Arg> args;
+    //         while(try_peek(close_paren).has_value()==false)
+    //         {   
+    //             args.push_back(compile_expression(0).value());
+    //             try_consume(Tokentype::comma);
+    //         }
+    //         try_consume(Tokentype::close_paren,"expected ')'\n");
+    //         ops.emplace_back(Funcall{funcall_name,args});
+    //         try_consume(Tokentype::semicolon,"Expected ;\n");//semicolon
+    //         return true;
+    //     }
+    //     return false;
+    // }
+    
+    // bool compile_varinit()
+    // {
+    //     if(try_peek(Tokentype::identifier).has_value())
+    //     {
+    //         //if(compile_expression(0).has_value())return true; TODO : How to ignore a statement!
+    //         if(get_var_offset(peek().value().val)==-1)
+    //         {
+    //             std::cerr << "variable not declared " << peek().value().val << "\n";
+    //             exit(EXIT_FAILURE);
+    //         }
+    //         if(peek(1).value().type!=Tokentype::assignment)return false;
+    //         size_t offset = get_var_offset(consume().val);
+    //         consume();// for the assignment operator
+    //         ops.emplace_back(AutoAssign{offset,compile_expression(0).value()});
+    //         try_consume(Tokentype::semicolon,"Expected ;\n");//semicolon
+    //         return true;
+    //     }
+    //     return false;
+    // }
     bool autovar_dec()
     {
         if(try_consume(Tokentype::auto_).has_value())
@@ -401,7 +426,7 @@ private:
                 vars.push_back(Variable{var_name,vars_count++});
                 if(try_consume(Tokentype::assignment).has_value())
                 {
-                    Arg arg=compile_expression(0).value();
+                    Arg arg=compile_expression(1).value();
                     ops.emplace_back(AutoAssign{get_var_offset(var_name),arg});
                 }
             }
@@ -410,25 +435,7 @@ private:
         }
         return false;
     }
-    bool compile_varinit()
-    {
-        if(try_peek(Tokentype::identifier).has_value())
-        {
-            //if(compile_expression(0).has_value())return true; TODO : How to ignore a statement!
-            if(get_var_offset(peek().value().val)==-1)
-            {
-                std::cerr << "variable not declared " << peek().value().val << "\n";
-                exit(EXIT_FAILURE);
-            }
-            if(peek(1).value().type!=Tokentype::assignment)return false;
-            size_t offset = get_var_offset(consume().val);
-            consume();// for the assignment operator
-            ops.emplace_back(AutoAssign{offset,compile_expression(0).value()});
-            try_consume(Tokentype::semicolon,"Expected ;\n");//semicolon
-            return true;
-        }
-        return false;
-    }
+    
 
     bool compile_extrn()
     {
@@ -476,12 +483,14 @@ private:
         if(precedence==precedences.size())return compile_primary_expression();
         std::optional<Arg> lhs=compile_expression(precedence+1),rhs;
         size_t index=vars_count;
-        if(try_peek(get_ops(precedence))){
+        if(try_peek(get_ops(precedence)) && precedence>0){
             vars_count++;
             ops.emplace_back(AutoVar{1});
         }
+        
         while(try_peek(get_ops(precedence)))
         {
+            if(precedence==0)index=std::get<Var>(lhs.value()).offset;
             Tokentype type=consume().type;
             rhs=compile_expression(precedence+1);
             ops.emplace_back(BinOp{index,lhs.value(),rhs.value(),type});
@@ -514,7 +523,7 @@ private:
                 }
                 return Var{vars_count++};
             }
-            case Tokentype::integer_lit:return Literal{atoi(token.val.c_str())};
+            case Tokentype::integer_lit:return Literal{(size_t)atoll(token.val.c_str())};
             case Tokentype::string_lit:
             {
                 std::string lit=token.val;
@@ -548,6 +557,13 @@ private:
                 ops.emplace_back(UnOp{vars_count,arg.value(),UnOpType::Not});
                 return Var{vars_count++};
             }
+            case Tokentype::mult:
+            {
+                std::optional<Arg> arg=compile_primary_expression();
+                ops.emplace_back(AutoVar{1});
+                ops.emplace_back(UnOp{vars_count,arg.value(),UnOpType::Deref});
+                return Var{vars_count++};
+            }
             case Tokentype::open_paren:
             {
                 std::optional<Arg> arg=compile_expression(0);
@@ -578,6 +594,9 @@ private:
             }
             case Tokentype::funcall:
             {
+                bool ret=try_peek({Tokentype::semicolon,Tokentype::open_curly},-2).has_value();
+                // if our tokens are like ;/{  funcall ( then we can assume the result of the func is unused
+                //                                     ^ current index since we consumed the funcall token already
                 std::string funcall_name=token.val;
                 try_consume(Tokentype::open_paren,"expected '('\n");
                 std::vector<Arg> args;
@@ -588,6 +607,7 @@ private:
                 }
                 try_consume(Tokentype::close_paren,"expected ')'\n");
                 ops.emplace_back(Funcall{funcall_name,args});
+                if(ret)return Var{10011};
                 ops.emplace_back(AutoVar{1});
                 FuncResult res= {funcall_name};
                 ops.emplace_back(AutoAssign{vars_count,res});
@@ -626,18 +646,18 @@ private:
         }
         return {};
     }
-    std::optional<Tokentype> try_peek(const std::vector<Tokentype>& types)
+    std::optional<Tokentype> try_peek(const std::vector<Tokentype>& types,int offset=0)
     {
         for(const Tokentype type:types)
         {
-            if(peek().value().type==type)return type;
+            if(peek(offset).value().type==type)return type;
         }
         return {};
     }
-    std::optional<Tokentype> try_peek(const Tokentype& type)
+    std::optional<Tokentype> try_peek(const Tokentype& type,int offset=0)
     {
         std::vector<Tokentype> t={type};
-        return try_peek(t);
+        return try_peek(t,offset);
     }
     std::vector<Op> ops;
     std::vector<Token> tokens;

@@ -5,7 +5,7 @@ main()
     while(a<100000)
     {
         auto c=a+b;
-        printf("%d\n",c);
+        printf("%d\n",a);
         a=b;
         b=c;
     }
