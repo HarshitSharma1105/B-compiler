@@ -218,27 +218,27 @@ public:
             std::stringstream& stream;
             void operator()(const Var& var)
             {
-                stream << "    mov rcx,[rbp-" << (var.index+1)*8 << "]\n";
+                stream << "    mov r15,[rbp-" << (var.index+1)*8 << "]\n";
             }
 
             void operator()(const Literal& literal)
             {
-                stream << "    mov rcx," << literal.literal << "\n";
+                stream << "    mov r15," << literal.literal << "\n";
             }
             void operator()(const DataOffset& data)
             {
-                stream << "    mov rcx,data_" << data.start << "\n";
+                stream << "    mov r15,data_" << data.start << "\n";
             }
             void operator()(const FuncResult& funcresult)
             {
-                stream << "    mov rcx,rax\n";
+                stream << "    mov r15,rax\n";
             }
         };
         struct Visitor {
             int count=1;
             std::stringstream& stream;
             ArgVisitor argvisitor{stream};
-            std::string regs[4]={"rdi","rsi","rdx","rcx"};
+            std::string regs[6]={"rdi","rsi","rdx","rcx","r8","r9"};
             void operator()(const AutoVar& autovar) 
             {
                 count+=autovar.count;
@@ -248,38 +248,38 @@ public:
             void operator()(const AutoAssign& autoassign) 
             {
                 std::visit(argvisitor,autoassign.arg);
-                stream << "    mov QWORD [rbp-" << (autoassign.index+1)*8 << "],rcx\n";
+                stream << "    mov QWORD [rbp-" << (autoassign.index+1)*8 << "],r15\n";
             }
             void operator()(const UnOp& unop)
             {
                 std::visit(argvisitor,unop.arg);
-                stream << "    mov rbx,rcx\n";
+                stream << "    mov r14,r15\n";
                 switch(unop.type)
                 {
-                    case UnOpType::Negate:stream << "    xor rcx,rcx\n    sub rcx,rbx\n";break;
-                    case UnOpType::Not:   stream << "    cmp rbx,0\n    sete al\n    movzx rcx,al\n";break;
-                    case UnOpType::Deref: stream << "    mov rcx,[rcx]\n";break;
+                    case UnOpType::Negate:stream << "    xor r15,r15\n    sub r15,r14\n";break;
+                    case UnOpType::Not:   stream << "    cmp r14,0\n    sete al\n    movzx r15,al\n";break;
+                    case UnOpType::Deref: stream << "    mov r15,[r15]\n";break;
                     default: assert(false && "TODO More Unary Operations\n");
                 }
-                stream << "    mov QWORD [rbp-" << (unop.index+1)*8 << "],rcx\n";
+                stream << "    mov QWORD [rbp-" << (unop.index+1)*8 << "],r15\n";
             }
             void operator()(const BinOp& binop)
             {
                 std::visit(argvisitor,binop.rhs);
-                stream << "    mov rbx,rcx\n";
+                stream << "    mov r14,r15\n";
                 std::visit(argvisitor,binop.lhs);
                 switch(binop.type)
                 {
-                    case Tokentype::assignment:stream << "    mov rcx,rbx\n";break;
-                    case Tokentype::less:stream       << "    cmp rcx,rbx\n    setl al\n    movzx rcx,al\n";break;
-                    case Tokentype::greater:stream    << "    cmp rcx,rbx\n    setg al\n    movzx rcx,al\n";break;
-                    case Tokentype::add:stream        << "    add rcx,rbx\n";break;
-                    case Tokentype::sub:stream        << "    sub rcx,rbx\n";break;
-                    case Tokentype::mult:stream       << "    imul rcx,rbx\n";break;
-                    case Tokentype::divi:stream       << "    xor rdx,rdx\n    div rbx\n";assert(false && "MAKE DIVISION TO RCX ALSO\n");
+                    case Tokentype::assignment:stream << "    mov r15,r14\n";break;
+                    case Tokentype::less:stream       << "    cmp r15,r14\n    setl al\n    movzx r15,al\n";break;
+                    case Tokentype::greater:stream    << "    cmp r15,r14\n    setg al\n    movzx r15,al\n";break;
+                    case Tokentype::add:stream        << "    add r15,r14\n";break;
+                    case Tokentype::sub:stream        << "    sub r15,r14\n";break;
+                    case Tokentype::mult:stream       << "    imul r15,r14\n";break;
+                    case Tokentype::divi:stream       << "    xor rdx,rdx\n    div r14\n";assert(false && "MAKE DIVISION TO r15 ALSO\n");
                     default: assert(false && "Unknown Binary Operand type\n");
                 }
-                stream << "    mov QWORD [rbp-" << (binop.index+1)*8 << "],rcx\n";
+                stream << "    mov QWORD [rbp-" << (binop.index+1)*8 << "],r15\n";
             }
 
             void operator()(const ExtrnDecl& extrndecl)
@@ -289,11 +289,11 @@ public:
 
             void operator()(const Funcall& funcall) 
             {
-                if(funcall.args.size()>4)assert(false && "too many args");
+                if(funcall.args.size()>6)assert(false && "too many args");
                 for(size_t i=0;i<funcall.args.size();i++)
                 {
                     std::visit(argvisitor,funcall.args[i]);
-                    stream << "    mov " << regs[i] << ",rcx\n";
+                    stream << "    mov " << regs[i] << ",r15\n";
                 }
                 stream << "    xor rax,rax\n";
                 if(count%2)stream << "    sub rsp,8\n";
@@ -340,12 +340,12 @@ public:
             void operator()(const ReturnValue& retval)
             {
                 std::visit(argvisitor,retval.arg.value());
-                stream << "    mov rax,rcx\n";
+                stream << "    mov rax,r15\n";
             }
             void operator()(const JmpIfZero& jz)
             {
                 std::visit(argvisitor,jz.arg);
-                stream << "    test rcx,rcx\n";
+                stream << "    test r15,r15\n";
                 stream << "    jz op_" << jz.idx << "\n";
             }
             void operator()(const Jmp& jmp)
@@ -355,9 +355,9 @@ public:
             void operator()(const Store& store)
             {
                 std::visit(argvisitor,store.val);
-                stream << "    mov rbx,rcx\n";
+                stream << "    mov r14,r15\n";
                 std::visit(argvisitor,store.addr);
-                stream << "    mov [rcx],rbx\n";
+                stream << "    mov [r15],r14\n";
             }
         };
         textstream << "format ELF64\n";
