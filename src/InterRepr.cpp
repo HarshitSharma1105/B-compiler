@@ -495,7 +495,7 @@ private:
     {
         if(precedence==precedences.size())return compile_primary_expression();
         std::optional<Arg> lhs=compile_expression(precedence+1),rhs;
-        if(try_peek(get_ops(precedence))){
+        if(try_peek(precedences[precedence])){
             size_t index=vars_count++;
             if(precedence==0)index=std::get<Var>(lhs.value()).index;           
             // TODO : Make this a variant to allow smooth compilation of all statmenets like *p=20,p[1]=20,
@@ -578,7 +578,8 @@ private:
                     // TODO : Same as the get<Var> TODO fix this ugly code
                     return val;
                 }
-                else ops.emplace_back(UnOp{vars_count,arg.value(),UnOpType::Deref});
+                // TODO : something like (*(p+8*i))=val should work
+                ops.emplace_back(UnOp{vars_count,arg.value(),UnOpType::Deref});
                 return Var{vars_count++};
             }
             case Tokentype::open_paren:
@@ -635,10 +636,6 @@ private:
         return {};
     }
 
-    std::vector<Tokentype> get_ops(int precedence)
-    {
-        return precedences[precedence];
-    }
     std::optional<Token> peek(int offset=0){
         if(token_index+offset>=tokens.size()){
             return {};

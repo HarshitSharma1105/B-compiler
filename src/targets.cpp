@@ -23,7 +23,7 @@ public:
 		}
 		else 
 		{
-			std::cerr << "Unsupported Target Language . Please provide valid target for the compiler\n";
+			std::cerr << "Unsupported Target Language " << target_lang << " Please provide valid target for the compiler\n";
 			exit(EXIT_FAILURE);
 		}
 	}
