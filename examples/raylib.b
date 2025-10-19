@@ -3,7 +3,7 @@ main()
     extrn InitWindow,WindowShouldClose,BeginDrawing,EndDrawing,ClearBackground;
     extrn SetTargetFPS,DrawRectangle;
     auto a=800,b=600,c="hello from B";
-    InitWindow(a,b,c);
+    InitWindow(a*2,b+1000,c);
     SetTargetFPS(60);
     auto x=200,y=200;
     auto dx=2,dy=2;

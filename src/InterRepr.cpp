@@ -590,7 +590,8 @@ private:
             }
             case Tokentype::incr:
             {
-                size_t val=get_var_index(try_consume(Tokentype::identifier,"expected identifier after pre increment\n").val);
+                Token var=try_consume(Tokentype::identifier,"expected identifier after pre decrement\n");
+                size_t val=get_var_index(var.val);
                 if(val==-1)
                 {
                     std::cerr << "variable not declared " << token.val << "\n";
@@ -601,10 +602,11 @@ private:
             }
             case Tokentype::decr:
             {
-                size_t val=get_var_index(try_consume(Tokentype::identifier,"expected identifier after pre decrement\n").val);
+                Token var=try_consume(Tokentype::identifier,"expected identifier after pre decrement\n");
+                size_t val=get_var_index(var.val);
                 if(val==-1)
                 {
-                    std::cerr << "variable not declared " << token.val << "\n";
+                    std::cerr << "variable not declared " << var.val << "\n";
                     exit(EXIT_FAILURE);
                 }
                 ops.emplace_back(BinOp{val,Var{val},Literal{1},Tokentype::sub});
