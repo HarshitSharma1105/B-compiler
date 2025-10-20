@@ -54,8 +54,7 @@ struct ExtrnDecl{
 
 enum UnOpType{
     Negate,
-    Not,
-    Deref
+    Not
 };
 
 
@@ -182,7 +181,6 @@ struct DebugVisitor {
         {
             case Negate:std::cout << "negate";break;
             case Not:   std::cout << "not";break;
-            case Deref: std::cout << "derefernce";break;
         }
         std::cout << " )\n";
     }
@@ -506,42 +504,39 @@ private:
             bool lval;
             std::vector<Op>& ops;
             std::optional<Arg> rhs;
-            size_t operator()(const Var &var)
+            Tokentype type;
+            void operator()(const Var &var)
             {
-                return var.index;
+                if(lval)ops.emplace_back(BinOp{var.index,var,rhs.value(),type});
             }
-            size_t operator()(const Literal& literal)
+            void operator()(const Literal& literal)
             {
                 if(lval)
                 {
                     std::cerr << "Assignment to literal not allowed\n";
                     exit(EXIT_FAILURE);
                 }
-                return 0;
             }
-            size_t operator()(const DataOffset& dataoffset)
+            void operator()(const DataOffset& dataoffset)
             {
                 if(lval)
                 {
                     std::cerr << "Assignment to string literals not allowed\n";
                     exit(EXIT_FAILURE);
                 }
-                return 0;
             }
-            size_t operator()(const FuncResult& funcresult)
+            void operator()(const FuncResult& funcresult)
             {
                 if(lval)
                 {
                     std::cerr << "Assignment to function result not allowed\n";
                     exit(EXIT_FAILURE);
                 }
-                return 0;
             }
-            size_t operator()(const Ref& ref)
+            void operator()(const Ref& ref)
             {
-                if(lval)ops.emplace_back(Store{ref,rhs.value()});
-                else ops.emplace_back(UnOp{ref.index,ref,UnOpType::Deref});
-                return ref.index;
+                if(lval)ops.emplace_back(Store{Var{ref.index},rhs.value()});
+                // since store expects the address we don't want to dereference here yet
             }
         };
         if(try_peek(precedences[precedence])){
@@ -550,16 +545,17 @@ private:
             rhs=compile_expression(precedence+1);            
             if(precedence==0)
             {
-                AssignVisitor assignvisitor{true,ops,rhs};
-                index=std::visit(assignvisitor,lhs.value());
+                AssignVisitor assignvisitor{true,ops,rhs,type};
+                std::visit(assignvisitor,lhs.value());
+                return lhs;
             }          
             else
             {
                 ops.emplace_back(AutoVar{1});
                 index=vars_count++;
+                ops.emplace_back(BinOp{index,lhs.value(),rhs.value(),type});
+                lhs=Var{index};
             }    
-            ops.emplace_back(BinOp{index,lhs.value(),rhs.value(),type});
-            lhs=Var{index};
         }
         else if(precedence==0)
         {

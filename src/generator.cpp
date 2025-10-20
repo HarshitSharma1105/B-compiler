@@ -240,6 +240,7 @@ public:
             void operator()(const Ref& ref)
             {
                 stream << "    mov r15,[rbp-" << (ref.index+1)*8 << "]\n";
+                stream << "    mov r15,[r15]\n";
             }
         };
         struct Visitor {
@@ -266,7 +267,6 @@ public:
                 {
                     case UnOpType::Negate:stream << "    xor r15,r15\n    sub r15,r14\n";break;
                     case UnOpType::Not:   stream << "    cmp r14,0\n    sete al\n    movzx r15,al\n";break;
-                    case UnOpType::Deref: stream << "    mov r15,[r15]\n";break;
                     default: assert(false && "TODO More Unary Operations\n");
                 }
                 stream << "    mov QWORD [rbp-" << (unop.index+1)*8 << "],r15\n";
