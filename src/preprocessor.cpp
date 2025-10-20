@@ -63,6 +63,6 @@ std::string preprocessor(std::string path,const std::string& b_sourcecode)
             index++;
         }
     }
-    finalb_sourcecode+=b_sourcecode.substr(index,b_sourcecode.size()-index+1);
+    finalb_sourcecode+=b_sourcecode.substr(index);//default is till end
     return finalb_sourcecode;
 }

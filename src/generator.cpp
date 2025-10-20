@@ -26,6 +26,10 @@ public:
             {
                 stream << "    move $s0,$a0\n";
             }
+            void operator()(const Ref& ref)
+            {
+                assert(false && "TODO:Pointers in MIPS\n");
+            }
         };
         struct Visitor {
             std::stringstream& stream;
@@ -232,6 +236,10 @@ public:
             void operator()(const FuncResult& funcresult)
             {
                 stream << "    mov r15,rax\n";
+            }
+            void operator()(const Ref& ref)
+            {
+                stream << "    mov r15,[rbp-" << (ref.index+1)*8 << "]\n";
             }
         };
         struct Visitor {

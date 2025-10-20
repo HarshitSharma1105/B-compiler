@@ -22,6 +22,9 @@ struct Var{
     size_t index;
 };
 
+struct Ref{
+    size_t index;
+};
 
 struct Literal{
    size_t literal;
@@ -36,7 +39,7 @@ struct FuncResult{
 };
 
 
-typedef std::variant<Var,Literal,DataOffset,FuncResult> Arg;
+typedef std::variant<Var,Ref,Literal,DataOffset,FuncResult> Arg;
 
 struct AutoAssign{
     size_t index;
@@ -136,6 +139,10 @@ struct DebugArgVisitor{
     void operator()(const Var& var)
     {
         std::cout << "AutoVar(" << var.index << ")";
+    }
+    void operator()(const Ref& ref)
+    {
+        std::cout << "Reference(" << ref.index << ")";
     }
 
     void operator()(const Literal& literal)
@@ -495,16 +502,69 @@ private:
     {
         if(precedence==precedences.size())return compile_primary_expression();
         std::optional<Arg> lhs=compile_expression(precedence+1),rhs;
+        struct AssignVisitor{
+            bool lval;
+            std::vector<Op>& ops;
+            std::optional<Arg> rhs;
+            size_t operator()(const Var &var)
+            {
+                return var.index;
+            }
+            size_t operator()(const Literal& literal)
+            {
+                if(lval)
+                {
+                    std::cerr << "Assignment to literal not allowed\n";
+                    exit(EXIT_FAILURE);
+                }
+                return 0;
+            }
+            size_t operator()(const DataOffset& dataoffset)
+            {
+                if(lval)
+                {
+                    std::cerr << "Assignment to string literals not allowed\n";
+                    exit(EXIT_FAILURE);
+                }
+                return 0;
+            }
+            size_t operator()(const FuncResult& funcresult)
+            {
+                if(lval)
+                {
+                    std::cerr << "Assignment to function result not allowed\n";
+                    exit(EXIT_FAILURE);
+                }
+                return 0;
+            }
+            size_t operator()(const Ref& ref)
+            {
+                if(lval)ops.emplace_back(Store{ref,rhs.value()});
+                else ops.emplace_back(UnOp{ref.index,ref,UnOpType::Deref});
+                return ref.index;
+            }
+        };
         if(try_peek(precedences[precedence])){
-            size_t index=vars_count++;
-            if(precedence==0)index=std::get<Var>(lhs.value()).index;           
-            // TODO : Make this a variant to allow smooth compilation of all statmenets like *p=20,p[1]=20,
-            // and to also check at compile time things like 20=3+5 which should be an error as you can't assign to an rvalue
-            ops.emplace_back(AutoVar{1});
+            size_t index;
             Tokentype type=consume().type;
-            rhs=compile_expression(precedence+1);
+            rhs=compile_expression(precedence+1);            
+            if(precedence==0)
+            {
+                AssignVisitor assignvisitor{true,ops,rhs};
+                index=std::visit(assignvisitor,lhs.value());
+            }          
+            else
+            {
+                ops.emplace_back(AutoVar{1});
+                index=vars_count++;
+            }    
             ops.emplace_back(BinOp{index,lhs.value(),rhs.value(),type});
             lhs=Var{index};
+        }
+        else if(precedence==0)
+        {
+            AssignVisitor assignvisitor{false,ops,{}};
+            std::visit(assignvisitor,lhs.value());
         }
         return lhs;
     }
@@ -570,17 +630,20 @@ private:
             case Tokentype::mult:
             {
                 std::optional<Arg> arg=compile_primary_expression();
+                // ops.emplace_back(AutoVar{1});
+                // if(try_consume(Tokentype::assignment).has_value())
+                // {
+                //     Arg val=compile_expression(0).value();
+                //     ops.emplace_back(Store{arg.value(),val});
+                //     // TODO : Same as the get<Var> TODO fix this ugly code
+                //     return val;
+                // }
+                // // TODO : something like (*(p+8*i))=val should work
+                // ops.emplace_back(UnOp{vars_count,arg.value(),UnOpType::Deref});
+                // return Var{vars_count++};
                 ops.emplace_back(AutoVar{1});
-                if(try_consume(Tokentype::assignment).has_value())
-                {
-                    Arg val=compile_expression(0).value();
-                    ops.emplace_back(Store{arg.value(),val});
-                    // TODO : Same as the get<Var> TODO fix this ugly code
-                    return val;
-                }
-                // TODO : something like (*(p+8*i))=val should work
-                ops.emplace_back(UnOp{vars_count,arg.value(),UnOpType::Deref});
-                return Var{vars_count++};
+                ops.emplace_back(AutoAssign{vars_count,arg.value()});
+                return Ref{vars_count++};
             }
             case Tokentype::open_paren:
             {
@@ -614,9 +677,6 @@ private:
             }
             case Tokentype::funcall:
             {
-                bool ret=try_peek({Tokentype::semicolon,Tokentype::open_curly},-2).has_value();
-                // if our tokens are like ;/{  funcall ( then we can assume the result of the func is unused
-                //                                     ^ current index since we consumed the funcall token already
                 std::string funcall_name=token.val;
                 try_consume(Tokentype::open_paren,"expected '('\n");
                 std::vector<Arg> args;
@@ -627,10 +687,8 @@ private:
                 }
                 try_consume(Tokentype::close_paren,"expected ')'\n");
                 ops.emplace_back(Funcall{funcall_name,args});
-                if(ret)return Var{10011};
                 ops.emplace_back(AutoVar{1});
-                FuncResult res= {funcall_name};
-                ops.emplace_back(AutoAssign{vars_count,res});
+                ops.emplace_back(AutoAssign{vars_count,FuncResult{funcall_name}});
                 return Var{vars_count++};
             }
             default: debug(ops); assert(false && "UNREACHEABLE\n"); 
