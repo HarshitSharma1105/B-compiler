@@ -501,66 +501,48 @@ private:
         if(precedence==precedences.size())return compile_primary_expression();
         std::optional<Arg> lhs=compile_expression(precedence+1),rhs;
         struct AssignVisitor{
-            bool lval;
             std::vector<Op>& ops;
             std::optional<Arg> rhs;
             Tokentype type;
             void operator()(const Var &var)
             {
-                if(lval)ops.emplace_back(BinOp{var.index,var,rhs.value(),type});
+                ops.emplace_back(BinOp{var.index,var,rhs.value(),type});
             }
             void operator()(const Literal& literal)
             {
-                if(lval)
-                {
-                    std::cerr << "Assignment to literal not allowed\n";
-                    exit(EXIT_FAILURE);
-                }
+                std::cerr << "Assignment to integer literals not allowed\n";
+                exit(EXIT_FAILURE);
             }
             void operator()(const DataOffset& dataoffset)
             {
-                if(lval)
-                {
-                    std::cerr << "Assignment to string literals not allowed\n";
-                    exit(EXIT_FAILURE);
-                }
+                std::cerr << "Assignment to string literals not allowed\n";
+                exit(EXIT_FAILURE);
             }
             void operator()(const FuncResult& funcresult)
             {
-                if(lval)
-                {
-                    std::cerr << "Assignment to function result not allowed\n";
-                    exit(EXIT_FAILURE);
-                }
+                std::cerr << "Assignment to function result not allowed\n";
+                exit(EXIT_FAILURE);
             }
             void operator()(const Ref& ref)
             {
-                if(lval)ops.emplace_back(Store{Var{ref.index},rhs.value()});
+                ops.emplace_back(Store{Var{ref.index},rhs.value()});
                 // since store expects the address we don't want to dereference here yet
             }
         };
         if(try_peek(precedences[precedence])){
-            size_t index;
             Tokentype type=consume().type;
             rhs=compile_expression(precedence+1);            
             if(precedence==0)
             {
-                AssignVisitor assignvisitor{true,ops,rhs,type};
+                AssignVisitor assignvisitor{ops,rhs,type};
                 std::visit(assignvisitor,lhs.value());
-                return lhs;
             }          
             else
             {
                 ops.emplace_back(AutoVar{1});
-                index=vars_count++;
-                ops.emplace_back(BinOp{index,lhs.value(),rhs.value(),type});
-                lhs=Var{index};
+                ops.emplace_back(BinOp{vars_count,lhs.value(),rhs.value(),type});
+                lhs=Var{vars_count++};
             }    
-        }
-        else if(precedence==0)
-        {
-            AssignVisitor assignvisitor{false,ops,{}};
-            std::visit(assignvisitor,lhs.value());
         }
         return lhs;
     }
@@ -626,17 +608,6 @@ private:
             case Tokentype::mult:
             {
                 std::optional<Arg> arg=compile_primary_expression();
-                // ops.emplace_back(AutoVar{1});
-                // if(try_consume(Tokentype::assignment).has_value())
-                // {
-                //     Arg val=compile_expression(0).value();
-                //     ops.emplace_back(Store{arg.value(),val});
-                //     // TODO : Same as the get<Var> TODO fix this ugly code
-                //     return val;
-                // }
-                // // TODO : something like (*(p+8*i))=val should work
-                // ops.emplace_back(UnOp{vars_count,arg.value(),UnOpType::Deref});
-                // return Var{vars_count++};
                 ops.emplace_back(AutoVar{1});
                 ops.emplace_back(AutoAssign{vars_count,arg.value()});
                 return Ref{vars_count++};
