@@ -1,9 +1,4 @@
-#include<string>
-#include<filesystem>
-#include<sstream>
-#include<fstream>
-#include<iostream>
-
+#include<Preprocessor.h>
 
 void open_file(const std::string& path,std::string& finalb_sourcecode)
 {
