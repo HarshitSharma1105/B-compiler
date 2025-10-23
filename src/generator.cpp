@@ -24,11 +24,12 @@ public:
             }
             void operator()(const FuncResult& funcresult)
             {
-                stream << "    move $s0,$a0\n";
+                stream << "    move $s0,$v0\n";
             }
             void operator()(const Ref& ref)
             {
-                assert(false && "TODO:Pointers in MIPS\n");
+                stream << "    lw $s0,-" << (ref.index+1)*4 << "($s1)\n";
+                stream << "    lw $s0,0($s0)\n";
             }
         };
         struct Visitor {
@@ -63,12 +64,15 @@ public:
                 std::visit(argvisitor,binop.rhs);
                 switch(binop.type)
                 {
-                    case Tokentype::add:stream << "    add ";break;
-                    case Tokentype::sub:stream << "    sub ";break;
-                    case Tokentype::mult:stream << "   mul ";break;
-                    default: assert(false && "TODO: MIPS DIVISION\n");
+                    case Tokentype::assignment:stream << "";break;
+                    case Tokentype::less:stream       << "    slt $s0,$s2,$s0\n";break;
+                    case Tokentype::greater:stream    << "    sgt $s0,$s2,$s0\n";break;
+                    case Tokentype::add:stream        << "    add $s0,$s2,$s0\n";break;
+                    case Tokentype::sub:stream        << "    sub $s0,$s2,$s0\n";break;
+                    case Tokentype::mult:stream       << "    mul $s0,$s2,$s0\n";break;
+                    case Tokentype::divi: assert(false && "TODO MIPS Division\n");
+                    default: assert(false && "Unknown Binary Operation\n");
                 }
-                stream << " $s0,$s2,$s0\n";
                 stream << "    sw $s0,-" << (binop.index+1)*4 << "($s1)\n";
             }
 
@@ -145,27 +149,33 @@ public:
             void operator()(const ReturnValue& retval)
             {
                 std::visit(argvisitor,retval.arg.value());
-                stream << "    move $a0,$s0\n";
+                stream << "    move $v0,$s0\n";
             }
             void operator()(const JmpIfZero& jz)
             {
-                assert(false && "TODO Mips jumps\n");
+                std::visit(argvisitor,jz.arg);
+                stream << "    beqz $s0,op_" << jz.idx << "\n";
             }
             void operator()(const Jmp& jmp)
             {
-                assert(false && "TODO Mips jumps\n");
+                stream << "    b op_" << jmp.idx << "\n";
             }
             void operator()(const Store& store)
             {
-                assert(false && "TODO Mips Pointers");
+                std::visit(argvisitor,store.val);
+                stream << "    move $s2,$s0\n";
+                std::visit(argvisitor,store.addr);
+                stream << "    sw $s2,($s0)\n";
             }
         };
         textstream << ".text\n";
         textstream << "    .globl main\n";
         generate_stdlib();
         Visitor visitor{textstream};
+        int idx=0;
         while(peek().has_value())
         {
+            textstream << "op_" << idx++ << ":\n";
             std::visit(visitor,consume());
         }
         return textstream.str();
@@ -182,10 +192,28 @@ private:
         textstream << "putint:\n";
         textstream << "    li $v0,1\n";
         textstream << "    syscall\n";
+        textstream << "    li $v0,11\n";
+        textstream << "    li $a0,32\n";
+        textstream << "    syscall\n";
         textstream << "    jr $ra\n";
+
+
+        textstream << "pnl:\n";
+        textstream << "    li $v0,11\n";
+        textstream << "    li $a0,10\n";
+        textstream << "    syscall\n";
+        textstream << "    jr $ra\n";
+
+        
 
         textstream << "puts:\n";
         textstream << "    li $v0,4\n";
+        textstream << "    syscall\n";
+        textstream << "    jr $ra\n";
+
+
+        textstream << "malloc:\n";
+        textstream << "    li $v0,9\n";
         textstream << "    syscall\n";
         textstream << "    jr $ra\n";
     }

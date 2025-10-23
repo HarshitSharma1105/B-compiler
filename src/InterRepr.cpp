@@ -307,8 +307,6 @@ private:
         else if(compile_funcdecl())return;
         else if(compile_extrn())return;
         else if(autovar_dec())return;
-        //else if(compile_varinit())return;
-        //else if(compile_funcall())return;
         else if(scope_end())return;
         else if(scope_open())return;
         else if(compile_return())return;
@@ -389,45 +387,6 @@ private:
     }
 
 
-    // bool compile_funcall()
-    // {
-    //     if(try_peek(Tokentype::funcall).has_value())
-    //     {
-    //         std::string funcall_name=consume().val;
-    //         try_consume(Tokentype::open_paren,"expected '('\n");
-    //         std::vector<Arg> args;
-    //         while(try_peek(close_paren).has_value()==false)
-    //         {   
-    //             args.push_back(compile_expression(0).value());
-    //             try_consume(Tokentype::comma);
-    //         }
-    //         try_consume(Tokentype::close_paren,"expected ')'\n");
-    //         ops.emplace_back(Funcall{funcall_name,args});
-    //         try_consume(Tokentype::semicolon,"Expected ;\n");//semicolon
-    //         return true;
-    //     }
-    //     return false;
-    // }
-    
-    // bool compile_varinit()
-    // {
-    //     if(try_peek(Tokentype::identifier).has_value())
-    //     {
-    //         //if(compile_expression(0).has_value())return true; TODO : How to ignore a statement!
-    //         if(get_var_index(peek().value().val)==-1)
-    //         {
-    //             std::cerr << "variable not declared " << peek().value().val << "\n";
-    //             exit(EXIT_FAILURE);
-    //         }
-    //         if(peek(1).value().type!=Tokentype::assignment)return false;
-    //         size_t index = get_var_index(consume().val);
-    //         consume();// for the assignment operator
-    //         ops.emplace_back(AutoAssign{index,compile_expression(0).value()});
-    //         try_consume(Tokentype::semicolon,"Expected ;\n");//semicolon
-    //         return true;
-    //     }
-    //     return false;
-    // }
     bool autovar_dec()
     {
         if(try_consume(Tokentype::auto_).has_value())

@@ -5,7 +5,7 @@ main(){
     b=5*(c-20)+65;
     c=-b++ + (-a);
     auto f=c++ + ++c;
-    printf("%d,%d,%d\n",(a+10)*20,(b+30),-c);
+    printf("%d %d %d\n",(a+10)*20,b+30,-c);
     foo(a++);
     foo(a);;;;;;;
     {
