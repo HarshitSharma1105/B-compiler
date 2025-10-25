@@ -146,7 +146,7 @@ std::string Generator_Mips::generate()
 
         void operator()(const ReturnValue& retval)
         {
-            std::visit(argvisitor,retval.arg.value());
+            std::visit(argvisitor,retval.arg);
             stream << "    move $v0,$s0\n";
         }
         void operator()(const JmpIfZero& jz)

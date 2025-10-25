@@ -31,7 +31,9 @@ void debug(const Tokentype& tokentype)
         case while_:            std::cout << "while ";break;
         case less:              std::cout << "less ";break;
         case greater:           std::cout << "greater ";break;
-        case not_:            std::cout << "negate ";break;
+        case not_:              std::cout << "negate ";break;
+        case if_:               std::cout << "if ";break;
+        case else_:             std::cout << "else ";break;
         default:                std::cout << "Unknown token "; break;
     }
 }
@@ -61,8 +63,7 @@ std::vector<Token> Tokenizer::tokenize()
             }
             if(buffer=="auto")
             {
-                tokens.push_back({Tokentype::auto_,buffer});
-                buffer.clear();
+                tokens.push_back({Tokentype::auto_});
             }
             else if(buffer=="extrn")
             {
@@ -82,19 +83,25 @@ std::vector<Token> Tokenizer::tokenize()
             }
             else if(buffer=="return")
             {
-                tokens.push_back({Tokentype::return_,buffer});
-                buffer.clear();
+                tokens.push_back({Tokentype::return_});
             }
             else if(buffer=="while")
             {
-                tokens.push_back({Tokentype::while_,buffer});
-                buffer.clear();
+                tokens.push_back({Tokentype::while_});
+            }
+            else if(buffer=="if")
+            {
+                tokens.push_back({Tokentype::if_});
+            }
+            else if(buffer=="else")
+            {
+                tokens.push_back({Tokentype::else_});
             }
             else 
             { 
                 tokens.push_back({Tokentype::identifier,buffer});
-                buffer.clear();
             }
+            buffer.clear();
         }
         else if(peek().value()=='(')
         {
@@ -211,7 +218,7 @@ std::vector<Token> Tokenizer::tokenize()
         }
         else
         {
-            std::cerr << "errorrred from tokenizer " << peek().value() << "\n";
+            std::cerr << "Unrecognized Token: " << peek().value() << "\n";
             exit(EXIT_FAILURE);
         }
     }

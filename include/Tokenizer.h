@@ -33,7 +33,9 @@ incr,
 decr,
 return_,
 while_,
-not_
+not_,
+if_,
+else_
 };
 
 struct Token{

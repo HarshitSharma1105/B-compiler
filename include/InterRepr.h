@@ -95,7 +95,7 @@ struct DataSection{
 };
 
 struct ReturnValue{
-    std::optional<Arg> arg;
+    Arg arg;
 };
 
 
@@ -116,14 +116,16 @@ enum ScopeType{
     Global,
     Function,
     Local,
-    Loop
+    Loop,
+    If_,
+    Else_
 };
 
 struct Scope{
     ScopeType type;
     std::string scope_name;
     size_t vars_count,vars_size;
-    std::optional<JmpInfo> info;
+    JmpInfo info;
 };
 
 struct ScopeBegin{
@@ -165,9 +167,11 @@ private:
     bool autovar_dec();
     bool compile_extrn();
     bool compile_funcdecl();
+    bool compile_if();
+    bool compile_else();
 
-    std::optional<Arg> compile_expression(int precedence);
-    std::optional<Arg> compile_primary_expression();
+    Arg compile_expression(int precedence);
+    Arg compile_primary_expression();
 
     std::optional<Token> peek(int offset=0);
     Token consume();

@@ -133,7 +133,7 @@ std::string Generator_x86_64::generate()
         }
         void operator()(const ReturnValue& retval)
         {
-            std::visit(argvisitor,retval.arg.value());
+            std::visit(argvisitor,retval.arg);
             stream << "    mov rax,r15\n";
         }
         void operator()(const JmpIfZero& jz)

@@ -97,7 +97,7 @@ struct DebugVisitor {
     void operator()(const ReturnValue& retval)
     {
         std::cout << "Return Value (";
-        if(retval.arg.has_value())std::visit(debugargvisitor,retval.arg.value());
+        std::visit(debugargvisitor,retval.arg);
         std::cout << ")\n";
     }
     void operator()(const JmpIfZero& jz)
@@ -172,8 +172,52 @@ void IREmittor::compile_statement()
     else if(scope_open())return;
     else if(compile_return())return;
     else if(compile_while_loops())return;
+    else if(compile_if())return;
+    else if(compile_else())return;
     else if(compile_stmt())return;
-    assert(false && "UNREACHEABLE\n");
+}
+
+
+bool IREmittor::compile_if()
+{
+    if(try_consume(Tokentype::if_).has_value())
+    {
+        JmpInfo info= {.skip_idx=0,.jmp_idx=ops.size()}; // wanna jump at the checking of condition  instruction
+        Scope scope={ScopeType::If_,"",vars_count,vars.size(),info};
+        scopes.push(scope);
+        Arg arg=compile_expression(0);  
+        ops.emplace_back(JmpIfZero{arg,0});
+        scopes.top().info.skip_idx=ops.size()-1;
+        try_consume(Tokentype::open_curly,"expected {\n");
+        return true;
+    }
+    return false;
+}
+
+
+bool IREmittor::compile_else()
+{
+    if(try_consume(Tokentype::else_).has_value())
+    {
+        Scope if_scope=scopes.top();
+        if(if_scope.type!=ScopeType::If_)
+        {
+            std::cerr << "Else should be precedded by an if block\n";
+            exit(EXIT_FAILURE);
+        }
+        
+        JmpInfo if_info=if_scope.info;
+        scopes.pop();
+
+        std::get<JmpIfZero>(ops[if_info.skip_idx]).idx=ops.size();
+
+        Scope scope={ScopeType::Else_,"",vars_count,vars.size(),{.skip_idx=if_info.jmp_idx}};
+        scopes.push(scope);
+
+        try_consume(Tokentype::open_curly,"expected {\n");
+        return true;
+    }
+    return false;
 }
 
 bool IREmittor::compile_while_loops()
@@ -183,9 +227,9 @@ bool IREmittor::compile_while_loops()
         JmpInfo info= {.skip_idx=0,.jmp_idx=ops.size()}; // wanna jump at the checking of condition  instruction
         Scope scope={ScopeType::Loop,"",vars_count,vars.size(),info};
         scopes.push(scope);
-        Arg arg=compile_expression(0).value();  
+        Arg arg=compile_expression(0);  
         ops.emplace_back(JmpIfZero{arg,0});
-        scopes.top().info.value().skip_idx=ops.size()-1;
+        scopes.top().info.skip_idx=ops.size()-1;
         try_consume(Tokentype::open_curly,"expected {\n");
         return true;
     }
@@ -197,7 +241,7 @@ bool IREmittor::compile_return()
 {
     if(try_consume(Tokentype::return_).has_value())
     {
-        std::optional<Arg> arg=compile_expression(0);
+        Arg arg=compile_expression(0);
         try_consume(Tokentype::semicolon,"Expected ;\n");
         ops.emplace_back(ReturnValue{arg});
         return true;
@@ -207,12 +251,9 @@ bool IREmittor::compile_return()
 
 bool IREmittor::compile_stmt()
 {
-    if(compile_expression(0).has_value())
-    {
-        try_consume(Tokentype::semicolon,"Expected ;\n");
-        return true;
-    }
-    return false;
+    compile_expression(0);
+    try_consume(Tokentype::semicolon,"Expected ;\n");
+    return true;
 }
 
 bool IREmittor::scope_open()
@@ -230,18 +271,30 @@ bool IREmittor::scope_end()
 {
     if(try_consume(Tokentype::close_curly).has_value())
     {
-        Scope scope=scopes.top();
+        Scope& scope=scopes.top();
+        JmpInfo info=scope.info;
         std::string name=scope.scope_name;
         vars_count=scope.vars_count;
-        scopes.pop();
+        vars.resize(scope.vars_size);
+        
         if(scope.type==ScopeType::Loop)
         {
-            JmpInfo info=scope.info.value();
             ops.emplace_back(Jmp{info.jmp_idx});
             std::get<JmpIfZero>(ops[info.skip_idx]).idx=ops.size();
         }
-        if(scope.type==ScopeType::Function)ops.emplace_back(ScopeClose{name,scope.type});
-        vars.resize(scope.vars_size);
+        else if(scope.type==ScopeType::If_)
+        {
+            if(try_peek(Tokentype::else_).has_value())
+            {
+                scope.info.jmp_idx=ops.size();
+                ops.emplace_back(Jmp{0});
+                return true;
+            }
+            std::get<JmpIfZero>(ops[info.skip_idx]).idx=ops.size();
+        }
+        else if(scope.type==ScopeType::Else_) std::get<Jmp>(ops[info.skip_idx]).idx=ops.size();
+        else if(scope.type==ScopeType::Function)ops.emplace_back(ScopeClose{name,scope.type});
+        scopes.pop();
         return true;
     }
     return false;
@@ -265,7 +318,7 @@ bool IREmittor::autovar_dec()
             vars.push_back(Variable{var_name,vars_count++});
             if(try_consume(Tokentype::assignment).has_value())
             {
-                Arg arg=compile_expression(1).value();
+                Arg arg=compile_expression(1);
                 ops.emplace_back(AutoAssign{get_var_index(var_name),arg});
             }
         }
@@ -316,17 +369,17 @@ bool IREmittor::compile_funcdecl()
     }
     return false;
 }
-std::optional<Arg> IREmittor::compile_expression(int precedence)
+Arg IREmittor::compile_expression(int precedence)
 {
     if(precedence==precedences.size())return compile_primary_expression();
-    std::optional<Arg> lhs=compile_expression(precedence+1),rhs;
+    Arg lhs=compile_expression(precedence+1),rhs;
     struct AssignVisitor{
         std::vector<Op>& ops;
-        std::optional<Arg> rhs;
+        Arg rhs;
         Tokentype type;
         void operator()(const Var &var)
         {
-            ops.emplace_back(BinOp{var.index,var,rhs.value(),type});
+            ops.emplace_back(BinOp{var.index,var,rhs,type});
         }
         void operator()(const Literal& literal)
         {
@@ -345,7 +398,7 @@ std::optional<Arg> IREmittor::compile_expression(int precedence)
         }
         void operator()(const Ref& ref)
         {
-            ops.emplace_back(Store{ref.index,rhs.value()});
+            ops.emplace_back(Store{ref.index,rhs});
             // since store expects the address we don't want to dereference here yet
         }
     };
@@ -355,18 +408,18 @@ std::optional<Arg> IREmittor::compile_expression(int precedence)
         if(precedence==0)
         {
             AssignVisitor assignvisitor{ops,rhs,type};
-            std::visit(assignvisitor,lhs.value());
+            std::visit(assignvisitor,lhs);
         }          
         else
         {
             ops.emplace_back(AutoVar{1});
-            ops.emplace_back(BinOp{vars_count,lhs.value(),rhs.value(),type});
+            ops.emplace_back(BinOp{vars_count,lhs,rhs,type});
             lhs=Var{vars_count++};
         }    
     }
     return lhs;
 }
-std::optional<Arg> IREmittor::compile_primary_expression()
+Arg IREmittor::compile_primary_expression()
 {
     Token token=consume();
     switch(token.type)
@@ -413,28 +466,28 @@ std::optional<Arg> IREmittor::compile_primary_expression()
         }
         case Tokentype::sub: 
         {
-            std::optional<Arg> arg=compile_primary_expression();
+            Arg arg=compile_primary_expression();
             ops.emplace_back(AutoVar{1});
-            ops.emplace_back(UnOp{vars_count,arg.value(),UnOpType::Negate});
+            ops.emplace_back(UnOp{vars_count,arg,UnOpType::Negate});
             return Var{vars_count++};
         }
         case Tokentype::not_:
         {
-            std::optional<Arg> arg=compile_primary_expression();
+            Arg arg=compile_primary_expression();
             ops.emplace_back(AutoVar{1});
-            ops.emplace_back(UnOp{vars_count,arg.value(),UnOpType::Not});
+            ops.emplace_back(UnOp{vars_count,arg,UnOpType::Not});
             return Var{vars_count++};
         }
         case Tokentype::mult:
         {
-            std::optional<Arg> arg=compile_primary_expression();
+            Arg arg=compile_primary_expression();
             ops.emplace_back(AutoVar{1});
-            ops.emplace_back(AutoAssign{vars_count,arg.value()});
+            ops.emplace_back(AutoAssign{vars_count,arg});
             return Ref{vars_count++};
         }
         case Tokentype::open_paren:
         {
-            std::optional<Arg> arg=compile_expression(0);
+            Arg arg=compile_expression(0);
             try_consume(Tokentype::close_paren,"expected )\n");
             return arg;
         }
@@ -469,7 +522,7 @@ std::optional<Arg> IREmittor::compile_primary_expression()
             std::vector<Arg> args;
             while(try_peek(close_paren).has_value()==false)
             {   
-                args.push_back(compile_expression(0).value());
+                args.push_back(compile_expression(0));
                 try_consume(Tokentype::comma);
             }
             try_consume(Tokentype::close_paren,"expected ')'\n");
@@ -480,7 +533,6 @@ std::optional<Arg> IREmittor::compile_primary_expression()
         }
         default: debug(ops); assert(false && "UNREACHEABLE\n"); 
     }
-    return {};
 }
 
 std::optional<Token> IREmittor::peek(int offset){
