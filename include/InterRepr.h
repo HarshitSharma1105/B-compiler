@@ -86,7 +86,8 @@ struct FuncDecl{
 };
 
 struct Store{
-    Arg addr,val;
+    size_t index;
+    Arg val;
 };
 
 struct DataSection{
@@ -184,5 +185,5 @@ private:
     std::unordered_set<std::string> extrns;
     std::vector<Variable> vars;
     std::stringstream datastring;
-    bool ismainfuncpresent=false;
+    bool is_main_func_present=false;
 };

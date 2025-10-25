@@ -1,14 +1,12 @@
 CXX = g++
-CXXFLAGS = -std=c++20  -Iinclude
+CXXFLAGS = -std=c++20 -I include
 
 SRC_DIR = src
 OBJ_DIR = objs
-INCLUDE_DIR = include
+TARGET = builds/compiler
 
 SOURCES = $(wildcard $(SRC_DIR)/*.cpp)
-OBJECTS = $(patsubst $(SRC_DIR)/%.cpp,$(OBJ_DIR)/%.o,$(SOURCES))
-
-TARGET = builds/compiler
+OBJECTS = $(SOURCES:$(SRC_DIR)/%.cpp=$(OBJ_DIR)/%.o)
 
 all: $(TARGET)
 

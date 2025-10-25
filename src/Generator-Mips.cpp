@@ -160,10 +160,9 @@ std::string Generator_Mips::generate()
         }
         void operator()(const Store& store)
         {
+            stream << "    lw $s2,-" << store.index*4 << "($s1)\n";
             std::visit(argvisitor,store.val);
-            stream << "    move $s2,$s0\n";
-            std::visit(argvisitor,store.addr);
-            stream << "    sw $s2,($s0)\n";
+            stream << "    sw $s0,($s2)\n";
         }
     };
     textstream << ".text\n";

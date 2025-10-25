@@ -148,10 +148,9 @@ std::string Generator_x86_64::generate()
         }
         void operator()(const Store& store)
         {
+            stream << "    mov r14,[rbp-" << store.index*8 << "]\n";
             std::visit(argvisitor,store.val);
-            stream << "    mov r14,r15\n";
-            std::visit(argvisitor,store.addr);
-            stream << "    mov [r15],r14\n";
+            stream << "    mov [r14],r15\n";
         }
     };
     textstream << "format ELF64\n";

@@ -114,9 +114,7 @@ struct DebugVisitor {
     {
         std::cout << "Store ";
         std::visit(debugargvisitor,store.val);
-        std::cout << " at address in ";
-        std::visit(debugargvisitor,store.addr);
-        std::cout << "\n";  
+        std::cout << " at address in AutoVar(" << store.index << ")\n";
     }
 };
 
@@ -146,7 +144,7 @@ std::vector<Op>   IREmittor::EmitIR()
     {
         compile_statement();
     }
-    if(ismainfuncpresent!=true){
+    if(is_main_func_present!=true){
         std::cerr << "Main function not declared\n";
         exit(EXIT_FAILURE);
     }
@@ -300,7 +298,7 @@ bool IREmittor::compile_funcdecl()
     if(try_peek(Tokentype::funcdecl).has_value())
     {
         std::string func_name=consume().val;
-        if(func_name=="main")ismainfuncpresent=true;
+        if(func_name=="main")is_main_func_present=true;
         try_consume(Tokentype::open_paren,"expcted '('\n");
         scopes.push(Scope{ScopeType::Function,func_name,vars_count,vars.size(),{}});
         size_t curr=vars_count;
@@ -347,7 +345,7 @@ std::optional<Arg> IREmittor::compile_expression(int precedence)
         }
         void operator()(const Ref& ref)
         {
-            ops.emplace_back(Store{Var{ref.index},rhs.value()});
+            ops.emplace_back(Store{ref.index,rhs.value()});
             // since store expects the address we don't want to dereference here yet
         }
     };

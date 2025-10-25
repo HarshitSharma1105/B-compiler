@@ -19,5 +19,4 @@ private:
     int index=0;
     std::stringstream textstream;
     std::unordered_set<std::string> extrns;
-    bool is_main_func_present=false;
 };
