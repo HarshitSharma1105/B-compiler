@@ -148,6 +148,11 @@ std::string Generator_Mips::generate()
         {
             std::visit(argvisitor,retval.arg);
             stream << "    move $v0,$s0\n";
+            stream << "    move $sp,$s1\n";
+            stream << "    lw $ra,0($sp)\n";
+            stream << "    lw $s1,4($sp)\n";
+            stream << "    addi $sp,$sp,8\n";
+            stream << "    jr $ra\n";
         }
         void operator()(const JmpIfZero& jz)
         {

@@ -121,9 +121,11 @@ struct DebugVisitor {
 
 void debug(const std::vector<Op>& ops)
 {
+    int i=0;
     DebugVisitor debugvisitor;
     for(const Op& op:ops)
     {
+        std::cout << "Operation " << i++ << ": ";
         std::visit(debugvisitor,op);
     }
 }
@@ -182,12 +184,12 @@ bool IREmittor::compile_if()
 {
     if(try_consume(Tokentype::if_).has_value())
     {
-        JmpInfo info= {.skip_idx=0,.jmp_idx=ops.size()}; // wanna jump at the checking of condition  instruction
+        JmpInfo info; // wanna jump at the checking of condition  instruction
         Scope scope={ScopeType::If_,"",vars_count,vars.size(),info};
         scopes.push(scope);
         Arg arg=compile_expression(0);  
+        scopes.top().info.skip_idx=ops.size();
         ops.emplace_back(JmpIfZero{arg,0});
-        scopes.top().info.skip_idx=ops.size()-1;
         try_consume(Tokentype::open_curly,"expected {\n");
         return true;
     }
@@ -228,8 +230,8 @@ bool IREmittor::compile_while_loops()
         Scope scope={ScopeType::Loop,"",vars_count,vars.size(),info};
         scopes.push(scope);
         Arg arg=compile_expression(0);  
+        scopes.top().info.skip_idx=ops.size();
         ops.emplace_back(JmpIfZero{arg,0});
-        scopes.top().info.skip_idx=ops.size()-1;
         try_consume(Tokentype::open_curly,"expected {\n");
         return true;
     }
@@ -276,8 +278,8 @@ bool IREmittor::scope_end()
         std::string name=scope.scope_name;
         vars_count=scope.vars_count;
         vars.resize(scope.vars_size);
-        
-        if(scope.type==ScopeType::Loop)
+        if(scope.type==ScopeType::Function)ops.emplace_back(ScopeClose{name,scope.type});
+        else if(scope.type==ScopeType::Loop)
         {
             ops.emplace_back(Jmp{info.jmp_idx});
             std::get<JmpIfZero>(ops[info.skip_idx]).idx=ops.size();
@@ -293,7 +295,6 @@ bool IREmittor::scope_end()
             std::get<JmpIfZero>(ops[info.skip_idx]).idx=ops.size();
         }
         else if(scope.type==ScopeType::Else_) std::get<Jmp>(ops[info.skip_idx]).idx=ops.size();
-        else if(scope.type==ScopeType::Function)ops.emplace_back(ScopeClose{name,scope.type});
         scopes.pop();
         return true;
     }

@@ -135,6 +135,9 @@ std::string Generator_x86_64::generate()
         {
             std::visit(argvisitor,retval.arg);
             stream << "    mov rax,r15\n";
+            stream << "    mov rsp,rbp\n";
+            stream << "    pop rbp\n";
+            stream << "    ret\n";
         }
         void operator()(const JmpIfZero& jz)
         {
