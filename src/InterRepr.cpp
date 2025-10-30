@@ -309,19 +309,15 @@ bool IREmittor::autovar_dec()
         while(peek().value().type!=Tokentype::semicolon)
         {
             try_consume(Tokentype::comma);
-            std::string var_name=consume().val;
+            std::string var_name=peek().value().val;
             if(get_var_index(var_name)!=-1)
             {
-                std::cerr << "variable already declared " << peek().value().val << "\n";
+                std::cerr << "variable already declared " << var_name << "\n";
                 exit(EXIT_FAILURE);
             }
             ops.emplace_back(AutoVar{1});
             vars.push_back(Variable{var_name,vars_count++});
-            if(try_consume(Tokentype::assignment).has_value())
-            {
-                Arg arg=compile_expression(1);
-                ops.emplace_back(AutoAssign{get_var_index(var_name),arg});
-            }
+            compile_expression(0);
         }
         try_consume(Tokentype::semicolon,"Expected ;\n");//semicolon
         return true;
@@ -400,19 +396,19 @@ Arg IREmittor::compile_expression(int precedence)
         void operator()(const Ref& ref)
         {
             ops.emplace_back(Store{ref.index,rhs});
-            // since store expects the address we don't want to dereference here yet
         }
     };
     if(try_peek(precedences[precedence])){
         Tokentype type=consume().type;
-        rhs=compile_expression(precedence+1);            
         if(precedence==0)
         {
+            rhs=compile_expression(0);
             AssignVisitor assignvisitor{ops,rhs,type};
             std::visit(assignvisitor,lhs);
         }          
         else
         {
+            rhs=compile_expression(precedence+1);       
             ops.emplace_back(AutoVar{1});
             ops.emplace_back(BinOp{vars_count,lhs,rhs,type});
             lhs=Var{vars_count++};
@@ -549,6 +545,11 @@ Token IREmittor::try_consume(const Tokentype& type, const std::string& err_msg)
 {
     if (peek().value().type == type) {
         return consume();
+    }
+    debug(ops);
+    for(int i=0;i<4;i++)
+    {
+        debug({peek(i).value()});
     }
     std::cerr << err_msg << std::endl;
     exit(EXIT_FAILURE);
