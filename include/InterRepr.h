@@ -176,9 +176,9 @@ private:
     std::optional<Token> peek(int offset=0);
     Token consume();
     Token try_consume(const Tokentype& type, const std::string& err_msg);
-    std::optional<Token> try_consume(const Tokentype& type);
-    std::optional<Tokentype> try_peek(const std::vector<Tokentype>& types,int offset=0);
-    std::optional<Tokentype> try_peek(const Tokentype& type,int offset=0);
+    bool try_consume(const Tokentype& type);
+    bool try_peek(const std::vector<Tokentype>& types,int offset=0);
+    bool try_peek(const Tokentype& type,int offset=0);
     
     std::vector<Op> ops;
     std::vector<Token> tokens;

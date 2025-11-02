@@ -166,7 +166,7 @@ size_t IREmittor::get_var_index(const std::string& name)
 }
 void IREmittor::compile_statement()
 {
-    if(try_consume(Tokentype::semicolon).has_value())return;
+    if(try_consume(Tokentype::semicolon))return;
     else if(compile_funcdecl())return;
     else if(compile_extrn())return;
     else if(autovar_dec())return;
@@ -182,7 +182,7 @@ void IREmittor::compile_statement()
 
 bool IREmittor::compile_if()
 {
-    if(try_consume(Tokentype::if_).has_value())
+    if(try_consume(Tokentype::if_))
     {
         JmpInfo info; // wanna jump at the checking of condition  instruction
         Scope scope={ScopeType::If_,"",vars_count,vars.size(),info};
@@ -199,7 +199,7 @@ bool IREmittor::compile_if()
 
 bool IREmittor::compile_else()
 {
-    if(try_consume(Tokentype::else_).has_value())
+    if(try_consume(Tokentype::else_))
     {
         Scope if_scope=scopes.top();
         if(if_scope.type!=ScopeType::If_)
@@ -224,7 +224,7 @@ bool IREmittor::compile_else()
 
 bool IREmittor::compile_while_loops()
 {
-    if(try_consume(Tokentype::while_).has_value())
+    if(try_consume(Tokentype::while_))
     {
         JmpInfo info= {.skip_idx=0,.jmp_idx=ops.size()}; // wanna jump at the checking of condition  instruction
         Scope scope={ScopeType::Loop,"",vars_count,vars.size(),info};
@@ -241,7 +241,7 @@ bool IREmittor::compile_while_loops()
 
 bool IREmittor::compile_return()
 {
-    if(try_consume(Tokentype::return_).has_value())
+    if(try_consume(Tokentype::return_))
     {
         Arg arg=compile_expression(0);
         try_consume(Tokentype::semicolon,"Expected ;\n");
@@ -260,7 +260,7 @@ bool IREmittor::compile_stmt()
 
 bool IREmittor::scope_open()
 {
-    if(try_consume(Tokentype::open_curly).has_value())
+    if(try_consume(Tokentype::open_curly))
     {
         scopes.push(Scope{ScopeType::Local,"",vars_count,vars.size(),{}});
         //ops.emplace_back(ScopeBegin{"",ScopeType::Local});
@@ -271,7 +271,7 @@ bool IREmittor::scope_open()
 
 bool IREmittor::scope_end()
 {
-    if(try_consume(Tokentype::close_curly).has_value())
+    if(try_consume(Tokentype::close_curly))
     {
         Scope& scope=scopes.top();
         JmpInfo info=scope.info;
@@ -286,7 +286,7 @@ bool IREmittor::scope_end()
         }
         else if(scope.type==ScopeType::If_)
         {
-            if(try_peek(Tokentype::else_).has_value())
+            if(try_peek(Tokentype::else_))
             {
                 scope.info.jmp_idx=ops.size();
                 ops.emplace_back(Jmp{0});
@@ -304,7 +304,7 @@ bool IREmittor::scope_end()
 
 bool IREmittor::autovar_dec()
 {
-    if(try_consume(Tokentype::auto_).has_value())
+    if(try_consume(Tokentype::auto_))
     {
         while(peek().value().type!=Tokentype::semicolon)
         {
@@ -316,7 +316,7 @@ bool IREmittor::autovar_dec()
                 exit(EXIT_FAILURE);
             }
             ops.emplace_back(AutoVar{1});
-            vars.push_back(Variable{var_name,vars_count++});
+            vars.emplace_back(var_name,vars_count++);
             compile_expression(0);
         }
         try_consume(Tokentype::semicolon,"Expected ;\n");//semicolon
@@ -328,7 +328,7 @@ bool IREmittor::autovar_dec()
 
 bool IREmittor::compile_extrn()
 {
-    if(try_peek(Tokentype::extrn).has_value())
+    if(try_peek(Tokentype::extrn))
     {
         while(peek().value().type!=Tokentype::semicolon)
         {
@@ -345,7 +345,7 @@ bool IREmittor::compile_extrn()
 
 bool IREmittor::compile_funcdecl()
 {
-    if(try_peek(Tokentype::funcdecl).has_value())
+    if(try_peek(Tokentype::funcdecl))
     {
         std::string func_name=consume().val;
         if(func_name=="main")is_main_func_present=true;
@@ -354,7 +354,7 @@ bool IREmittor::compile_funcdecl()
         size_t curr=vars_count;
         while(peek().value().type==Tokentype::identifier)
         {
-            vars.push_back(Variable{consume().val,vars_count++});
+            vars.emplace_back(consume().val,vars_count++);
             try_consume(Tokentype::comma);
             //"Expected comma between args\n";
         }
@@ -429,7 +429,7 @@ Arg IREmittor::compile_primary_expression()
                 std::cerr << "variable not declared " << token.val << "\n";
                 exit(EXIT_FAILURE);
             }
-            if(try_peek({Tokentype::incr,Tokentype::decr}).has_value()==false)return var;
+            if(try_peek({Tokentype::incr,Tokentype::decr})==false)return var;
             Tokentype type=consume().type;
             ops.emplace_back(AutoVar{1});
             ops.emplace_back(AutoAssign{vars_count,var});
@@ -517,9 +517,9 @@ Arg IREmittor::compile_primary_expression()
             std::string funcall_name=token.val;
             try_consume(Tokentype::open_paren,"expected '('\n");
             std::vector<Arg> args;
-            while(try_peek(close_paren).has_value()==false)
+            while(try_peek(Tokentype::close_paren)==false)
             {   
-                args.push_back(compile_expression(0));
+                args.emplace_back(compile_expression(0));
                 try_consume(Tokentype::comma);
             }
             try_consume(Tokentype::close_paren,"expected ')'\n");
@@ -546,30 +546,26 @@ Token IREmittor::try_consume(const Tokentype& type, const std::string& err_msg)
     if (peek().value().type == type) {
         return consume();
     }
-    debug(ops);
-    for(int i=0;i<4;i++)
-    {
-        debug({peek(i).value()});
-    }
     std::cerr << err_msg << std::endl;
     exit(EXIT_FAILURE);
 }
-std::optional<Token> IREmittor::try_consume(const Tokentype& type)
+bool IREmittor::try_consume(const Tokentype& type)
 {
     if (peek().value().type == type) {
-        return consume();
+        consume();
+        return true;
     }
-    return {};
+    return false;
 }
-std::optional<Tokentype> IREmittor::try_peek(const std::vector<Tokentype>& types,int offset)
+bool IREmittor::try_peek(const std::vector<Tokentype>& types,int offset)
 {
     for(const Tokentype type:types)
     {
-        if(peek(offset).value().type==type)return type;
+        if(peek(offset).value().type==type)return true;
     }
-    return {};
+    return false;
 }
-std::optional<Tokentype> IREmittor::try_peek(const Tokentype& type,int offset)
+bool IREmittor::try_peek(const Tokentype& type,int offset)
 {
     std::vector<Tokentype> t={type};
     return try_peek(t,offset);

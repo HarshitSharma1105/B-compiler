@@ -116,6 +116,7 @@ std::string Generator_Mips::generate()
             stream << "    addi $sp,$sp,8\n";
             if(scope.type== ScopeType::Function)
             {
+                stream << "    li $a0,0\n";
                 if(scope.name!="main")stream << "    jr $ra\n";
                 else stream << "    li $v0,10\n" << "    syscall\n";
             }

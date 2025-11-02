@@ -114,7 +114,7 @@ std::string Generator_x86_64::generate()
         {
             stream << "    mov rsp,rbp\n";
             stream << "    pop rbp\n";
-            if(scope.type==ScopeType::Function)stream <<"    ret\n";
+            if(scope.type==ScopeType::Function)stream <<"   mov rax,0\n    ret\n";
         }
         void operator()(const DataSection& data)
         {
