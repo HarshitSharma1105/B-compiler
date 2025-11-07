@@ -196,7 +196,7 @@ bool IREmittor::compile_if()
 {
     if(try_consume(Tokentype::if_))
     {
-        ops.emplace_back(Label{labels_count++});
+        ops.emplace_back(Label{labels_count});
         size_t start=labels_count++;
         size_t curr_vars=vars_count;
         size_t vars_size=vars.size();
@@ -209,13 +209,6 @@ bool IREmittor::compile_if()
         std::get<JmpIfZero>(ops[curr]).idx=labels_count++;
         vars.resize(vars_size);
         vars_count=curr_vars;
-        // JmpInfo info; // wanna jump at the checking of condition  instruction
-        // Scope scope={ScopeType::If_,"",vars_count,vars.size(),info};
-        // scopes.push(scope);
-        // Arg arg=compile_expression(0);  
-        // scopes.top().info.skip_idx=ops.size();
-        // ops.emplace_back(JmpIfZero{arg,0});
-        // try_consume(Tokentype::open_curly,"expected {\n");
         return true;
     }
     return false;
@@ -303,26 +296,27 @@ bool IREmittor::scope_end()
 {
     if(try_consume(Tokentype::close_curly))
     {
-        Scope& scope=scopes.top();
-        JmpInfo info=scope.info;
-        std::string name=scope.scope_name;
-        vars_count=scope.vars_count;
-        vars.resize(scope.vars_size);
-        if(scope.type==ScopeType::If_)
-        {
-            scope.info.jmp_idx=ops.size();
-            ops.emplace_back(Jmp{labels_count});
-            ops.emplace_back(Label{labels_count});
-            std::get<JmpIfZero>(ops[info.skip_idx]).idx=labels_count++;
-            if(try_peek(Tokentype::else_)) return true;
-        }
-        else if(scope.type==ScopeType::Else_)
-        {
-            ops.emplace_back(Label{labels_count});
-            std::get<Jmp>(ops[info.skip_idx]).idx=labels_count++;
-        }
-        scopes.pop();
-        return true;
+        assert(false && "TODO ELSE\n");
+        // Scope& scope=scopes.top();
+        // JmpInfo info=scope.info;
+        // std::string name=scope.scope_name;
+        // vars_count=scope.vars_count;
+        // vars.resize(scope.vars_size);
+        // if(scope.type==ScopeType::If_)
+        // {
+        //     scope.info.jmp_idx=ops.size();
+        //     ops.emplace_back(Jmp{labels_count});
+        //     ops.emplace_back(Label{labels_count});
+        //     std::get<JmpIfZero>(ops[info.skip_idx]).idx=labels_count++;
+        //     if(try_peek(Tokentype::else_)) return true;
+        // }
+        // else if(scope.type==ScopeType::Else_)
+        // {
+        //     ops.emplace_back(Label{labels_count});
+        //     std::get<Jmp>(ops[info.skip_idx]).idx=labels_count++;
+        // }
+        // scopes.pop();
+        // return true;
     }
     return false;
 }
