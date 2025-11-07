@@ -155,14 +155,18 @@ std::string Generator_Mips::generate()
             stream << "    addi $sp,$sp,8\n";
             stream << "    jr $ra\n";
         }
+        void operator()(const Label& label)
+        {
+            stream << "label_" << label.idx << ":\n";
+        }
         void operator()(const JmpIfZero& jz)
         {
             std::visit(argvisitor,jz.arg);
-            stream << "    beqz $s0,op_" << jz.idx << "\n";
+            stream << "    beqz $s0,label_" << jz.idx << "\n";
         }
         void operator()(const Jmp& jmp)
         {
-            stream << "    b op_" << jmp.idx << "\n";
+            stream << "    b label_" << jmp.idx << "\n";
         }
         void operator()(const Store& store)
         {
@@ -175,10 +179,8 @@ std::string Generator_Mips::generate()
     textstream << "    .globl main\n";
     generate_stdlib();
     Visitor visitor{textstream};
-    int idx=0;
     while(peek().has_value())
     {
-        textstream << "op_" << idx++ << ":\n";
         std::visit(visitor,consume());
     }
     return textstream.str();

@@ -100,32 +100,34 @@ struct DebugVisitor {
         std::visit(debugargvisitor,retval.arg);
         std::cout << ")\n";
     }
+    void operator()(const Label& label)
+    {
+        std::cout << "Label(" << label.idx << ")\n";
+    }
     void operator()(const JmpIfZero& jz)
     {
-        std::cout << "Jump To "  << jz.idx << " If (";
+        std::cout << "Branch Label("  << jz.idx << ") (";
         std::visit(debugargvisitor,jz.arg);
-        std::cout << "==0)\n";
+        std::cout << ")\n";
     }
     void operator()(const Jmp& jmp)
     {
-        std::cout << "Jump To " << jmp.idx << "\n";
+        std::cout << "Branch Label(" << jmp.idx << ")\n";
     }
     void operator()(const Store& store)
     {
         std::cout << "Store ";
         std::visit(debugargvisitor,store.val);
-        std::cout << " at address in AutoVar(" << store.index << ")\n";
+        std::cout << " at AutoVar(" << store.index << ")\n";
     }
 };
 
 
 void debug(const std::vector<Op>& ops)
 {
-    int i=0;
     DebugVisitor debugvisitor;
     for(const Op& op:ops)
     {
-        std::cout << "Operation " << i++ << ": ";
         std::visit(debugvisitor,op);
     }
 }
@@ -184,6 +186,7 @@ bool IREmittor::compile_if()
 {
     if(try_consume(Tokentype::if_))
     {
+        ops.emplace_back(Label{labels_count++});
         JmpInfo info; // wanna jump at the checking of condition  instruction
         Scope scope={ScopeType::If_,"",vars_count,vars.size(),info};
         scopes.push(scope);
@@ -202,16 +205,16 @@ bool IREmittor::compile_else()
     if(try_consume(Tokentype::else_))
     {
         Scope if_scope=scopes.top();
+        JmpInfo if_info=if_scope.info;
+        scopes.pop();
+
+
         if(if_scope.type!=ScopeType::If_)
         {
             std::cerr << "Else should be precedded by an if block\n";
             exit(EXIT_FAILURE);
         }
-        
-        JmpInfo if_info=if_scope.info;
-        scopes.pop();
 
-        std::get<JmpIfZero>(ops[if_info.skip_idx]).idx=ops.size();
 
         Scope scope={ScopeType::Else_,"",vars_count,vars.size(),{.skip_idx=if_info.jmp_idx}};
         scopes.push(scope);
@@ -226,7 +229,8 @@ bool IREmittor::compile_while_loops()
 {
     if(try_consume(Tokentype::while_))
     {
-        JmpInfo info= {.skip_idx=0,.jmp_idx=ops.size()}; // wanna jump at the checking of condition  instruction
+        ops.emplace_back(Label{labels_count});
+        JmpInfo info= {.skip_idx=0,.jmp_idx=labels_count++}; // wanna jump at the checking of condition  instruction
         Scope scope={ScopeType::Loop,"",vars_count,vars.size(),info};
         scopes.push(scope);
         Arg arg=compile_expression(0);  
@@ -282,19 +286,22 @@ bool IREmittor::scope_end()
         else if(scope.type==ScopeType::Loop)
         {
             ops.emplace_back(Jmp{info.jmp_idx});
-            std::get<JmpIfZero>(ops[info.skip_idx]).idx=ops.size();
+            ops.emplace_back(Label{labels_count});
+            std::get<JmpIfZero>(ops[info.skip_idx]).idx=labels_count++;
         }
         else if(scope.type==ScopeType::If_)
         {
-            if(try_peek(Tokentype::else_))
-            {
-                scope.info.jmp_idx=ops.size();
-                ops.emplace_back(Jmp{0});
-                return true;
-            }
-            std::get<JmpIfZero>(ops[info.skip_idx]).idx=ops.size();
+            scope.info.jmp_idx=ops.size();
+            ops.emplace_back(Jmp{labels_count});
+            ops.emplace_back(Label{labels_count});
+            std::get<JmpIfZero>(ops[info.skip_idx]).idx=labels_count++;
+            if(try_peek(Tokentype::else_)) return true;
         }
-        else if(scope.type==ScopeType::Else_) std::get<Jmp>(ops[info.skip_idx]).idx=ops.size();
+        else if(scope.type==ScopeType::Else_)
+        {
+            ops.emplace_back(Label{labels_count});
+            std::get<Jmp>(ops[info.skip_idx]).idx=labels_count++;
+        }
         scopes.pop();
         return true;
     }

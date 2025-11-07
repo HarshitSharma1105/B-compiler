@@ -98,6 +98,9 @@ struct ReturnValue{
     Arg arg;
 };
 
+struct Label{
+    size_t idx;
+};
 
 struct JmpIfZero{
     Arg arg;
@@ -138,7 +141,7 @@ struct ScopeClose{
 };
 
 typedef std::variant<AutoVar,AutoAssign,UnOp,BinOp,ExtrnDecl,Funcall,FuncDecl,
-    ScopeBegin,ScopeClose,DataSection,ReturnValue,JmpIfZero,Jmp,Store> Op;
+    ScopeBegin,ScopeClose,DataSection,ReturnValue,JmpIfZero,Jmp,Label,Store> Op;
 
 
 
@@ -186,6 +189,7 @@ private:
     int token_index=0;
     size_t data_offset=0;
     size_t vars_count=0;
+    size_t labels_count=0;
     std::unordered_set<std::string> extrns;
     std::vector<Variable> vars;
     std::stringstream datastring;

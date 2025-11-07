@@ -139,15 +139,19 @@ std::string Generator_x86_64::generate()
             stream << "    pop rbp\n";
             stream << "    ret\n";
         }
+        void operator()(const Label& label)
+        {
+            stream << "label_" << label.idx << ":\n";
+        }
         void operator()(const JmpIfZero& jz)
         {
             std::visit(argvisitor,jz.arg);
             stream << "    test r15,r15\n";
-            stream << "    jz op_" << jz.idx << "\n";
+            stream << "    jz label_" << jz.idx << "\n";
         }
         void operator()(const Jmp& jmp)
         {
-            stream << "    jmp op_" << jmp.idx << "\n";
+            stream << "    jmp label_" << jmp.idx << "\n";
         }
         void operator()(const Store& store)
         {
@@ -158,11 +162,9 @@ std::string Generator_x86_64::generate()
     };
     textstream << "format ELF64\n";
     textstream << "section \".text\" executable\n";
-    int idx=0;
     Visitor visitor{0,textstream};
     while(peek().has_value())
     {
-        textstream << "op_" << idx++ << ":\n";
         std::visit(visitor,consume());
     }
     return textstream.str();
