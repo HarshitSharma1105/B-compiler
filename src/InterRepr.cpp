@@ -173,12 +173,22 @@ void IREmittor::compile_statement()
     else if(compile_extrn())return;
     else if(autovar_dec())return;
     else if(scope_end())return;
-    else if(scope_open())return;
     else if(compile_return())return;
     else if(compile_while_loops())return;
     else if(compile_if())return;
     else if(compile_else())return;
-    else if(compile_stmt())return;
+    else if(compile_block())return;
+}
+
+
+bool IREmittor::compile_block()
+{
+    if(try_consume(Tokentype::open_curly))
+    {
+        while(!try_consume(Tokentype::close_curly))compile_statement();
+    }
+    else compile_stmt(); // TODO : Allow for syntax like if() do_work() which currently runs into an infinite loop probably because of compile_block
+    return true;
 }
 
 
@@ -187,13 +197,25 @@ bool IREmittor::compile_if()
     if(try_consume(Tokentype::if_))
     {
         ops.emplace_back(Label{labels_count++});
-        JmpInfo info; // wanna jump at the checking of condition  instruction
-        Scope scope={ScopeType::If_,"",vars_count,vars.size(),info};
-        scopes.push(scope);
+        size_t start=labels_count++;
+        size_t curr_vars=vars_count;
+        size_t vars_size=vars.size();
         Arg arg=compile_expression(0);  
-        scopes.top().info.skip_idx=ops.size();
+        size_t curr=ops.size();
         ops.emplace_back(JmpIfZero{arg,0});
-        try_consume(Tokentype::open_curly,"expected {\n");
+        compile_block();
+        ops.emplace_back(Jmp{labels_count});
+        ops.emplace_back(Label{labels_count});
+        std::get<JmpIfZero>(ops[curr]).idx=labels_count++;
+        vars.resize(vars_size);
+        vars_count=curr_vars;
+        // JmpInfo info; // wanna jump at the checking of condition  instruction
+        // Scope scope={ScopeType::If_,"",vars_count,vars.size(),info};
+        // scopes.push(scope);
+        // Arg arg=compile_expression(0);  
+        // scopes.top().info.skip_idx=ops.size();
+        // ops.emplace_back(JmpIfZero{arg,0});
+        // try_consume(Tokentype::open_curly,"expected {\n");
         return true;
     }
     return false;
@@ -230,13 +252,18 @@ bool IREmittor::compile_while_loops()
     if(try_consume(Tokentype::while_))
     {
         ops.emplace_back(Label{labels_count});
-        JmpInfo info= {.skip_idx=0,.jmp_idx=labels_count++}; // wanna jump at the checking of condition  instruction
-        Scope scope={ScopeType::Loop,"",vars_count,vars.size(),info};
-        scopes.push(scope);
+        size_t start=labels_count++;
+        size_t curr_vars=vars_count;
+        size_t vars_size=vars.size();
         Arg arg=compile_expression(0);  
-        scopes.top().info.skip_idx=ops.size();
+        size_t curr=ops.size();
         ops.emplace_back(JmpIfZero{arg,0});
-        try_consume(Tokentype::open_curly,"expected {\n");
+        compile_block();
+        ops.emplace_back(Jmp{start});
+        ops.emplace_back(Label{labels_count});
+        std::get<JmpIfZero>(ops[curr]).idx=labels_count++;
+        vars.resize(vars_size);
+        vars_count=curr_vars;
         return true;
     }
     return false;
@@ -255,11 +282,10 @@ bool IREmittor::compile_return()
     return false;
 }
 
-bool IREmittor::compile_stmt()
+void IREmittor::compile_stmt()
 {
     compile_expression(0);
     try_consume(Tokentype::semicolon,"Expected ;\n");
-    return true;
 }
 
 bool IREmittor::scope_open()
@@ -282,14 +308,7 @@ bool IREmittor::scope_end()
         std::string name=scope.scope_name;
         vars_count=scope.vars_count;
         vars.resize(scope.vars_size);
-        if(scope.type==ScopeType::Function)ops.emplace_back(ScopeClose{name,scope.type});
-        else if(scope.type==ScopeType::Loop)
-        {
-            ops.emplace_back(Jmp{info.jmp_idx});
-            ops.emplace_back(Label{labels_count});
-            std::get<JmpIfZero>(ops[info.skip_idx]).idx=labels_count++;
-        }
-        else if(scope.type==ScopeType::If_)
+        if(scope.type==ScopeType::If_)
         {
             scope.info.jmp_idx=ops.size();
             ops.emplace_back(Jmp{labels_count});
@@ -354,11 +373,11 @@ bool IREmittor::compile_funcdecl()
 {
     if(try_peek(Tokentype::funcdecl))
     {
+        size_t curr_vars=vars_count;
+        size_t vars_size=vars.size();
         std::string func_name=consume().val;
         if(func_name=="main")is_main_func_present=true;
         try_consume(Tokentype::open_paren,"expcted '('\n");
-        scopes.push(Scope{ScopeType::Function,func_name,vars_count,vars.size(),{}});
-        size_t curr=vars_count;
         while(peek().value().type==Tokentype::identifier)
         {
             vars.emplace_back(consume().val,vars_count++);
@@ -366,9 +385,12 @@ bool IREmittor::compile_funcdecl()
             //"Expected comma between args\n";
         }
         ops.emplace_back(ScopeBegin{func_name,ScopeType::Function});
-        ops.emplace_back(FuncDecl{func_name,vars_count-curr});
+        ops.emplace_back(FuncDecl{func_name,vars_count-curr_vars});
         try_consume(Tokentype::close_paren,"expected ')'\n");
-        try_consume(Tokentype::open_curly,"expected '{'\n");
+        compile_block();
+        vars.resize(vars_size);
+        vars_count=curr_vars;
+        ops.emplace_back(ScopeClose{func_name,ScopeType::Function});
         return true;
     }
     return false;

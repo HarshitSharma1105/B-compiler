@@ -164,7 +164,7 @@ private:
     void compile_statement();
     bool compile_while_loops();
     bool compile_return();
-    bool compile_stmt();
+    void compile_stmt();
     bool scope_open();
     bool scope_end();
     bool autovar_dec();
@@ -172,7 +172,7 @@ private:
     bool compile_funcdecl();
     bool compile_if();
     bool compile_else();
-
+    bool compile_block();
     Arg compile_expression(int precedence);
     Arg compile_primary_expression();
 
