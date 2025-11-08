@@ -172,13 +172,15 @@ void IREmittor::compile_statement()
     else if(compile_funcdecl())return;
     else if(compile_extrn())return;
     else if(autovar_dec())return;
-    else if(scope_end())return;
+    else if(compile_scope())return;
     else if(compile_return())return;
     else if(compile_while_loops())return;
     else if(compile_if())return;
     else if(compile_else())return;
-    else if(compile_block())return;
+    compile_stmt();
 }
+
+
 
 
 bool IREmittor::compile_block()
@@ -187,10 +189,17 @@ bool IREmittor::compile_block()
     {
         while(!try_consume(Tokentype::close_curly))compile_statement();
     }
-    else compile_stmt(); // TODO : Allow for syntax like if() do_work() which currently runs into an infinite loop probably because of compile_block
-    return true;
+    else compile_statement();
 }
-
+bool IREmittor::compile_scope()
+{
+    if(try_consume(Tokentype::open_curly))
+    {
+        while(!try_consume(Tokentype::close_curly))compile_statement();
+        return true;
+    }
+    return false;
+}
 
 bool IREmittor::compile_if()
 {
@@ -421,7 +430,7 @@ Arg IREmittor::compile_expression(int precedence)
             ops.emplace_back(Store{ref.index,rhs});
         }
     };
-    if(try_peek(precedences[precedence])){
+    while(try_peek(precedences[precedence])){
         Tokentype type=consume().type;
         if(precedence==0)
         {
@@ -569,6 +578,7 @@ Token IREmittor::try_consume(const Tokentype& type, const std::string& err_msg)
     if (peek().value().type == type) {
         return consume();
     }
+    debug(ops);
     std::cerr << err_msg << std::endl;
     exit(EXIT_FAILURE);
 }

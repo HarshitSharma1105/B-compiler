@@ -173,6 +173,7 @@ private:
     bool compile_if();
     bool compile_else();
     bool compile_block();
+    bool compile_scope();
     Arg compile_expression(int precedence);
     Arg compile_primary_expression();
 
