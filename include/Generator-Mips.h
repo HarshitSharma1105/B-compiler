@@ -8,15 +8,12 @@
 class Generator_Mips
 {
 public:
-    Generator_Mips(const std::vector<Op> &ops);
+    Generator_Mips(const Compiler &compiler);
     std::string generate();
 
 private:
     void generate_stdlib();
-    std::optional<Op> peek(int offset=0);
-    Op consume();
-    std::vector<Op> ops;
-    int index=0;
+    Compiler compiler;
     std::stringstream textstream;
     std::unordered_set<std::string> extrns;
 };

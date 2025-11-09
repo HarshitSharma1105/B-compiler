@@ -123,7 +123,7 @@ struct DebugVisitor {
 };
 
 
-void debug(const std::vector<Op>& ops)
+void debug(const Ops& ops)
 {
     DebugVisitor debugvisitor;
     for(const Op& op:ops)
@@ -142,20 +142,49 @@ static std::vector<std::vector<Tokentype>> precedences =
 
 
 IREmittor::IREmittor(const std::vector<Token> &tokens) : tokens(tokens){}
-std::vector<Op>   IREmittor::EmitIR()
+Compiler   IREmittor::EmitIR()
 {   
     while(peek().has_value())
     {
-        compile_statement();
+        compile_prog();
     }
     if(is_main_func_present!=true){
         std::cerr << "Main function not declared\n";
         exit(EXIT_FAILURE);
     }
-    ops.emplace_back(DataSection{datastring.str()});
-    return ops;
+    compiler.functions.back().function_body.emplace_back(DataSection{datastring.str()});
+    compiler.data_section=datastring.str();
+    return compiler;
 }
 
+
+void IREmittor::compile_prog()
+{
+    if(try_peek(Tokentype::function))
+    {
+        Func func{};
+        std::string func_name=consume().val;
+        func.function_name=func_name;
+        size_t curr_vars=vars_count;
+        size_t vars_size=vars.size();
+        if(func_name=="main")is_main_func_present=true;
+        try_consume(Tokentype::open_paren,"expcted '('\n");
+        while(peek().value().type==Tokentype::identifier)
+        {
+            vars.emplace_back(consume().val,vars_count++);
+            try_consume(Tokentype::comma);
+            //"Expected comma between args\n";
+        }
+        func.function_body.emplace_back(ScopeBegin{func_name,ScopeType::Function});
+        func.function_body.emplace_back(FuncDecl{func_name,vars_count-curr_vars});
+        try_consume(Tokentype::close_paren,"expected ')'\n");
+        compile_block(func.function_body);
+        vars.resize(vars_size);
+        vars_count=curr_vars;
+        func.function_body.emplace_back(ScopeClose{func_name,ScopeType::Function});
+        compiler.functions.push_back(func);
+    }
+}
 
 
 size_t IREmittor::get_var_index(const std::string& name)
@@ -166,42 +195,41 @@ size_t IREmittor::get_var_index(const std::string& name)
     }
     return -1;
 }
-void IREmittor::compile_statement()
+void IREmittor::compile_func_body(Ops& ops)
 {
     if(try_consume(Tokentype::semicolon))return;
-    else if(compile_funcdecl())return;
-    else if(compile_extrn())return;
-    else if(autovar_dec())return;
-    else if(compile_scope())return;
-    else if(compile_return())return;
-    else if(compile_while_loops())return;
-    else if(compile_if())return;
-    else if(compile_else())return;
-    compile_stmt();
+    else if(compile_extrn(ops))return;
+    else if(autovar_dec(ops))return;
+    else if(compile_scope(ops))return;
+    else if(compile_return(ops))return;
+    else if(compile_while_loops(ops))return;
+    else if(compile_if(ops))return;
+    else if(compile_else(ops))return;
+    compile_stmt(ops);
 }
 
 
 
 
-bool IREmittor::compile_block()
+void IREmittor::compile_block(Ops& ops)
 {
     if(try_consume(Tokentype::open_curly))
     {
-        while(!try_consume(Tokentype::close_curly))compile_statement();
+        while(!try_consume(Tokentype::close_curly))compile_func_body(ops);
     }
-    else compile_statement();
+    else compile_func_body(ops);
 }
-bool IREmittor::compile_scope()
+bool IREmittor::compile_scope(Ops& ops)
 {
     if(try_consume(Tokentype::open_curly))
     {
-        while(!try_consume(Tokentype::close_curly))compile_statement();
+        while(!try_consume(Tokentype::close_curly))compile_func_body(ops);
         return true;
     }
     return false;
 }
 
-bool IREmittor::compile_if()
+bool IREmittor::compile_if(Ops& ops)
 {
     if(try_consume(Tokentype::if_))
     {
@@ -209,10 +237,10 @@ bool IREmittor::compile_if()
         size_t start=labels_count++;
         size_t curr_vars=vars_count;
         size_t vars_size=vars.size();
-        Arg arg=compile_expression(0);  
+        Arg arg=compile_expression(0,ops);  
         size_t curr=ops.size();
         ops.emplace_back(JmpIfZero{arg,0});
-        compile_block();
+        compile_block(ops);
         ops.emplace_back(Jmp{labels_count});
         ops.emplace_back(Label{labels_count});
         std::get<JmpIfZero>(ops[curr]).idx=labels_count++;
@@ -224,7 +252,7 @@ bool IREmittor::compile_if()
 }
 
 
-bool IREmittor::compile_else()
+bool IREmittor::compile_else(Ops& ops)
 {
     if(try_consume(Tokentype::else_))
     {
@@ -249,7 +277,7 @@ bool IREmittor::compile_else()
     return false;
 }
 
-bool IREmittor::compile_while_loops()
+bool IREmittor::compile_while_loops(Ops& ops)
 {
     if(try_consume(Tokentype::while_))
     {
@@ -257,10 +285,10 @@ bool IREmittor::compile_while_loops()
         size_t start=labels_count++;
         size_t curr_vars=vars_count;
         size_t vars_size=vars.size();
-        Arg arg=compile_expression(0);  
+        Arg arg=compile_expression(0,ops);  
         size_t curr=ops.size();
         ops.emplace_back(JmpIfZero{arg,0});
-        compile_block();
+        compile_block(ops);
         ops.emplace_back(Jmp{start});
         ops.emplace_back(Label{labels_count});
         std::get<JmpIfZero>(ops[curr]).idx=labels_count++;
@@ -272,11 +300,11 @@ bool IREmittor::compile_while_loops()
 }
 
 
-bool IREmittor::compile_return()
+bool IREmittor::compile_return(Ops& ops)
 {
     if(try_consume(Tokentype::return_))
     {
-        Arg arg=compile_expression(0);
+        Arg arg=compile_expression(0,ops);
         try_consume(Tokentype::semicolon,"Expected ;\n");
         ops.emplace_back(ReturnValue{arg});
         return true;
@@ -284,13 +312,13 @@ bool IREmittor::compile_return()
     return false;
 }
 
-void IREmittor::compile_stmt()
+void IREmittor::compile_stmt(Ops& ops)
 {
-    compile_expression(0);
+    compile_expression(0,ops);
     try_consume(Tokentype::semicolon,"Expected ;\n");
 }
 
-bool IREmittor::scope_open()
+bool IREmittor::scope_open(Ops& ops)
 {
     if(try_consume(Tokentype::open_curly))
     {
@@ -301,7 +329,7 @@ bool IREmittor::scope_open()
     return false;
 }
 
-bool IREmittor::scope_end()
+bool IREmittor::scope_end(Ops& ops)
 {
     if(try_consume(Tokentype::close_curly))
     {
@@ -331,7 +359,7 @@ bool IREmittor::scope_end()
 }
 
 
-bool IREmittor::autovar_dec()
+bool IREmittor::autovar_dec(Ops& ops)
 {
     if(try_consume(Tokentype::auto_))
     {
@@ -346,7 +374,7 @@ bool IREmittor::autovar_dec()
             }
             ops.emplace_back(AutoVar{1});
             vars.emplace_back(var_name,vars_count++);
-            compile_expression(0);
+            compile_expression(0,ops);
         }
         try_consume(Tokentype::semicolon,"Expected ;\n");//semicolon
         return true;
@@ -355,7 +383,7 @@ bool IREmittor::autovar_dec()
 }
 
 
-bool IREmittor::compile_extrn()
+bool IREmittor::compile_extrn(Ops& ops)
 {
     if(try_peek(Tokentype::extrn))
     {
@@ -372,38 +400,13 @@ bool IREmittor::compile_extrn()
 }
 
 
-bool IREmittor::compile_funcdecl()
+
+Arg IREmittor::compile_expression(int precedence,Ops& ops)
 {
-    if(try_peek(Tokentype::funcdecl))
-    {
-        size_t curr_vars=vars_count;
-        size_t vars_size=vars.size();
-        std::string func_name=consume().val;
-        if(func_name=="main")is_main_func_present=true;
-        try_consume(Tokentype::open_paren,"expcted '('\n");
-        while(peek().value().type==Tokentype::identifier)
-        {
-            vars.emplace_back(consume().val,vars_count++);
-            try_consume(Tokentype::comma);
-            //"Expected comma between args\n";
-        }
-        ops.emplace_back(ScopeBegin{func_name,ScopeType::Function});
-        ops.emplace_back(FuncDecl{func_name,vars_count-curr_vars});
-        try_consume(Tokentype::close_paren,"expected ')'\n");
-        compile_block();
-        vars.resize(vars_size);
-        vars_count=curr_vars;
-        ops.emplace_back(ScopeClose{func_name,ScopeType::Function});
-        return true;
-    }
-    return false;
-}
-Arg IREmittor::compile_expression(int precedence)
-{
-    if(precedence==precedences.size())return compile_primary_expression();
-    Arg lhs=compile_expression(precedence+1),rhs;
+    if(precedence==precedences.size())return compile_primary_expression(ops);
+    Arg lhs=compile_expression(precedence+1,ops),rhs;
     struct AssignVisitor{
-        std::vector<Op>& ops;
+        Ops& ops;
         Arg rhs;
         Tokentype type;
         void operator()(const Var &var)
@@ -434,13 +437,13 @@ Arg IREmittor::compile_expression(int precedence)
         Tokentype type=consume().type;
         if(precedence==0)
         {
-            rhs=compile_expression(0);
+            rhs=compile_expression(0,ops);
             AssignVisitor assignvisitor{ops,rhs,type};
             std::visit(assignvisitor,lhs);
         }          
         else
         {
-            rhs=compile_expression(precedence+1);       
+            rhs=compile_expression(precedence+1,ops);       
             ops.emplace_back(AutoVar{1});
             ops.emplace_back(BinOp{vars_count,lhs,rhs,type});
             lhs=Var{vars_count++};
@@ -448,7 +451,7 @@ Arg IREmittor::compile_expression(int precedence)
     }
     return lhs;
 }
-Arg IREmittor::compile_primary_expression()
+Arg IREmittor::compile_primary_expression(Ops& ops)
 {
     Token token=consume();
     switch(token.type)
@@ -495,28 +498,28 @@ Arg IREmittor::compile_primary_expression()
         }
         case Tokentype::sub: 
         {
-            Arg arg=compile_primary_expression();
+            Arg arg=compile_primary_expression(ops);
             ops.emplace_back(AutoVar{1});
             ops.emplace_back(UnOp{vars_count,arg,UnOpType::Negate});
             return Var{vars_count++};
         }
         case Tokentype::not_:
         {
-            Arg arg=compile_primary_expression();
+            Arg arg=compile_primary_expression(ops);
             ops.emplace_back(AutoVar{1});
             ops.emplace_back(UnOp{vars_count,arg,UnOpType::Not});
             return Var{vars_count++};
         }
         case Tokentype::mult:
         {
-            Arg arg=compile_primary_expression();
+            Arg arg=compile_primary_expression(ops);
             ops.emplace_back(AutoVar{1});
             ops.emplace_back(AutoAssign{vars_count,arg});
             return Ref{vars_count++};
         }
         case Tokentype::open_paren:
         {
-            Arg arg=compile_expression(0);
+            Arg arg=compile_expression(0,ops);
             try_consume(Tokentype::close_paren,"expected )\n");
             return arg;
         }
@@ -544,14 +547,14 @@ Arg IREmittor::compile_primary_expression()
             ops.emplace_back(BinOp{val,Var{val},Literal{1},Tokentype::sub});
             return Var{val};
         }
-        case Tokentype::funcall:
+        case Tokentype::function:
         {
             std::string funcall_name=token.val;
             try_consume(Tokentype::open_paren,"expected '('\n");
             std::vector<Arg> args;
             while(try_peek(Tokentype::close_paren)==false)
             {   
-                args.emplace_back(compile_expression(0));
+                args.emplace_back(compile_expression(0,ops));
                 try_consume(Tokentype::comma);
             }
             try_consume(Tokentype::close_paren,"expected ')'\n");
@@ -578,7 +581,6 @@ Token IREmittor::try_consume(const Tokentype& type, const std::string& err_msg)
     if (peek().value().type == type) {
         return consume();
     }
-    debug(ops);
     std::cerr << err_msg << std::endl;
     exit(EXIT_FAILURE);
 }

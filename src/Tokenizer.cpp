@@ -7,8 +7,7 @@
 void debug(const Tokentype& tokentype)
 {
     switch (tokentype) {
-        case funcall:           std::cout << "function call "; break;
-        case funcdecl:          std::cout << "function declaration ";break;
+        case function:           std::cout << "function call "; break;
         case auto_:             std::cout << "auto ";break;
         case extrn:             std::cout << "extrn ";break;
         case open_curly:        std::cout << "open_curly "; break;
@@ -31,6 +30,8 @@ void debug(const Tokentype& tokentype)
         case while_:            std::cout << "while ";break;
         case less:              std::cout << "less ";break;
         case greater:           std::cout << "greater ";break;
+        case equals:            std::cout << "equals ";break;
+        case not_equals:        std::cout << "not equals ";break; 
         case not_:              std::cout << "negate ";break;
         case if_:               std::cout << "if ";break;
         case else_:             std::cout << "else ";break;
@@ -105,13 +106,9 @@ std::vector<Token> Tokenizer::tokenize()
         }
         else if(peek().value()=='(')
         {
-            if(tokens.back().type==Tokentype::identifier)
+            if(tokens.back().type==Tokentype::identifier || tokens.back().type==Tokentype::integer_lit)
             {
-                tokens.back().type=Tokentype::funcall;
-                int curr=0;
-                while(peek(curr++)!=')'){}
-                while(std::isspace(peek(curr).value())){curr++;}
-                if(peek(curr)=='{')tokens.back().type=Tokentype::funcdecl;
+                tokens.back().type=Tokentype::function;
             }
             tokens.push_back({Tokentype::open_paren,"("});
             consume();   
@@ -174,12 +171,22 @@ std::vector<Token> Tokenizer::tokenize()
         }
         else if (peek().value()=='=')
         {
-            tokens.push_back({Tokentype::assignment,"="});
+            if(peek(1).value()=='=')
+            {
+                tokens.push_back({Tokentype::equals,"=="});
+                consume();
+            }
+            else tokens.push_back({Tokentype::assignment,"="});
             consume();
         }
         else if(peek().value()=='!')
         {
-            tokens.push_back({Tokentype::not_,"!"});
+            if(peek(1).value()=='=')
+            {
+                tokens.push_back({Tokentype::not_equals,"=="});
+                consume();
+            }
+            else tokens.push_back({Tokentype::not_,"!"});
             consume();
         }
         else if(peek().value()==',')

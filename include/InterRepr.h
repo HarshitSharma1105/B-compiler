@@ -143,39 +143,49 @@ struct ScopeClose{
 typedef std::variant<AutoVar,AutoAssign,UnOp,BinOp,ExtrnDecl,Funcall,FuncDecl,
     ScopeBegin,ScopeClose,DataSection,ReturnValue,JmpIfZero,Jmp,Label,Store> Op;
 
+typedef std::vector<Op> Ops;
+
+struct Func{
+    Ops function_body;
+    std::string function_name;
+};
 
 
+struct Compiler{
+    std::vector<Func> functions;
+    std::string data_section;
+};
 
 
-void debug(const std::vector<Op>& ops);
+void debug(const Ops& ops);
 
 
 class IREmittor
 {
 public:
     IREmittor(const std::vector<Token> &tokens);
-    std::vector<Op>   EmitIR();
+    Compiler   EmitIR();
 
 
 
 private:
     size_t get_var_index(const std::string& name);
-
-    void compile_statement();
-    bool compile_while_loops();
-    bool compile_return();
-    void compile_stmt();
-    bool scope_open();
-    bool scope_end();
-    bool autovar_dec();
-    bool compile_extrn();
-    bool compile_funcdecl();
-    bool compile_if();
-    bool compile_else();
-    bool compile_block();
-    bool compile_scope();
-    Arg compile_expression(int precedence);
-    Arg compile_primary_expression();
+    void compile_prog();
+    void compile_func_body(Ops& ops);
+    bool compile_while_loops(Ops& ops);
+    bool compile_return(Ops& ops);
+    void compile_stmt(Ops& ops);
+    bool scope_open(Ops& ops);
+    bool scope_end(Ops& ops);
+    bool autovar_dec(Ops& ops);
+    bool compile_extrn(Ops& ops);
+    bool compile_funcdecl(Ops& ops);
+    bool compile_if(Ops& ops);
+    bool compile_else(Ops& ops);
+    void compile_block(Ops& ops);
+    bool compile_scope(Ops& ops);
+    Arg compile_expression(int precedence,Ops& ops);
+    Arg compile_primary_expression(Ops& ops);
 
     std::optional<Token> peek(int offset=0);
     Token consume();
@@ -183,8 +193,7 @@ private:
     bool try_consume(const Tokentype& type);
     bool try_peek(const std::vector<Tokentype>& types,int offset=0);
     bool try_peek(const Tokentype& type,int offset=0);
-    
-    std::vector<Op> ops;
+    Compiler compiler;
     std::vector<Token> tokens;
     std::stack<Scope> scopes;
     int token_index=0;

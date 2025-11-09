@@ -11,12 +11,13 @@ enum Target{
 };
 
 
+void debug(const Compiler& compiler);
 
 class Runner
 {
 public:
 	Runner(std::string target_lang,const std::string& path);
-	void compile(const std::vector<Op>& ops);
+	void compile(const Compiler& compiler);
 	void run();
 
 private:

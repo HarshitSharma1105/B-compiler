@@ -1,7 +1,7 @@
 #include<Generator-x86_64.h>
 
 
-Generator_x86_64::Generator_x86_64(const std::vector<Op> &ops) : ops(ops){}
+Generator_x86_64::Generator_x86_64(const Compiler& compiler) : compiler(compiler){}
 std::string Generator_x86_64::generate()
 {
     struct ArgVisitor{
@@ -163,21 +163,10 @@ std::string Generator_x86_64::generate()
     textstream << "format ELF64\n";
     textstream << "section \".text\" executable\n";
     Visitor visitor{0,textstream};
-    while(peek().has_value())
+    for(const Func& func:compiler.functions)
     {
-        std::visit(visitor,consume());
+        for(const Op& op:func.function_body) std::visit(visitor,op);
     }
     return textstream.str();
 }
 
-
-
-std::optional<Op> Generator_x86_64::peek(int offset){
-    if(index+offset>=ops.size()){
-        return {};
-    }
-    return ops[index+offset];
-}
-Op Generator_x86_64::consume(){
-    return ops[index++];
-}

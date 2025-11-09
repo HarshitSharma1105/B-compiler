@@ -18,13 +18,13 @@ int main(int argc,char* argv[])
     std::vector<Token> tokens=tokenizer.tokenize();
 
     IREmittor iremittor(tokens);
-    std::vector<Op> ops=iremittor.EmitIR();
+    Compiler compiler =iremittor.EmitIR();
 
     std::string target_lang=argv[3];
     Runner runner(target_lang,parent_path);
-    runner.compile(ops);
+    runner.compile(compiler);
     runner.run();
-    if(debugging)debug(ops);
+    if(debugging)debug(compiler);
     else system(("rm -rf "+parent_path+"/trash/").c_str());
     return 0;
 }

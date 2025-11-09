@@ -9,8 +9,7 @@
 
 
 enum Tokentype{
-funcall,
-funcdecl,
+function,
 auto_,
 extrn,
 identifier,
@@ -29,6 +28,8 @@ mult,
 divi,
 less,
 greater,
+equals,
+not_equals,
 incr,
 decr,
 return_,

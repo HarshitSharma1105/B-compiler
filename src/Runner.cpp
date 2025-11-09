@@ -2,7 +2,13 @@
 
 
 
-
+void debug(const Compiler& compiler)
+{
+	for(auto func:compiler.functions)
+    {
+        debug(func.function_body); 
+    }
+}
 
 
 Runner::Runner(std::string target_lang,const std::string& path) : path(path)
@@ -21,17 +27,17 @@ Runner::Runner(std::string target_lang,const std::string& path) : path(path)
 		exit(EXIT_FAILURE);
 	}
 }
-void Runner::compile(const std::vector<Op>& ops)
+void Runner::compile(const Compiler& compiler)
 {
 	std::string assembly_sourcecode;
 	if(target==Target::MIPS)
 	{
-		Generator_Mips generator(ops);
+		Generator_Mips generator(compiler);
 		assembly_sourcecode=generator.generate();
 	}
 	else if(target==Target::X86_64)
 	{
-		Generator_x86_64 generator(ops);
+		Generator_x86_64 generator(compiler);
 		assembly_sourcecode=generator.generate();
 	}
 	std::string command = "mkdir " + path+"/trash";//TODO: Use smth like mkdir_if_not_exist

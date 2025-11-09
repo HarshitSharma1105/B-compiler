@@ -2,7 +2,7 @@
 
 
 
-Generator_Mips::Generator_Mips(const std::vector<Op> &ops) : ops(ops){}
+Generator_Mips::Generator_Mips(const Compiler& compiler) : compiler(compiler){}
 std::string Generator_Mips::generate()
 {
     struct ArgVisitor{
@@ -179,9 +179,9 @@ std::string Generator_Mips::generate()
     textstream << "    .globl main\n";
     generate_stdlib();
     Visitor visitor{textstream};
-    while(peek().has_value())
+    for(const Func& func:compiler.functions)
     {
-        std::visit(visitor,consume());
+        for(const Op& op:func.function_body) std::visit(visitor,op);
     }
     return textstream.str();
 }
@@ -219,13 +219,4 @@ void Generator_Mips::generate_stdlib()
     textstream << "    li $v0,9\n";
     textstream << "    syscall\n";
     textstream << "    jr $ra\n";
-}
-std::optional<Op> Generator_Mips::peek(int offset){
-    if(index+offset>=ops.size()){
-        return {};
-    }
-    return ops[index+offset];
-}
-Op Generator_Mips::consume(){
-    return ops[index++];
 }
