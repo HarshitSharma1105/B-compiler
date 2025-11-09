@@ -80,11 +80,6 @@ struct Funcall{
 };
 
 
-struct FuncDecl{
-    std::string name;
-    size_t count;
-};
-
 struct Store{
     size_t index;
     Arg val;
@@ -115,39 +110,15 @@ struct JmpInfo{
     size_t skip_idx,jmp_idx;
 };
 
-enum ScopeType{
-    Global,
-    Function,
-    Local,
-    Loop,
-    If_,
-    Else_
-};
 
-struct Scope{
-    ScopeType type;
-    std::string scope_name;
-    size_t vars_count,vars_size;
-    JmpInfo info;
-};
-
-struct ScopeBegin{
-    std::string name;
-    ScopeType type;
-};
-struct ScopeClose{
-    std::string name;
-    ScopeType type;
-};
-
-typedef std::variant<AutoVar,AutoAssign,UnOp,BinOp,ExtrnDecl,Funcall,FuncDecl,
-    ScopeBegin,ScopeClose,DataSection,ReturnValue,JmpIfZero,Jmp,Label,Store> Op;
+typedef std::variant<AutoVar,AutoAssign,UnOp,BinOp,ExtrnDecl,Funcall,DataSection,ReturnValue,JmpIfZero,Jmp,Label,Store> Op;
 
 typedef std::vector<Op> Ops;
 
 struct Func{
     Ops function_body;
     std::string function_name;
+    size_t max_vars_count,num_args;
 };
 
 
@@ -175,11 +146,8 @@ private:
     bool compile_while_loops(Ops& ops);
     bool compile_return(Ops& ops);
     void compile_stmt(Ops& ops);
-    bool scope_open(Ops& ops);
-    bool scope_end(Ops& ops);
     bool autovar_dec(Ops& ops);
     bool compile_extrn(Ops& ops);
-    bool compile_funcdecl(Ops& ops);
     bool compile_if(Ops& ops);
     bool compile_else(Ops& ops);
     void compile_block(Ops& ops);
@@ -195,10 +163,10 @@ private:
     bool try_peek(const Tokentype& type,int offset=0);
     Compiler compiler;
     std::vector<Token> tokens;
-    std::stack<Scope> scopes;
     int token_index=0;
     size_t data_offset=0;
     size_t vars_count=0;
+    size_t max_vars_count=0;
     size_t labels_count=0;
     std::unordered_set<std::string> extrns;
     std::vector<Variable> vars;

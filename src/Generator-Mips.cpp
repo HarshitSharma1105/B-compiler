@@ -91,36 +91,36 @@ std::string Generator_Mips::generate()
             stream << "    jal " << funcall.name << "\n";
         }
 
-        void operator()(const FuncDecl& funcdecl) 
-        {
-            stream << "    addi $sp,$sp,-" << funcdecl.count*4 << "\n";
-            for (int i=0;i<funcdecl.count; i++)
-            {
-                stream << "    sw " << regs[i] << ",-" << (i+1)*4 << "($s1)" << "\n";
-            }
-        }
-        void operator()(const ScopeBegin& scope)
-        {
-            if(scope.type== ScopeType::Function)stream << scope.name << ":\n";
-            stream << "    addi $sp,$sp,-8\n";
-            stream << "    sw $ra,0($sp)\n";
-            stream << "    sw $s1,4($sp)\n";
-            stream << "    move $s1,$sp\n";
-        }
+        // void operator()(const FuncDecl& funcdecl) 
+        // {
+        //     stream << "    addi $sp,$sp,-" << funcdecl.count*4 << "\n";
+        //     for (int i=0;i<funcdecl.count; i++)
+        //     {
+        //         stream << "    sw " << regs[i] << ",-" << (i+1)*4 << "($s1)" << "\n";
+        //     }
+        // }
+        // void operator()(const ScopeBegin& scope)
+        // {
+        //     if(scope.type== ScopeType::Function)stream << scope.name << ":\n";
+        //     stream << "    addi $sp,$sp,-8\n";
+        //     stream << "    sw $ra,0($sp)\n";
+        //     stream << "    sw $s1,4($sp)\n";
+        //     stream << "    move $s1,$sp\n";
+        // }
 
-        void operator()(const ScopeClose& scope)
-        {
-            stream << "    move $sp,$s1\n";
-            stream << "    lw $ra,0($sp)\n";
-            stream << "    lw $s1,4($sp)\n";
-            stream << "    addi $sp,$sp,8\n";
-            if(scope.type== ScopeType::Function)
-            {
-                stream << "    li $a0,0\n";
-                if(scope.name!="main")stream << "    jr $ra\n";
-                else stream << "    li $v0,10\n" << "    syscall\n";
-            }
-        }
+        // void operator()(const ScopeClose& scope)
+        // {
+        //     stream << "    move $sp,$s1\n";
+        //     stream << "    lw $ra,0($sp)\n";
+        //     stream << "    lw $s1,4($sp)\n";
+        //     stream << "    addi $sp,$sp,8\n";
+        //     if(scope.type== ScopeType::Function)
+        //     {
+        //         stream << "    li $a0,0\n";
+        //         if(scope.name!="main")stream << "    jr $ra\n";
+        //         else stream << "    li $v0,10\n" << "    syscall\n";
+        //     }
+        // }
         void operator()(const DataSection& data)
         {
             stream << ".data\n";

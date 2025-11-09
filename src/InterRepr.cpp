@@ -75,20 +75,6 @@ struct DebugVisitor {
         }
         std::cout << ")\n";
     }
-
-    void operator()(const FuncDecl& funcdecl) 
-    {
-        std::cout << "Function Declaration " << funcdecl.name << "(" << funcdecl.count << ")\n";
-    }
-    void operator()(const ScopeBegin& scope)
-    {
-        std::cout << "Scope Begin " << scope.name << "\n";
-    }
-    void operator()(const ScopeClose& scope)
-    {
-        std::cout << "Scope End " << scope.name  << "\n";
-    }
-
     void operator()(const DataSection& datasection)
     {
         std::cout << "data:\n" << datasection.concatedstrings << "\n";
@@ -152,7 +138,7 @@ Compiler   IREmittor::EmitIR()
         std::cerr << "Main function not declared\n";
         exit(EXIT_FAILURE);
     }
-    compiler.functions.back().function_body.emplace_back(DataSection{datastring.str()});
+    // compiler.functions.back().function_body.emplace_back(DataSection{datastring.str()});
     compiler.data_section=datastring.str();
     return compiler;
 }
@@ -175,14 +161,19 @@ void IREmittor::compile_prog()
             try_consume(Tokentype::comma);
             //"Expected comma between args\n";
         }
-        func.function_body.emplace_back(ScopeBegin{func_name,ScopeType::Function});
-        func.function_body.emplace_back(FuncDecl{func_name,vars_count-curr_vars});
+        func.num_args=vars_count-curr_vars;
         try_consume(Tokentype::close_paren,"expected ')'\n");
         compile_block(func.function_body);
         vars.resize(vars_size);
+        max_vars_count=std::max(max_vars_count,vars_count);
         vars_count=curr_vars;
-        func.function_body.emplace_back(ScopeClose{func_name,ScopeType::Function});
+        func.max_vars_count=max_vars_count;
+        max_vars_count=0;
         compiler.functions.push_back(func);
+    }
+    else 
+    {
+        assert(false && "TODO Global statements");
     }
 }
 
@@ -223,7 +214,12 @@ bool IREmittor::compile_scope(Ops& ops)
 {
     if(try_consume(Tokentype::open_curly))
     {
+        size_t curr_vars=vars_count;
+        size_t vars_size=vars.size();
         while(!try_consume(Tokentype::close_curly))compile_func_body(ops);
+        vars.resize(vars_size);
+        max_vars_count=std::max(max_vars_count,vars_count);
+        vars_count=curr_vars;
         return true;
     }
     return false;
@@ -245,6 +241,7 @@ bool IREmittor::compile_if(Ops& ops)
         ops.emplace_back(Label{labels_count});
         std::get<JmpIfZero>(ops[curr]).idx=labels_count++;
         vars.resize(vars_size);
+        max_vars_count=std::max(max_vars_count,vars_count);
         vars_count=curr_vars;
         return true;
     }
@@ -256,23 +253,7 @@ bool IREmittor::compile_else(Ops& ops)
 {
     if(try_consume(Tokentype::else_))
     {
-        Scope if_scope=scopes.top();
-        JmpInfo if_info=if_scope.info;
-        scopes.pop();
-
-
-        if(if_scope.type!=ScopeType::If_)
-        {
-            std::cerr << "Else should be precedded by an if block\n";
-            exit(EXIT_FAILURE);
-        }
-
-
-        Scope scope={ScopeType::Else_,"",vars_count,vars.size(),{.skip_idx=if_info.jmp_idx}};
-        scopes.push(scope);
-
-        try_consume(Tokentype::open_curly,"expected {\n");
-        return true;
+        assert(false && "TODO: Else conditions\n");
     }
     return false;
 }
@@ -293,6 +274,7 @@ bool IREmittor::compile_while_loops(Ops& ops)
         ops.emplace_back(Label{labels_count});
         std::get<JmpIfZero>(ops[curr]).idx=labels_count++;
         vars.resize(vars_size);
+        max_vars_count=std::max(max_vars_count,vars_count);
         vars_count=curr_vars;
         return true;
     }
@@ -318,45 +300,8 @@ void IREmittor::compile_stmt(Ops& ops)
     try_consume(Tokentype::semicolon,"Expected ;\n");
 }
 
-bool IREmittor::scope_open(Ops& ops)
-{
-    if(try_consume(Tokentype::open_curly))
-    {
-        scopes.push(Scope{ScopeType::Local,"",vars_count,vars.size(),{}});
-        //ops.emplace_back(ScopeBegin{"",ScopeType::Local});
-        return true;
-    }
-    return false;
-}
 
-bool IREmittor::scope_end(Ops& ops)
-{
-    if(try_consume(Tokentype::close_curly))
-    {
-        assert(false && "TODO ELSE\n");
-        // Scope& scope=scopes.top();
-        // JmpInfo info=scope.info;
-        // std::string name=scope.scope_name;
-        // vars_count=scope.vars_count;
-        // vars.resize(scope.vars_size);
-        // if(scope.type==ScopeType::If_)
-        // {
-        //     scope.info.jmp_idx=ops.size();
-        //     ops.emplace_back(Jmp{labels_count});
-        //     ops.emplace_back(Label{labels_count});
-        //     std::get<JmpIfZero>(ops[info.skip_idx]).idx=labels_count++;
-        //     if(try_peek(Tokentype::else_)) return true;
-        // }
-        // else if(scope.type==ScopeType::Else_)
-        // {
-        //     ops.emplace_back(Label{labels_count});
-        //     std::get<Jmp>(ops[info.skip_idx]).idx=labels_count++;
-        // }
-        // scopes.pop();
-        // return true;
-    }
-    return false;
-}
+
 
 
 bool IREmittor::autovar_dec(Ops& ops)
@@ -372,7 +317,7 @@ bool IREmittor::autovar_dec(Ops& ops)
                 std::cerr << "variable already declared " << var_name << "\n";
                 exit(EXIT_FAILURE);
             }
-            ops.emplace_back(AutoVar{1});
+            //ops.emplace_back(AutoVar{1});
             vars.emplace_back(var_name,vars_count++);
             compile_expression(0,ops);
         }
@@ -444,7 +389,7 @@ Arg IREmittor::compile_expression(int precedence,Ops& ops)
         else
         {
             rhs=compile_expression(precedence+1,ops);       
-            ops.emplace_back(AutoVar{1});
+            //ops.emplace_back(AutoVar{1});
             ops.emplace_back(BinOp{vars_count,lhs,rhs,type});
             lhs=Var{vars_count++};
         }    
@@ -466,7 +411,7 @@ Arg IREmittor::compile_primary_expression(Ops& ops)
             }
             if(try_peek({Tokentype::incr,Tokentype::decr})==false)return var;
             Tokentype type=consume().type;
-            ops.emplace_back(AutoVar{1});
+            //ops.emplace_back(AutoVar{1});
             ops.emplace_back(AutoAssign{vars_count,var});
             switch(type)
             {
@@ -499,21 +444,21 @@ Arg IREmittor::compile_primary_expression(Ops& ops)
         case Tokentype::sub: 
         {
             Arg arg=compile_primary_expression(ops);
-            ops.emplace_back(AutoVar{1});
+            //ops.emplace_back(AutoVar{1});
             ops.emplace_back(UnOp{vars_count,arg,UnOpType::Negate});
             return Var{vars_count++};
         }
         case Tokentype::not_:
         {
             Arg arg=compile_primary_expression(ops);
-            ops.emplace_back(AutoVar{1});
+            //ops.emplace_back(AutoVar{1});
             ops.emplace_back(UnOp{vars_count,arg,UnOpType::Not});
             return Var{vars_count++};
         }
         case Tokentype::mult:
         {
             Arg arg=compile_primary_expression(ops);
-            ops.emplace_back(AutoVar{1});
+            //ops.emplace_back(AutoVar{1});
             ops.emplace_back(AutoAssign{vars_count,arg});
             return Ref{vars_count++};
         }
@@ -559,7 +504,7 @@ Arg IREmittor::compile_primary_expression(Ops& ops)
             }
             try_consume(Tokentype::close_paren,"expected ')'\n");
             ops.emplace_back(Funcall{funcall_name,args});
-            ops.emplace_back(AutoVar{1});
+            //ops.emplace_back(AutoVar{1});
             ops.emplace_back(AutoAssign{vars_count,FuncResult{funcall_name}});
             return Var{vars_count++};
         }

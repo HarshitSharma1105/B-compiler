@@ -30,13 +30,11 @@ std::string Generator_x86_64::generate()
         }
     };
     struct Visitor {
-        int count=1;
         std::stringstream& stream;
-        ArgVisitor argvisitor{stream};
         std::string regs[6]={"rdi","rsi","rdx","rcx","r8","r9"};
+        ArgVisitor argvisitor{stream};
         void operator()(const AutoVar& autovar) 
         {
-            count+=autovar.count;
             stream << "    sub rsp," << autovar.count*8 << "\n";
         }
 
@@ -90,31 +88,7 @@ std::string Generator_x86_64::generate()
                 stream << "    mov " << regs[i] << ",r15\n";
             }
             stream << "    xor rax,rax\n";
-            if(count%2)stream << "    sub rsp,8\n";
             stream << "    call " << funcall.name << "\n";
-            if(count%2)stream << "    add rsp,8\n";
-        }
-
-        void operator()(const FuncDecl& funcdecl) 
-        {
-            count+=funcdecl.count;
-            stream << "    sub rsp," << funcdecl.count*8 << "\n";
-            for (int i=0;i<funcdecl.count; i++)
-            {
-                stream << "    mov [rbp-" << (i+1)*8 << "]," << regs[i] << "\n";
-            }
-        }
-        void operator()(const ScopeBegin& scope)
-        {
-            if(scope.type==ScopeType::Function) stream << "public " << scope.name << "\n" << scope.name << ":\n";
-            stream << "    push rbp\n";
-            stream << "    mov rbp,rsp\n";
-        }
-        void operator()(const ScopeClose& scope)
-        {
-            stream << "    mov rsp,rbp\n";
-            stream << "    pop rbp\n";
-            if(scope.type==ScopeType::Function)stream <<"   mov rax,0\n    ret\n";
         }
         void operator()(const DataSection& data)
         {
@@ -160,13 +134,28 @@ std::string Generator_x86_64::generate()
             stream << "    mov [r14],r15\n";
         }
     };
+    std::string regs[6]={"rdi","rsi","rdx","rcx","r8","r9"};
     textstream << "format ELF64\n";
     textstream << "section \".text\" executable\n";
-    Visitor visitor{0,textstream};
+    Visitor visitor{textstream};
     for(const Func& func:compiler.functions)
     {
+        size_t alloc_size=func.max_vars_count;
+        if(func.max_vars_count%2)alloc_size++;
+        textstream << "public " << func.function_name << "\n" << func.function_name << ":\n";
+        textstream << "    push rbp\n";
+        textstream << "    mov rbp,rsp\n";
+        textstream << "    sub rsp," << 8*alloc_size << "\n";
+        for (int i=0;i<func.num_args; i++)
+        {
+            textstream << "    mov [rbp-" << (i+1)*8 << "]," << regs[i] << "\n";
+        }
         for(const Op& op:func.function_body) std::visit(visitor,op);
+        textstream << "    mov rsp,rbp\n";
+        textstream << "    pop rbp\n";
+        textstream << "    mov rax,0\n    ret\n";
     }
+    std::visit(visitor,Op{DataSection{compiler.data_section}});
     return textstream.str();
 }
 
