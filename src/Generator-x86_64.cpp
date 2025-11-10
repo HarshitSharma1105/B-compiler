@@ -1,9 +1,7 @@
 #include<Generator-x86_64.h>
-
-
-Generator_x86_64::Generator_x86_64(const Compiler& compiler) : compiler(compiler){}
-std::string Generator_x86_64::generate()
+namespace x86_64
 {
+    std::string regs[6]={"rdi","rsi","rdx","rcx","r8","r9"};
     struct ArgVisitor{
         std::stringstream& stream;
         void operator()(const Var& var)
@@ -31,13 +29,7 @@ std::string Generator_x86_64::generate()
     };
     struct Visitor {
         std::stringstream& stream;
-        std::string regs[6]={"rdi","rsi","rdx","rcx","r8","r9"};
         ArgVisitor argvisitor{stream};
-        void operator()(const AutoVar& autovar) 
-        {
-            stream << "    sub rsp," << autovar.count*8 << "\n";
-        }
-
         void operator()(const AutoAssign& autoassign) 
         {
             std::visit(argvisitor,autoassign.arg);
@@ -85,7 +77,7 @@ std::string Generator_x86_64::generate()
             for(size_t i=0;i<funcall.args.size();i++)
             {
                 std::visit(argvisitor,funcall.args[i]);
-                stream << "    mov " << regs[i] << ",r15\n";
+                stream << "    mov " << x86_64::regs[i] << ",r15\n";
             }
             stream << "    xor rax,rax\n";
             stream << "    call " << funcall.name << "\n";
@@ -134,28 +126,45 @@ std::string Generator_x86_64::generate()
             stream << "    mov [r14],r15\n";
         }
     };
-    std::string regs[6]={"rdi","rsi","rdx","rcx","r8","r9"};
+}
+Generator_x86_64::Generator_x86_64(const Compiler& compiler) : compiler(compiler){}
+std::string Generator_x86_64::generate()
+{
     textstream << "format ELF64\n";
     textstream << "section \".text\" executable\n";
-    Visitor visitor{textstream};
+    x86_64::Visitor visitor{textstream};
     for(const Func& func:compiler.functions)
     {
-        size_t alloc_size=func.max_vars_count;
-        if(func.max_vars_count%2)alloc_size++;
-        textstream << "public " << func.function_name << "\n" << func.function_name << ":\n";
-        textstream << "    push rbp\n";
-        textstream << "    mov rbp,rsp\n";
-        textstream << "    sub rsp," << 8*alloc_size << "\n";
-        for (int i=0;i<func.num_args; i++)
-        {
-            textstream << "    mov [rbp-" << (i+1)*8 << "]," << regs[i] << "\n";
-        }
-        for(const Op& op:func.function_body) std::visit(visitor,op);
-        textstream << "    mov rsp,rbp\n";
-        textstream << "    pop rbp\n";
-        textstream << "    mov rax,0\n    ret\n";
+        generate_function_prologue(func);
+        generate_func(func);
+        generate_function_epilogue();
     }
     std::visit(visitor,Op{DataSection{compiler.data_section}});
     return textstream.str();
 }
 
+void Generator_x86_64::generate_function_prologue(const Func& func)
+{
+    std::string regs[6]={"rdi","rsi","rdx","rcx","r8","r9"};
+    size_t alloc_size=func.max_vars_count;
+    if(func.max_vars_count%2)alloc_size++;
+    textstream << "public " << func.function_name << "\n" << func.function_name << ":\n";
+    textstream << "    push rbp\n";
+    textstream << "    mov rbp,rsp\n";
+    textstream << "    sub rsp," << 8*alloc_size << "\n";
+    for (int i=0;i<func.num_args; i++)
+    {
+        textstream << "    mov [rbp-" << (i+1)*8 << "]," << x86_64::regs[i] << "\n";
+    }
+}
+void Generator_x86_64::generate_function_epilogue()
+{
+    textstream << "    mov rsp,rbp\n";
+    textstream << "    pop rbp\n";
+    textstream << "    mov rax,0\n    ret\n";
+}
+void Generator_x86_64::generate_func(const Func& func)
+{
+    x86_64::Visitor visitor{textstream};
+    for(const Op& op:func.function_body) std::visit(visitor,op);
+}

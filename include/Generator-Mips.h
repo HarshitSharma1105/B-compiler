@@ -12,6 +12,9 @@ public:
     std::string generate();
 
 private:
+    void generate_func(const Func& func);
+    void generate_function_epilogue();
+    void generate_function_prologue(const Func& func);
     void generate_stdlib();
     Compiler compiler;
     std::stringstream textstream;

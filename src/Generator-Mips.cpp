@@ -1,10 +1,8 @@
 #include<Generator-Mips.h>
 
-
-
-Generator_Mips::Generator_Mips(const Compiler& compiler) : compiler(compiler){}
-std::string Generator_Mips::generate()
+namespace Mips
 {
+    std::string regs[4]={"$a0","$a1","$a2","$a3"};
     struct ArgVisitor{
         std::stringstream& stream;
         void operator()(const Var& var)
@@ -30,15 +28,11 @@ std::string Generator_Mips::generate()
             stream << "    lw $s0,0($s0)\n";
         }
     };
+
+
     struct Visitor {
         std::stringstream& stream;
         ArgVisitor argvisitor{stream};
-        std::string regs[4]={"$a0","$a1","$a2","$a3"};
-        void operator()(const AutoVar& autovar) 
-        {
-            stream << "    addi $sp,$sp,-" << autovar.count*4 << "\n";
-        }
-
         void operator()(const AutoAssign& autoassign) 
         {
             std::visit(argvisitor,autoassign.arg);
@@ -86,41 +80,10 @@ std::string Generator_Mips::generate()
             for(size_t i=0;i<funcall.args.size();i++)
             {
                 std::visit(argvisitor,funcall.args[i]);
-                stream << "    move " << regs[i] << ",$s0\n";
+                stream << "    move " << Mips::regs[i] << ",$s0\n";
             }
             stream << "    jal " << funcall.name << "\n";
         }
-
-        // void operator()(const FuncDecl& funcdecl) 
-        // {
-        //     stream << "    addi $sp,$sp,-" << funcdecl.count*4 << "\n";
-        //     for (int i=0;i<funcdecl.count; i++)
-        //     {
-        //         stream << "    sw " << regs[i] << ",-" << (i+1)*4 << "($s1)" << "\n";
-        //     }
-        // }
-        // void operator()(const ScopeBegin& scope)
-        // {
-        //     if(scope.type== ScopeType::Function)stream << scope.name << ":\n";
-        //     stream << "    addi $sp,$sp,-8\n";
-        //     stream << "    sw $ra,0($sp)\n";
-        //     stream << "    sw $s1,4($sp)\n";
-        //     stream << "    move $s1,$sp\n";
-        // }
-
-        // void operator()(const ScopeClose& scope)
-        // {
-        //     stream << "    move $sp,$s1\n";
-        //     stream << "    lw $ra,0($sp)\n";
-        //     stream << "    lw $s1,4($sp)\n";
-        //     stream << "    addi $sp,$sp,8\n";
-        //     if(scope.type== ScopeType::Function)
-        //     {
-        //         stream << "    li $a0,0\n";
-        //         if(scope.name!="main")stream << "    jr $ra\n";
-        //         else stream << "    li $v0,10\n" << "    syscall\n";
-        //     }
-        // }
         void operator()(const DataSection& data)
         {
             stream << ".data\n";
@@ -175,16 +138,56 @@ std::string Generator_Mips::generate()
             stream << "    sw $s0,($s2)\n";
         }
     };
+}
+Generator_Mips::Generator_Mips(const Compiler& compiler) : compiler(compiler){}
+std::string Generator_Mips::generate()
+{
     textstream << ".text\n";
     textstream << "    .globl main\n";
     generate_stdlib();
-    Visitor visitor{textstream};
+    Mips::Visitor visitor{textstream};
     for(const Func& func:compiler.functions)
     {
-        for(const Op& op:func.function_body) std::visit(visitor,op);
+        generate_function_prologue(func);
+        generate_func(func);
+        generate_function_epilogue();
     }
+    std::visit(visitor,Op{DataSection{compiler.data_section}});
     return textstream.str();
 }
+
+
+
+void Generator_Mips::generate_function_prologue(const Func& func)
+{
+    textstream << func.function_name << ":\n";
+    textstream << "    addi $sp,$sp,-8\n";
+    textstream << "    sw $ra,0($sp)\n";
+    textstream << "    sw $s1,4($sp)\n";
+    textstream << "    move $s1,$sp\n";
+    textstream << "    addi $sp,$sp,-" << func.max_vars_count*4 << '\n';
+    for (int i=0;i<func.num_args; i++)
+    {
+        textstream << "    sw " << Mips::regs[i] << ",-" << (i+1)*4 << "($s1)" << "\n";
+    }
+}
+void Generator_Mips::generate_function_epilogue()
+{
+    textstream << "    move $sp,$s1\n";
+    textstream << "    lw $ra,0($sp)\n";
+    textstream << "    lw $s1,4($sp)\n";
+    textstream << "    addi $sp,$sp,8\n";
+    textstream << "    li $a0,0\n";
+    textstream << "    jr $ra\n";
+}
+void Generator_Mips::generate_func(const Func& func)
+{
+    Mips::Visitor visitor{textstream};
+    for(const Op& op:func.function_body) std::visit(visitor,op);
+}
+
+
+
 void Generator_Mips::generate_stdlib()
 {
     textstream << "putchar:\n";

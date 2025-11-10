@@ -26,11 +26,6 @@ struct DebugArgVisitor{
 
 struct DebugVisitor {
     DebugArgVisitor debugargvisitor{};
-    void operator()(const AutoVar& autovar) 
-    {
-        std::cout << "Auto Variables(" << autovar.count << ")\n";
-    }
-
     void operator()(const AutoAssign& autoassign) 
     {
         std::cout << "Assign AutoVar(" << autoassign.index << ") = ";

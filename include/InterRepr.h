@@ -17,9 +17,6 @@ struct Variable{
 
 
 
-struct AutoVar{
-    size_t count; 
-};
 
 
 struct Var{
@@ -111,7 +108,7 @@ struct JmpInfo{
 };
 
 
-typedef std::variant<AutoVar,AutoAssign,UnOp,BinOp,ExtrnDecl,Funcall,DataSection,ReturnValue,JmpIfZero,Jmp,Label,Store> Op;
+typedef std::variant<AutoAssign,UnOp,BinOp,ExtrnDecl,Funcall,DataSection,ReturnValue,JmpIfZero,Jmp,Label,Store> Op;
 
 typedef std::vector<Op> Ops;
 
