@@ -19,4 +19,5 @@ private:
     Compiler compiler;
     std::stringstream textstream;
     std::unordered_set<std::string> extrns;
+    bool is_main;
 };

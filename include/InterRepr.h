@@ -145,8 +145,7 @@ private:
     void compile_stmt(Ops& ops);
     bool autovar_dec(Ops& ops);
     bool compile_extrn(Ops& ops);
-    bool compile_if(Ops& ops);
-    bool compile_else(Ops& ops);
+    bool compile_branch(Ops& ops);
     void compile_block(Ops& ops);
     bool compile_scope(Ops& ops);
     Arg compile_expression(int precedence,Ops& ops);

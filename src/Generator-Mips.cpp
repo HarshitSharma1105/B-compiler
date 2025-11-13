@@ -150,6 +150,7 @@ std::string Generator_Mips::generate()
     {
         generate_function_prologue(func);
         generate_func(func);
+        is_main=(func.function_name=="main");
         generate_function_epilogue();
     }
     std::visit(visitor,Op{DataSection{compiler.data_section}});
@@ -177,8 +178,15 @@ void Generator_Mips::generate_function_epilogue()
     textstream << "    lw $ra,0($sp)\n";
     textstream << "    lw $s1,4($sp)\n";
     textstream << "    addi $sp,$sp,8\n";
-    textstream << "    li $a0,0\n";
-    textstream << "    jr $ra\n";
+    if(!is_main)
+    {
+        textstream << "    li $a0,0\n";
+        textstream << "    jr $ra\n";
+    }
+    else
+    {
+        textstream << "    li $v0,10\n syscall\n";
+    }
 }
 void Generator_Mips::generate_func(const Func& func)
 {
@@ -203,6 +211,10 @@ void Generator_Mips::generate_stdlib()
     textstream << "    syscall\n";
     textstream << "    jr $ra\n";
 
+    textstream << "getint:\n";
+    textstream << "    li $v0,5\n";
+    textstream << "    syscall\n";
+    textstream << "    jr $ra\n";
 
     textstream << "pnl:\n";
     textstream << "    li $v0,11\n";

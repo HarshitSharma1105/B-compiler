@@ -189,8 +189,7 @@ void IREmittor::compile_func_body(Ops& ops)
     else if(compile_scope(ops))return;
     else if(compile_return(ops))return;
     else if(compile_while_loops(ops))return;
-    else if(compile_if(ops))return;
-    else if(compile_else(ops))return;
+    else if(compile_branch(ops))return;
     compile_stmt(ops);
 }
 
@@ -220,38 +219,42 @@ bool IREmittor::compile_scope(Ops& ops)
     return false;
 }
 
-bool IREmittor::compile_if(Ops& ops)
+bool IREmittor::compile_branch(Ops& ops)
 {
     if(try_consume(Tokentype::if_))
     {
-        ops.emplace_back(Label{labels_count});
-        size_t start=labels_count++;
+        ops.emplace_back(Label{labels_count++});
         size_t curr_vars=vars_count;
         size_t vars_size=vars.size();
         Arg arg=compile_expression(0,ops);  
-        size_t curr=ops.size();
+        size_t jmp=ops.size();
         ops.emplace_back(JmpIfZero{arg,0});
         compile_block(ops);
+        size_t if_jump=ops.size();
         ops.emplace_back(Jmp{labels_count});
         ops.emplace_back(Label{labels_count});
-        std::get<JmpIfZero>(ops[curr]).idx=labels_count++;
+        std::get<JmpIfZero>(ops[jmp]).idx=labels_count++;
         vars.resize(vars_size);
         max_vars_count=std::max(max_vars_count,vars_count);
         vars_count=curr_vars;
+        if(try_consume(Tokentype::else_))
+        {
+            curr_vars=vars_count;
+            vars_size=vars.size();
+            compile_block(ops);
+            ops.emplace_back(Label{labels_count});
+            std::get<Jmp>(ops[if_jump]).idx=labels_count++;
+            vars.resize(vars_size);
+            max_vars_count=std::max(max_vars_count,vars_count);
+            vars_count=curr_vars;
+        }
         return true;
     }
     return false;
 }
 
 
-bool IREmittor::compile_else(Ops& ops)
-{
-    if(try_consume(Tokentype::else_))
-    {
-        assert(false && "TODO: Else conditions\n");
-    }
-    return false;
-}
+
 
 bool IREmittor::compile_while_loops(Ops& ops)
 {

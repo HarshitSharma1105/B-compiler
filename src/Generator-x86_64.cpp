@@ -145,9 +145,8 @@ std::string Generator_x86_64::generate()
 
 void Generator_x86_64::generate_function_prologue(const Func& func)
 {
-    std::string regs[6]={"rdi","rsi","rdx","rcx","r8","r9"};
     size_t alloc_size=func.max_vars_count;
-    if(func.max_vars_count%2)alloc_size++;
+    if(alloc_size%2)alloc_size++;
     textstream << "public " << func.function_name << "\n" << func.function_name << ":\n";
     textstream << "    push rbp\n";
     textstream << "    mov rbp,rsp\n";
@@ -167,4 +166,8 @@ void Generator_x86_64::generate_func(const Func& func)
 {
     x86_64::Visitor visitor{textstream};
     for(const Op& op:func.function_body) std::visit(visitor,op);
+}
+void Generator_x86_64::generate_stdlib()
+{
+    
 }
