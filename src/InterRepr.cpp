@@ -315,7 +315,6 @@ bool IREmittor::autovar_dec(Ops& ops)
                 std::cerr << "variable already declared " << var_name << "\n";
                 exit(EXIT_FAILURE);
             }
-            //ops.emplace_back(AutoVar{1});
             vars.emplace_back(var_name,vars_count++);
             compile_expression(0,ops);
         }
@@ -341,53 +340,29 @@ bool IREmittor::compile_extrn(Ops& ops)
     }
     return false;
 }
-
+template<class... Ts> struct overload : Ts... { using Ts::operator()...; };
+template<class... Ts> overload(Ts...) -> overload<Ts...>;
 
 
 Arg IREmittor::compile_expression(int precedence,Ops& ops)
 {
     if(precedence==precedences.size())return compile_primary_expression(ops);
     Arg lhs=compile_expression(precedence+1,ops),rhs;
-    struct AssignVisitor{
-        Ops& ops;
-        Arg rhs;
-        Tokentype type;
-        void operator()(const Var &var)
-        {
-            ops.emplace_back(BinOp{var.index,var,rhs,type});
-        }
-        void operator()(const Literal& literal)
-        {
-            std::cerr << "Assignment to integer literals not allowed\n";
-            exit(EXIT_FAILURE);
-        }
-        void operator()(const DataOffset& dataoffset)
-        {
-            std::cerr << "Assignment to string literals not allowed\n";
-            exit(EXIT_FAILURE);
-        }
-        void operator()(const FuncResult& funcresult)
-        {
-            std::cerr << "Assignment to function result not allowed\n";
-            exit(EXIT_FAILURE);
-        }
-        void operator()(const Ref& ref)
-        {
-            ops.emplace_back(Store{ref.index,rhs});
-        }
-    };
     while(try_peek(precedences[precedence])){
         Tokentype type=consume().type;
         if(precedence==0)
         {
             rhs=compile_expression(0,ops);
-            AssignVisitor assignvisitor{ops,rhs,type};
-            std::visit(assignvisitor,lhs);
+            std::visit(overload{
+                [&](const Var& var)  { ops.emplace_back(BinOp{var.index,var,rhs,type});},
+                [&](const Ref& ref)  {  ops.emplace_back(Store{ref.index,rhs});},
+                [](const auto& ){std::cerr << "Assigning to non assignable value\n"; exit(EXIT_FAILURE); }
+            }, lhs);
+
         }          
         else
         {
             rhs=compile_expression(precedence+1,ops);       
-            //ops.emplace_back(AutoVar{1});
             ops.emplace_back(BinOp{vars_count,lhs,rhs,type});
             lhs=Var{vars_count++};
         }    
@@ -409,7 +384,6 @@ Arg IREmittor::compile_primary_expression(Ops& ops)
             }
             if(try_peek({Tokentype::incr,Tokentype::decr})==false)return var;
             Tokentype type=consume().type;
-            //ops.emplace_back(AutoVar{1});
             ops.emplace_back(AutoAssign{vars_count,var});
             switch(type)
             {
@@ -442,21 +416,18 @@ Arg IREmittor::compile_primary_expression(Ops& ops)
         case Tokentype::sub: 
         {
             Arg arg=compile_primary_expression(ops);
-            //ops.emplace_back(AutoVar{1});
             ops.emplace_back(UnOp{vars_count,arg,UnOpType::Negate});
             return Var{vars_count++};
         }
         case Tokentype::not_:
         {
             Arg arg=compile_primary_expression(ops);
-            //ops.emplace_back(AutoVar{1});
             ops.emplace_back(UnOp{vars_count,arg,UnOpType::Not});
             return Var{vars_count++};
         }
         case Tokentype::mult:
         {
             Arg arg=compile_primary_expression(ops);
-            //ops.emplace_back(AutoVar{1});
             ops.emplace_back(AutoAssign{vars_count,arg});
             return Ref{vars_count++};
         }
@@ -502,7 +473,6 @@ Arg IREmittor::compile_primary_expression(Ops& ops)
             }
             try_consume(Tokentype::close_paren,"expected ')'\n");
             ops.emplace_back(Funcall{funcall_name,args});
-            //ops.emplace_back(AutoVar{1});
             ops.emplace_back(AutoAssign{vars_count,FuncResult{funcall_name}});
             return Var{vars_count++};
         }

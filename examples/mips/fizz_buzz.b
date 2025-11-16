@@ -1,8 +1,7 @@
 main()
 {
     extrn  puts,getint,pnl;
-    auto n;
-    n=getint();
+    auto n=getint();
     if(n>7)
     {
         if(n>10) puts("first");
