@@ -7,7 +7,7 @@ main()
     SetTargetFPS(60);
     auto x=200,y=200;
     auto dx=2,dy=2;
-    while(!WindowShouldClose())
+    while(WindowShouldClose() == 0)
     {
         x=x+dx;
         y=y+dy;

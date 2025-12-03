@@ -116,7 +116,7 @@ void debug(const Ops& ops)
 static std::vector<std::vector<Tokentype>> precedences =
 {
     {Tokentype::assignment},   // we can put plus equals,minus equals,mult equals,assignment everything here
-    {Tokentype::less,Tokentype::greater},
+    {Tokentype::less,Tokentype::greater,Tokentype::equals,Tokentype::not_equals},
     {Tokentype::add,Tokentype::sub},
     {Tokentype::mult,Tokentype::divi}
 };
@@ -133,7 +133,6 @@ Compiler   IREmittor::EmitIR()
         std::cerr << "Main function not declared\n";
         exit(EXIT_FAILURE);
     }
-    // compiler.functions.back().function_body.emplace_back(DataSection{datastring.str()});
     compiler.data_section=datastring.str();
     return compiler;
 }

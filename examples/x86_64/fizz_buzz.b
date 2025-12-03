@@ -1,6 +1,14 @@
-main()
+main(argc,argv)
 {
-    extrn  printf,malloc,scanf;
+    extrn  printf,puts,malloc,scanf;
+    printf("%d\n",argc);
+    auto i=0;
+    while(i!=argc)
+    {
+        printf("%s ",*(argv+8*i));
+        i++;
+    }
+    puts("\n");
     auto p=malloc(8),n;
     scanf("%ld",p);
     n=*p;

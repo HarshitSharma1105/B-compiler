@@ -54,13 +54,15 @@ namespace x86_64
             std::visit(argvisitor,binop.lhs);
             switch(binop.type)
             {
-                case Tokentype::assignment:stream << "    mov r15,r14\n";break;
-                case Tokentype::less:stream       << "    cmp r15,r14\n    setl al\n    movzx r15,al\n";break;
-                case Tokentype::greater:stream    << "    cmp r15,r14\n    setg al\n    movzx r15,al\n";break;
-                case Tokentype::add:stream        << "    add r15,r14\n";break;
-                case Tokentype::sub:stream        << "    sub r15,r14\n";break;
-                case Tokentype::mult:stream       << "    imul r15,r14\n";break;
-                case Tokentype::divi:stream       << "    xor rdx,rdx\n    div r14\n";assert(false && "MAKE DIVISION TO r15 ALSO\n");
+                case Tokentype::assignment:stream    << "    mov r15,r14\n";break;
+                case Tokentype::less:      stream    << "    cmp r15,r14\n    setl al\n    movzx r15,al\n";break;
+                case Tokentype::greater:   stream    << "    cmp r15,r14\n    setg al\n    movzx r15,al\n";break;
+                case Tokentype::equals:    stream    << "    cmp r15,r14\n    sete al\n    movzx r15,al\n";break;
+                case Tokentype::not_equals:stream    << "    cmp r15,r14\n    setne al\n    movzx r15,al\n";break;
+                case Tokentype::add:       stream    << "    add r15,r14\n";break;
+                case Tokentype::sub:       stream    << "    sub r15,r14\n";break;
+                case Tokentype::mult:      stream    << "    imul r15,r14\n";break;
+                case Tokentype::divi:      stream    << "    xor rdx,rdx\n    div r14\n";assert(false && "MAKE DIVISION TO r15 ALSO\n");
                 default: assert(false && "Unknown Binary Operand type\n");
             }
             stream << "    mov QWORD [rbp-" << (binop.index+1)*8 << "],r15\n";
