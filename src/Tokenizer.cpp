@@ -7,35 +7,39 @@
 void debug(const Tokentype& tokentype)
 {
     switch (tokentype) {
-        case function:           std::cout << "function call "; break;
-        case auto_:             std::cout << "auto ";break;
-        case extrn:             std::cout << "extrn ";break;
-        case open_curly:        std::cout << "open_curly "; break;
-        case close_curly:       std::cout << "closed_curly "; break;
-        case open_paren:        std::cout << "open_paren "; break;
-        case close_paren:       std::cout << "close_paren "; break;
-        case integer_lit:       std::cout << "integer_lit "; break;
-        case string_lit:        std::cout << "string_lit ";  break;
-        case assignment:        std::cout << "assignment "; break;
-        case identifier:        std::cout << "identifier "; break;
-        case comma:             std::cout << "comma "; break;
-        case semicolon:         std::cout << "semicolon ";break;
-        case add:               std::cout << "add ";break;
-        case sub:               std::cout << "sub ";break;
-        case mult:              std::cout << "mult ";break;
-        case divi:              std::cout << "divi ";break;
-        case incr:              std::cout << "incr ";break;
-        case decr:              std::cout << "decr ";break;
-        case return_:           std::cout << "return ";break;
-        case while_:            std::cout << "while ";break;
-        case less:              std::cout << "less ";break;
-        case greater:           std::cout << "greater ";break;
-        case equals:            std::cout << "equals ";break;
-        case not_equals:        std::cout << "not equals ";break; 
-        case not_:              std::cout << "negate ";break;
-        case if_:               std::cout << "if ";break;
-        case else_:             std::cout << "else ";break;
-        default:                std::cout << "Unknown token "; break;
+        case Tokentype::function:          std::cout << "function call "; break;
+        case Tokentype::auto_:             std::cout << "auto ";break;
+        case Tokentype::extrn:             std::cout << "extrn ";break;
+        case Tokentype::open_curly:        std::cout << "open_curly "; break;
+        case Tokentype::close_curly:       std::cout << "closed_curly "; break;
+        case Tokentype::open_paren:        std::cout << "open_paren "; break;
+        case Tokentype::close_paren:       std::cout << "close_paren "; break;
+        case Tokentype::integer_lit:       std::cout << "integer_lit "; break;
+        case Tokentype::string_lit:        std::cout << "string_lit ";  break;
+        case Tokentype::assignment:        std::cout << "assignment "; break;
+        case Tokentype::identifier:        std::cout << "identifier "; break;
+        case Tokentype::comma:             std::cout << "comma "; break;
+        case Tokentype::semicolon:         std::cout << "semicolon ";break;
+        case Tokentype::add:               std::cout << "add ";break;
+        case Tokentype::sub:               std::cout << "sub ";break;
+        case Tokentype::mult:              std::cout << "mult ";break;
+        case Tokentype::divi:              std::cout << "divi ";break;
+        case Tokentype::incr:              std::cout << "incr ";break;
+        case Tokentype::decr:              std::cout << "decr ";break;
+        case Tokentype::return_:           std::cout << "return ";break;
+        case Tokentype::while_:            std::cout << "while ";break;
+        case Tokentype::less:              std::cout << "less ";break;
+        case Tokentype::greater:           std::cout << "greater ";break;
+        case Tokentype::equals:            std::cout << "equals ";break;
+        case Tokentype::not_equals:        std::cout << "not equals ";break; 
+        case Tokentype::not_:              std::cout << "negate ";break;
+        case Tokentype::if_:               std::cout << "if ";break;
+        case Tokentype::else_:             std::cout << "else ";break;
+        case Tokentype::shift_left:        std::cout << "shift-left ";break;
+        case Tokentype::shift_right:       std::cout << "shift-right ";break;
+        case Tokentype::bit_and:           std::cout << "bitwise-and ";break;
+        case Tokentype::bit_or:            std::cout << "bitwise-and ";break;
+        default:                           std::cout << "Unknown token "; break;
     }
 }
 void debug(const std::vector<Token>& tokens)
@@ -196,12 +200,32 @@ std::vector<Token> Tokenizer::tokenize()
         }
         else if(peek().value()=='<')
         {
-            tokens.push_back({Tokentype::less,"<"});  // TODO : Lesser Equals
+            if(peek(1).value() == '<')
+            {
+                tokens.push_back({Tokentype::shift_left,"<<"});
+                consume();
+            }
+            else tokens.push_back({Tokentype::less,"<"});  // TODO : Lesser Equals
             consume();
         }
         else if(peek().value()=='>')
         {
-            tokens.push_back({Tokentype::greater,">"}); // TODO : Greater Equals
+            if(peek(1).value() == '>')
+            {
+                tokens.push_back({Tokentype::shift_right,">>"});
+                consume();
+            }
+            else tokens.push_back({Tokentype::greater,">"}); // TODO : Greater Equals
+            consume();
+        }
+        else if (peek().value() == '&')
+        {
+            tokens.push_back({Tokentype::bit_and,"&"});
+            consume();
+        }
+        else if (peek().value() == '|')
+        {
+            tokens.push_back({Tokentype::bit_or,"|"});
             consume();
         }
         else if (std::isdigit(peek().value())) 

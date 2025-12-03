@@ -36,7 +36,11 @@ return_,
 while_,
 not_,
 if_,
-else_
+else_,
+shift_left,
+shift_right,
+bit_or,
+bit_and
 };
 
 struct Token{

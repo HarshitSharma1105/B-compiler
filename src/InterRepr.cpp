@@ -116,7 +116,9 @@ void debug(const Ops& ops)
 static std::vector<std::vector<Tokentype>> precedences =
 {
     {Tokentype::assignment},   // we can put plus equals,minus equals,mult equals,assignment everything here
+    {Tokentype::bit_and,Tokentype::bit_or},
     {Tokentype::less,Tokentype::greater,Tokentype::equals,Tokentype::not_equals},
+    {Tokentype::shift_left,Tokentype::shift_right},
     {Tokentype::add,Tokentype::sub},
     {Tokentype::mult,Tokentype::divi}
 };

@@ -56,14 +56,18 @@ namespace Mips
             std::visit(argvisitor,binop.rhs);
             switch(binop.type)
             {
-                case Tokentype::assignment:stream << "";break;
-                case Tokentype::less:      stream << "    slt $s0,$s2,$s0\n";break;
-                case Tokentype::greater:   stream << "    sgt $s0,$s2,$s0\n";break;
-                case Tokentype::equals:    stream << "    seq $s0,$s2,$s0\n";break;
-                case Tokentype::not_equals:stream << "    sne $s0,$s2,$s0\n";break;
-                case Tokentype::add:       stream << "    add $s0,$s2,$s0\n";break;
-                case Tokentype::sub:       stream << "    sub $s0,$s2,$s0\n";break;
-                case Tokentype::mult:      stream << "    mul $s0,$s2,$s0\n";break;
+                case Tokentype::assignment: stream << "";break;
+                case Tokentype::bit_and:    stream << "    and $s0,$s2,$s0\n";break;
+                case Tokentype::bit_or:     stream << "    or  $s0,$s2,$s0\n";break;
+                case Tokentype::less:       stream << "    slt $s0,$s2,$s0\n";break;
+                case Tokentype::greater:    stream << "    sgt $s0,$s2,$s0\n";break;
+                case Tokentype::equals:     stream << "    seq $s0,$s2,$s0\n";break;
+                case Tokentype::not_equals: stream << "    sne $s0,$s2,$s0\n";break;
+                case Tokentype::shift_left: stream << "    sllv $s0,$s2,$s0\n";break;
+                case Tokentype::shift_right:stream << "    srlv $s0,$s2,$s0\n";break;
+                case Tokentype::add:        stream << "    add $s0,$s2,$s0\n";break;
+                case Tokentype::sub:        stream << "    sub $s0,$s2,$s0\n";break;
+                case Tokentype::mult:       stream << "    mul $s0,$s2,$s0\n";break;
                 case Tokentype::divi: assert(false && "TODO MIPS Division\n");
                 default: assert(false && "Unknown Binary Operation\n");
             }
