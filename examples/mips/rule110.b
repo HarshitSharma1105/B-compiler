@@ -1,6 +1,6 @@
 main()
 {
-    extrn malloc,printf;
+    extrn malloc,puts,pnl;
     auto n = 30;
     auto board = malloc(8 * n);
     *(board + 8*(n-1)) = 1;

@@ -1,5 +1,23 @@
-main(){
+foo(a)
+{
     extrn puts,putint,pnl;
+    puts("hello from foo ");
+    putint(a);
+    pnl();
+    return a*a;
+}
+
+bar(a)
+{
+    extrn puts,putint,pnl;
+    auto d=a*a;
+    puts("hello from bar ");
+    putint(d);
+    pnl();
+    return a++;
+}
+
+main(){
     auto a=30,b,c=a-100;
     a=a+10;
     b=5*(c-20)+65;
@@ -23,20 +41,4 @@ main(){
     putint(bar(10));
     pnl();
     return 0;
-}
-foo(a)
-{
-    puts("hello from foo ");
-    putint(a);
-    pnl();
-    return a*a;
-}
-
-bar(a)
-{
-    auto d=a*a;
-    puts("hello from bar ");
-    putint(d);
-    pnl();
-    return a++;
 }

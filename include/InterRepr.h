@@ -4,7 +4,6 @@
 
 
 #include<variant>
-#include<unordered_map>
 #include<unordered_set>
 #include<algorithm>
 #include<stack>
@@ -13,11 +12,6 @@ struct Variable{
     std::string var_name;
     size_t index;
 };
-
-
-
-
-
 
 struct Var{
     size_t index;
@@ -48,21 +42,10 @@ struct AutoAssign{
 };
 
 
-struct ExtrnDecl{
-    std::string name;
-};
-
-
-enum UnOpType{
-    Negate,
-    Not
-};
-
-
 struct UnOp{
     size_t index;
     Arg arg;
-    UnOpType type;
+    Tokentype type;
 };
 
 struct BinOp{
@@ -103,12 +86,7 @@ struct Jmp{
     size_t idx;
 };
 
-struct JmpInfo{
-    size_t skip_idx,jmp_idx;
-};
-
-
-typedef std::variant<AutoAssign,UnOp,BinOp,ExtrnDecl,Funcall,DataSection,ReturnValue,JmpIfZero,Jmp,Label,Store> Op;
+typedef std::variant<AutoAssign,UnOp,BinOp,Funcall,DataSection,ReturnValue,JmpIfZero,Jmp,Label,Store> Op;
 
 typedef std::vector<Op> Ops;
 
@@ -122,6 +100,7 @@ struct Func{
 struct Compiler{
     std::vector<Func> functions;
     std::string data_section;
+    std::vector<std::string> extrns;
 };
 
 
@@ -164,7 +143,8 @@ private:
     size_t vars_count=0;
     size_t max_vars_count=0;
     size_t labels_count=0;
-    std::unordered_set<std::string> extrns;
+    std::unordered_set<std::string> funcs;
+    std::vector<std::string> extrns;
     std::vector<Variable> vars;
     std::stringstream datastring;
     bool is_main_func_present=false;

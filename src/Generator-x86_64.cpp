@@ -41,8 +41,8 @@ namespace x86_64
             stream << "    mov r14,r15\n";
             switch(unop.type)
             {
-                case UnOpType::Negate:stream << "    xor r15,r15\n    sub r15,r14\n";break;
-                case UnOpType::Not:   stream << "    cmp r14,0\n    sete al\n    movzx r15,al\n";break;
+                case Tokentype::sub:stream << "    xor r15,r15\n    sub r15,r14\n";break;
+                case Tokentype::not_:   stream << "    cmp r14,0\n    sete al\n    movzx r15,al\n";break;
                 default: assert(false && "TODO More Unary Operations\n");
             }
             stream << "    mov QWORD [rbp-" << (unop.index+1)*8 << "],r15\n";
@@ -71,12 +71,6 @@ namespace x86_64
             }
             stream << "    mov QWORD [rbp-" << (binop.index+1)*8 << "],r15\n";
         }
-
-        void operator()(const ExtrnDecl& extrndecl)
-        {
-            stream << "    extrn " << extrndecl.name << "\n";
-        }
-
         void operator()(const Funcall& funcall) 
         {
             if(funcall.args.size()>6)assert(false && "too many args");
@@ -146,6 +140,10 @@ std::string Generator_x86_64::generate()
         generate_function_epilogue();
     }
     std::visit(visitor,Op{DataSection{compiler.data_section}});
+    for(const auto& name : compiler.extrns)
+    {
+        textstream << "    extrn " << name << "\n";
+    }
     return textstream.str();
 }
 

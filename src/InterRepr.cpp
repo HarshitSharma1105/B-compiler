@@ -40,8 +40,8 @@ struct DebugVisitor {
         std::cout << ",type=";
         switch(unop.type)
         {
-            case Negate:std::cout << "negate";break;
-            case Not:   std::cout << "not";break;
+            case sub :std::cout << "negate";break;
+            case not_:   std::cout << "not";break;
         }
         std::cout << " )\n";
     }
@@ -55,10 +55,6 @@ struct DebugVisitor {
         std::cout << ",type=";
         debug(binop.type);
         std::cout << ")\n";
-    }
-    void operator()(const ExtrnDecl& extrndecl)
-    {
-        std::cout << "Extrn " << extrndecl.name << "\n";
     }
 
     void operator()(const Funcall& funcall) 
@@ -136,6 +132,7 @@ Compiler   IREmittor::EmitIR()
         exit(EXIT_FAILURE);
     }
     compiler.data_section=datastring.str();
+    compiler.extrns = std::move(extrns);
     return compiler;
 }
 
@@ -145,11 +142,11 @@ void IREmittor::compile_prog()
     if(try_peek(Tokentype::function))
     {
         Func func{};
-        std::string func_name=consume().val;
-        func.function_name=func_name;
+        func.function_name=consume().val;
+        funcs.insert(func.function_name);
         size_t curr_vars=vars_count;
         size_t vars_size=vars.size();
-        if(func_name=="main")is_main_func_present=true;
+        if(func.function_name=="main")is_main_func_present=true;
         try_consume(Tokentype::open_paren,"expcted '('\n");
         while(peek().value().type==Tokentype::identifier)
         {
@@ -333,8 +330,8 @@ bool IREmittor::compile_extrn(Ops& ops)
         while(peek().value().type!=Tokentype::semicolon)
         {
             std::string extrn_name=consume().val;
-            extrns.insert(extrn_name);
-            ops.emplace_back(ExtrnDecl{extrn_name});
+            funcs.insert(extrn_name);
+            extrns.push_back(extrn_name);
         }
         try_consume(Tokentype::semicolon,"Expected ;\n");//semicolon
         return true;
@@ -417,13 +414,13 @@ Arg IREmittor::compile_primary_expression(Ops& ops)
         case Tokentype::sub: 
         {
             Arg arg=compile_primary_expression(ops);
-            ops.emplace_back(UnOp{vars_count,arg,UnOpType::Negate});
+            ops.emplace_back(UnOp{vars_count,arg,token.type});
             return Var{vars_count++};
         }
         case Tokentype::not_:
         {
             Arg arg=compile_primary_expression(ops);
-            ops.emplace_back(UnOp{vars_count,arg,UnOpType::Not});
+            ops.emplace_back(UnOp{vars_count,arg,token.type});
             return Var{vars_count++};
         }
         case Tokentype::mult:
@@ -474,6 +471,11 @@ Arg IREmittor::compile_primary_expression(Ops& ops)
             }
             try_consume(Tokentype::close_paren,"expected ')'\n");
             ops.emplace_back(Funcall{funcall_name,args});
+            if(funcs.find(funcall_name)==funcs.end())
+            {
+                std::cerr << "Undeclared function " << funcall_name << "\n";
+                exit(EXIT_FAILURE);
+            }
             ops.emplace_back(AutoAssign{vars_count,FuncResult{funcall_name}});
             return Var{vars_count++};
         }

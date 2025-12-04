@@ -44,7 +44,7 @@ namespace Mips
             stream << "    li $s2,0\n";
             switch(unop.type)
             {
-                case Negate:stream << "    sub $s0,$s2,$s0\n";break;
+                case Tokentype::sub:stream << "    sub $s0,$s2,$s0\n";break;
                 default: assert(false && "TODO More Unary Operations\n");
             } 
             stream << "    sw $s0,-" << (unop.index+1)*4 << "($s1)\n";
@@ -72,12 +72,6 @@ namespace Mips
                 default: assert(false && "Unknown Binary Operation\n");
             }
             stream << "    sw $s0,-" << (binop.index+1)*4 << "($s1)\n";
-        }
-
-        void operator()(const ExtrnDecl& extrndecl)
-        {
-            //stream << "    extrn " << extrndecl.name << "\n";
-            // nothing to do for extrn symbols for now
         }
 
         void operator()(const Funcall& funcall) 
