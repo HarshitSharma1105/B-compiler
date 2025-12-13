@@ -1,8 +1,8 @@
 pushback(ptr,val)
 {
-	extrn malloc,printf;
-	auto siz = *(ptr+8);
-	auto cap = *(ptr+16);
+	extrn malloc,putint,pnl;
+	auto siz = *(ptr+4);
+	auto cap = *(ptr+8);
 	if(siz == cap)
 	{
 		cap = 2 * cap + 1;
@@ -18,27 +18,32 @@ pushback(ptr,val)
 	}
 	auto base = *ptr;
 	*(base+4*(siz++))=val;
-	*(ptr + 16) = cap;
-	*(ptr + 8)  = siz;
-	printf("%p %ld %ld\n",*ptr,*(ptr+8),*(ptr+16));
+	*(ptr + 8) = cap;
+	*(ptr + 4)  = siz;
+	putint(*ptr);
+	putint(*(ptr+4));
+	putint(*(ptr+8));
+	pnl();
 }
 print(ptr)
 {
-	auto siz = *(ptr+8);
+	auto siz = *(ptr+4);
 	auto base = *ptr;
 	auto i =0;
 	while(i < siz)
 	{
-		printf("%d ",*(base+4*i));
+		putint(*(base+4*i));
 		i++;
 	}
-	printf("\n");
+	pnl();
 }
 
 main(){
 	extrn memset;
-	auto da = malloc(24);
-	memset(da,0,24);
+	auto da = malloc(12);
+	*da=0;
+	*(da+4)=0;
+	*(da+8)=0;
 	pushback(da,10);
 	pushback(da,20);
 	pushback(da,40);
