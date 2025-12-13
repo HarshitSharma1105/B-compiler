@@ -121,7 +121,7 @@ namespace x86_64
         }
         void operator()(const Store& store)
         {
-            stream << "    mov r14,[rbp-" << store.index*8 << "]\n";
+            stream << "    mov r14,[rbp-" << (store.index+1)*8 << "]\n";
             std::visit(argvisitor,store.val);
             stream << "    mov [r14],r15\n";
         }

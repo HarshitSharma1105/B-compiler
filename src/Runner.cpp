@@ -1,6 +1,7 @@
 #include<Runner.h>
 
-
+#define exec(command) system((command).c_str())
+#define exec_c(command) system(command)
 
 void debug(const Compiler& compiler)
 {
@@ -43,8 +44,7 @@ void Runner::compile(const Compiler& compiler)
 		Generator_x86_64 generator(compiler);
 		assembly_sourcecode=generator.generate();
 	}
-	std::string command = "mkdir " + path+"/trash";//TODO: Use smth like mkdir_if_not_exist
-	system(command.c_str());
+	exec("mkdir " + path+"/trash");
 	{
 		std::ofstream outFile(path+ "/trash/output.asm");  
 		outFile << assembly_sourcecode;
@@ -57,17 +57,13 @@ void Runner::run()
 	
 	if(target==Target::MIPS)
 	{
-		command="java -jar assemblers/Mars4_5.jar sm " + path +"/trash/output.asm";
-		system(command.c_str());
+		exec("java -jar assemblers/Mars4_5.jar sm " + path +"/trash/output.asm");
 	}
 	else 
 	{
-		command = "assemblers/fasm " + path + "/trash/output.asm";
-		system(command.c_str());
-		command = "cc -no-pie " + path +"/trash/output.o -l:raylib/libraylib.so -o "+"builds/output";
-		system(command.c_str());
-		command = "LD_LIBRARY_PATH=\"/usr/lib/raylib\"    builds/output";
-		system(command.c_str());
+		exec("assemblers/fasm "+ path +"/trash/output.asm");
+		exec("cc -no-pie " + path +"/trash/output.o -l:raylib/libraylib.so -o builds/output");
+		exec_c("LD_LIBRARY_PATH=\"/usr/lib/raylib\"  builds/output");
 	}
 }
 

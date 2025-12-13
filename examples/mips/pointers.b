@@ -1,6 +1,6 @@
 main()
 {
-    extrn malloc,putint,puts;
+    extrn malloc,putint,puts,pnl;
     auto p=malloc(40);
     *p=20;
     *((p+4))=37;

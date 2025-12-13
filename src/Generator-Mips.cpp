@@ -133,7 +133,7 @@ namespace Mips
         }
         void operator()(const Store& store)
         {
-            stream << "    lw $s2,-" << store.index*4 << "($s1)\n";
+            stream << "    lw $s2,-" << (store.index+1)*4 << "($s1)\n";
             std::visit(argvisitor,store.val);
             stream << "    sw $s0,($s2)\n";
         }
