@@ -24,6 +24,7 @@ void debug(const Tokentype& tokentype)
         case Tokentype::sub:               std::cout << "sub ";break;
         case Tokentype::mult:              std::cout << "mult ";break;
         case Tokentype::divi:              std::cout << "divi ";break;
+        case Tokentype::remainder:         std::cout << "remainder ";break;
         case Tokentype::incr:              std::cout << "incr ";break;
         case Tokentype::decr:              std::cout << "decr ";break;
         case Tokentype::return_:           std::cout << "return ";break;
@@ -39,6 +40,7 @@ void debug(const Tokentype& tokentype)
         case Tokentype::shift_right:       std::cout << "shift-right ";break;
         case Tokentype::bit_and:           std::cout << "bitwise-and ";break;
         case Tokentype::bit_or:            std::cout << "bitwise-and ";break;
+        case Tokentype::assembly:          std::cout << "asm ";break;
         default:                           std::cout << "Unknown token "; break;
     }
 }
@@ -102,6 +104,10 @@ std::vector<Token> Tokenizer::tokenize()
             {
                 tokens.push_back({Tokentype::else_});
             }
+            else if(buffer=="asm")
+            {
+                tokens.push_back({Tokentype::assembly});
+            }
             else 
             { 
                 tokens.push_back({Tokentype::identifier,buffer});
@@ -149,6 +155,14 @@ std::vector<Token> Tokenizer::tokenize()
         }
         else if(peek().value()=='/')
         {
+            if(peek(1).value()=='/')
+            {
+                consume();
+                consume();
+                while(peek().has_value() && peek().value() != '\n')consume();
+                consume();
+                continue;
+            }
             tokens.push_back({Tokentype::divi,"/"});
             consume();
         }
@@ -218,6 +232,11 @@ std::vector<Token> Tokenizer::tokenize()
             else tokens.push_back({Tokentype::greater,">"}); // TODO : Greater Equals
             consume();
         }
+        else if(peek().value() == '%')
+        {
+            tokens.push_back({Tokentype::remainder,"%"});
+            consume();
+        }
         else if (peek().value() == '&')
         {
             tokens.push_back({Tokentype::bit_and,"&"});
@@ -227,6 +246,17 @@ std::vector<Token> Tokenizer::tokenize()
         {
             tokens.push_back({Tokentype::bit_or,"|"});
             consume();
+        }
+        else if (peek().value() == '\'')
+        {
+            consume();
+            char ch = consume();
+            if(consume()!='\'')
+            {
+                std::cerr << "Character literals can only be one character long\n";
+                exit(EXIT_FAILURE);
+            }
+            tokens.push_back({Tokentype::integer_lit,std::to_string(int(ch))});
         }
         else if (std::isdigit(peek().value())) 
         {

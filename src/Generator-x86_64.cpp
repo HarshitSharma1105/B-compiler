@@ -8,7 +8,6 @@ namespace x86_64
         {
             stream << "    mov r15,[rbp-" << (var.index+1)*8 << "]\n";
         }
-
         void operator()(const Literal& literal)
         {
             stream << "    mov r15," << literal.literal << "\n";
@@ -66,7 +65,8 @@ namespace x86_64
                 case Tokentype::add:        stream    << "    add r15,r14\n";break;
                 case Tokentype::sub:        stream    << "    sub r15,r14\n";break;
                 case Tokentype::mult:       stream    << "    imul r15,r14\n";break;
-                case Tokentype::divi:       stream    << "    xor rdx,rdx\n    div r14\n";assert(false && "MAKE DIVISION TO r15 ALSO\n");
+                case Tokentype::divi:       stream    << "    xor rdx,rdx\n    mov rax,r15\n    idiv r14\n    mov r15,rax\n";break;
+                case Tokentype::remainder:  stream    << "    xor rdx,rdx\n    mov rax,r15\n    idiv r14\n    mov r15,rdx\n";break;
                 default: assert(false && "Unknown Binary Operand type\n");
             }
             stream << "    mov QWORD [rbp-" << (binop.index+1)*8 << "],r15\n";
@@ -125,6 +125,10 @@ namespace x86_64
             std::visit(argvisitor,store.val);
             stream << "    mov [r14],r15\n";
         }
+        void operator()(const Asm& assembly)
+        {
+            stream << assembly.asm_code << '\n';
+        }
     };
 }
 Generator_x86_64::Generator_x86_64(const Compiler& compiler) : compiler(compiler){}
@@ -139,11 +143,11 @@ std::string Generator_x86_64::generate()
         generate_func(func);
         generate_function_epilogue();
     }
-    std::visit(visitor,Op{DataSection{compiler.data_section}});
     for(const auto& name : compiler.extrns)
     {
         textstream << "    extrn " << name << "\n";
     }
+    std::visit(visitor,Op{DataSection{compiler.data_section}});
     return textstream.str();
 }
 

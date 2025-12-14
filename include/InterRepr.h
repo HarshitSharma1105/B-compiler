@@ -86,7 +86,11 @@ struct Jmp{
     size_t idx;
 };
 
-typedef std::variant<AutoAssign,UnOp,BinOp,Funcall,DataSection,ReturnValue,JmpIfZero,Jmp,Label,Store> Op;
+struct Asm{
+    std::string asm_code;
+};
+
+typedef std::variant<AutoAssign,UnOp,BinOp,Funcall,DataSection,ReturnValue,JmpIfZero,Jmp,Label,Store,Asm> Op;
 
 typedef std::vector<Op> Ops;
 
@@ -127,6 +131,7 @@ private:
     bool compile_branch(Ops& ops);
     void compile_block(Ops& ops);
     bool compile_scope(Ops& ops);
+    bool compile_asm(Ops& ops);
     Arg compile_expression(int precedence,Ops& ops);
     Arg compile_primary_expression(Ops& ops);
 

@@ -97,6 +97,10 @@ struct DebugVisitor {
         std::visit(debugargvisitor,store.val);
         std::cout << " at AutoVar(" << store.index << ")\n";
     }
+    void operator()(const Asm& assembly)
+    {
+        std::cout << "Assembly Code " << assembly.asm_code << "\n";
+    }
 };
 
 
@@ -116,7 +120,7 @@ static std::vector<std::vector<Tokentype>> precedences =
     {Tokentype::less,Tokentype::greater,Tokentype::equals,Tokentype::not_equals},
     {Tokentype::shift_left,Tokentype::shift_right},
     {Tokentype::add,Tokentype::sub},
-    {Tokentype::mult,Tokentype::divi}
+    {Tokentype::mult,Tokentype::divi,Tokentype::remainder}
 };
 
 
@@ -188,6 +192,7 @@ void IREmittor::compile_func_body(Ops& ops)
     else if(compile_return(ops))return;
     else if(compile_while_loops(ops))return;
     else if(compile_branch(ops))return;
+    else if(compile_asm(ops))return;
     compile_stmt(ops);
 }
 
@@ -290,13 +295,6 @@ bool IREmittor::compile_return(Ops& ops)
     return false;
 }
 
-void IREmittor::compile_stmt(Ops& ops)
-{
-    compile_expression(0,ops);
-    try_consume(Tokentype::semicolon,"Expected ;\n");
-}
-
-
 
 
 
@@ -322,7 +320,19 @@ bool IREmittor::autovar_dec(Ops& ops)
     return false;
 }
 
-
+bool IREmittor::compile_asm(Ops& ops)
+{
+    if(try_consume(Tokentype::assembly))
+    {
+        try_consume(Tokentype::open_paren,"Expected open paren after asm statement");
+        std::string code = consume().val;
+        ops.emplace_back(Asm{code});
+        try_consume(Tokentype::close_paren,"Expected closed paren");
+        try_consume(Tokentype::semicolon,"Expected semicolon");
+        return true;
+    }
+    return false;
+}
 bool IREmittor::compile_extrn(Ops& ops)
 {
     if(try_peek(Tokentype::extrn))
@@ -340,6 +350,12 @@ bool IREmittor::compile_extrn(Ops& ops)
 }
 template<class... Ts> struct overload : Ts... { using Ts::operator()...; };
 template<class... Ts> overload(Ts...) -> overload<Ts...>;
+
+void IREmittor::compile_stmt(Ops& ops)
+{
+    compile_expression(0,ops);
+    try_consume(Tokentype::semicolon,"Expected ;\n");
+}
 
 
 Arg IREmittor::compile_expression(int precedence,Ops& ops)
@@ -479,7 +495,7 @@ Arg IREmittor::compile_primary_expression(Ops& ops)
             ops.emplace_back(AutoAssign{vars_count,FuncResult{funcall_name}});
             return Var{vars_count++};
         }
-        default: debug(ops); assert(false && "UNREACHEABLE\n"); 
+        default: debug(ops); debug({token}); assert(false && "UNREACHEABLE\n"); 
     }
 }
 

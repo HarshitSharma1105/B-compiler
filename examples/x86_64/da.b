@@ -1,6 +1,6 @@
 pushback(ptr,val)
 {
-	extrn malloc,printf;
+	extrn malloc,printf,free;
 	auto siz = *(ptr+8);
 	auto cap = *(ptr+16);
 	if(siz == cap)
@@ -10,11 +10,12 @@ pushback(ptr,val)
 		*ptr = malloc(4*cap);
 		auto new = *ptr;
 		auto i = 0;
-		while( i < siz)
+		while(i < siz)
 		{
 			*(new+4*i)=*(prev+4*i);
 			i++;
 		}
+		free(prev);
 	}
 	auto base = *ptr;
 	*(base+4*(siz++))=val;
@@ -26,7 +27,7 @@ print(ptr)
 {
 	auto siz = *(ptr+8);
 	auto base = *ptr;
-	auto i =0;
+	auto i = 0;
 	while(i < siz)
 	{
 		printf("%d ",*(base+4*i));
@@ -42,5 +43,7 @@ main(){
 	pushback(da,10);
 	pushback(da,20);
 	pushback(da,40);
+	pushback(da,100);
+	pushback(da,102);
 	print(da);
 }

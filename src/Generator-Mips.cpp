@@ -9,7 +9,6 @@ namespace Mips
         {
             stream << "    lw $s0,-" << (var.index+1)*4 << "($s1)\n";
         }
-
         void operator()(const Literal& literal)
         {
             stream << "    li $s0," << literal.literal << "\n";
@@ -69,6 +68,7 @@ namespace Mips
                 case Tokentype::sub:        stream << "    sub $s0,$s2,$s0\n";break;
                 case Tokentype::mult:       stream << "    mul $s0,$s2,$s0\n";break;
                 case Tokentype::divi: assert(false && "TODO MIPS Division\n");
+                case Tokentype::remainder: assert(false && "TODO MIPS Division\n");
                 default: assert(false && "Unknown Binary Operation\n");
             }
             stream << "    sw $s0,-" << (binop.index+1)*4 << "($s1)\n";
@@ -76,7 +76,7 @@ namespace Mips
 
         void operator()(const Funcall& funcall) 
         {
-            if(funcall.args.size()>4)assert(false && "too many arguments");
+            assert(funcall.args.size() <= 4 && "too many arguments");
             for(size_t i=0;i<funcall.args.size();i++)
             {
                 std::visit(argvisitor,funcall.args[i]);
@@ -136,6 +136,10 @@ namespace Mips
             stream << "    lw $s2,-" << (store.index+1)*4 << "($s1)\n";
             std::visit(argvisitor,store.val);
             stream << "    sw $s0,($s2)\n";
+        }
+        void operator()(const Asm& assembly)
+        {
+            stream << assembly.asm_code << '\n';
         }
     };
 }

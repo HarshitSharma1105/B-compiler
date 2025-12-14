@@ -26,6 +26,7 @@ add,
 sub,
 mult,
 divi,
+remainder,
 less,
 greater,
 equals,
@@ -40,7 +41,8 @@ else_,
 shift_left,
 shift_right,
 bit_or,
-bit_and
+bit_and,
+assembly
 };
 
 struct Token{
