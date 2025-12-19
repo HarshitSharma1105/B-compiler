@@ -9,7 +9,6 @@ struct DebugArgVisitor{
     {
         std::cout << "Reference(" << ref.index << ")";
     }
-
     void operator()(const Literal& literal)
     {
         std::cout << "Literal(" << literal.literal << ")";
@@ -26,12 +25,6 @@ struct DebugArgVisitor{
 
 struct DebugVisitor {
     DebugArgVisitor debugargvisitor{};
-    void operator()(const AutoAssign& autoassign) 
-    {
-        std::cout << "Assign AutoVar(" << autoassign.index << ") = ";
-        std::visit(debugargvisitor,autoassign.arg);
-        std::cout << "\n";
-    }
     void operator()(const UnOp& unop)
     {
         std::cout << "UnOp (AutoVar(" << unop.index << ")";
@@ -56,7 +49,6 @@ struct DebugVisitor {
         debug(binop.type);
         std::cout << ")\n";
     }
-
     void operator()(const Funcall& funcall) 
     {
         std::cout << "Function Call " << funcall.name << "(";
@@ -70,7 +62,6 @@ struct DebugVisitor {
     {
         std::cout << "data:\n" << datasection.concatedstrings << "\n";
     }
-
     void operator()(const ReturnValue& retval)
     {
         std::cout << "Return Value (";
@@ -168,6 +159,10 @@ void IREmittor::compile_prog()
         max_vars_count=0;
         compiler.functions.push_back(func);
     }
+    else if (try_peek(Tokentype::extrn))
+    {
+        compile_extrn();
+    }
     else 
     {
         assert(false && "TODO Global statements");
@@ -186,11 +181,12 @@ size_t IREmittor::get_var_index(const std::string& name)
 void IREmittor::compile_func_body(Ops& ops)
 {
     if(try_consume(Tokentype::semicolon))return;
-    else if(compile_extrn(ops))return;
+    else if(compile_extrn())return;
     else if(autovar_dec(ops))return;
     else if(compile_scope(ops))return;
     else if(compile_return(ops))return;
     else if(compile_while_loops(ops))return;
+    else if(compile_for_loops(ops))return;
     else if(compile_branch(ops))return;
     else if(compile_asm(ops))return;
     compile_stmt(ops);
@@ -283,6 +279,36 @@ bool IREmittor::compile_while_loops(Ops& ops)
 }
 
 
+bool IREmittor::compile_for_loops(Ops& ops)
+{
+    if(try_consume(Tokentype::for_))
+    {
+        Ops temp{};
+        size_t curr_vars=vars_count;
+        size_t vars_size=vars.size();
+        try_consume(Tokentype::open_paren,"Expected (\n");
+        if(!autovar_dec(ops))compile_stmt(ops);
+        ops.emplace_back(Label{labels_count});
+        size_t start=labels_count++;
+        Arg arg=compile_expression(0,ops);
+        try_consume(Tokentype::semicolon,"Expected ;\n");  
+        size_t curr=ops.size();
+        ops.emplace_back(JmpIfZero{arg,0});
+        compile_expression(0,temp);
+        try_consume(Tokentype::close_paren,"Expected )\n");
+        compile_block(ops);
+        ops.insert(ops.end(),temp.begin(),temp.end());
+        ops.emplace_back(Jmp{start});
+        ops.emplace_back(Label{labels_count});
+        std::get<JmpIfZero>(ops[curr]).idx=labels_count++;
+        vars.resize(vars_size);
+        max_vars_count=std::max(max_vars_count,vars_count);
+        vars_count=curr_vars;
+        return true;
+    }
+    return false;
+}
+
 bool IREmittor::compile_return(Ops& ops)
 {
     if(try_consume(Tokentype::return_))
@@ -333,7 +359,7 @@ bool IREmittor::compile_asm(Ops& ops)
     }
     return false;
 }
-bool IREmittor::compile_extrn(Ops& ops)
+bool IREmittor::compile_extrn()
 {
     if(try_peek(Tokentype::extrn))
     {
@@ -372,7 +398,6 @@ Arg IREmittor::compile_expression(int precedence,Ops& ops)
                 [&](const Ref& ref)  {  ops.emplace_back(Store{ref.index,rhs});},
                 [](const auto& ){std::cerr << "Assigning to non assignable value\n"; exit(EXIT_FAILURE); }
             }, lhs);
-
         }          
         else
         {
@@ -396,16 +421,35 @@ Arg IREmittor::compile_primary_expression(Ops& ops)
                 std::cerr << "variable not declared " << token.val << "\n";
                 exit(EXIT_FAILURE);
             }
-            if(try_peek({Tokentype::incr,Tokentype::decr})==false)return var;
-            Tokentype type=consume().type;
-            ops.emplace_back(AutoAssign{vars_count,var});
-            switch(type)
+            if(try_peek({Tokentype::incr,Tokentype::decr}))
             {
-                case Tokentype::incr:ops.emplace_back(BinOp{var.index,var,Literal{1},Tokentype::add});break;
-                case Tokentype::decr:ops.emplace_back(BinOp{var.index,var,Literal{1},Tokentype::sub});break;
-                default: assert(false && "add more post ops\n");
+                Tokentype type=consume().type;
+                ops.emplace_back(BinOp{vars_count,Arg{},var,Tokentype::assignment});
+                switch(type)
+                {
+                    case Tokentype::incr:ops.emplace_back(BinOp{var.index,var,Literal{1},Tokentype::add});break;
+                    case Tokentype::decr:ops.emplace_back(BinOp{var.index,var,Literal{1},Tokentype::sub});break;
+                    default: assert(false && "UNREACHABLE\n");
+                }
+                return Var{vars_count++};
             }
-            return Var{vars_count++};
+            else if(try_consume(Tokentype::open_square))
+            {
+                Arg siz = Literal{8},idx;
+                if(try_consume(Tokentype::open_paren))
+                {
+                    siz = compile_expression(0,ops);
+                    try_consume(Tokentype::comma,"Expected comma\n");
+                    idx = compile_expression(0,ops);
+                    try_consume(Tokentype::close_paren,"Expected close parenthesis\n");
+                }
+                else idx = compile_expression(0,ops);
+                try_consume(Tokentype::close_square,"Expected closing ']'\n");
+                ops.emplace_back(BinOp{vars_count,siz,idx,Tokentype::mult});
+                ops.emplace_back(BinOp{vars_count,var,Var{vars_count},Tokentype::add});
+                return Ref{vars_count++};
+            }
+            else return var;
         }
         case Tokentype::integer_lit:return Literal{(size_t)atoll(token.val.c_str())};
         case Tokentype::string_lit:
@@ -428,12 +472,8 @@ Arg IREmittor::compile_primary_expression(Ops& ops)
             return DataOffset{data_offset++};
         }
         case Tokentype::sub: 
-        {
-            Arg arg=compile_primary_expression(ops);
-            ops.emplace_back(UnOp{vars_count,arg,token.type});
-            return Var{vars_count++};
-        }
         case Tokentype::not_:
+        case Tokentype::bit_not:
         {
             Arg arg=compile_primary_expression(ops);
             ops.emplace_back(UnOp{vars_count,arg,token.type});
@@ -442,7 +482,7 @@ Arg IREmittor::compile_primary_expression(Ops& ops)
         case Tokentype::mult:
         {
             Arg arg=compile_primary_expression(ops);
-            ops.emplace_back(AutoAssign{vars_count,arg});
+            ops.emplace_back(BinOp{vars_count,Arg{},arg,Tokentype::assignment});
             return Ref{vars_count++};
         }
         case Tokentype::open_paren:
@@ -492,10 +532,10 @@ Arg IREmittor::compile_primary_expression(Ops& ops)
                 std::cerr << "Undeclared function " << funcall_name << "\n";
                 exit(EXIT_FAILURE);
             }
-            ops.emplace_back(AutoAssign{vars_count,FuncResult{funcall_name}});
+            ops.emplace_back(BinOp{vars_count,Arg{},FuncResult{funcall_name},Tokentype::assignment});
             return Var{vars_count++};
         }
-        default: debug(ops); debug({token}); assert(false && "UNREACHEABLE\n"); 
+        default: assert(false && "UNREACHEABLE\n"); 
     }
 }
 
@@ -526,15 +566,15 @@ bool IREmittor::try_consume(const Tokentype& type)
 }
 bool IREmittor::try_peek(const std::vector<Tokentype>& types,int offset)
 {
-    for(const Tokentype type:types)
+    const Tokentype type = peek(offset).value().type;
+    for(const Tokentype& expected_type:types)
     {
-        if(peek(offset).value().type==type)return true;
+        if(type==expected_type)return true;
     }
     return false;
 }
 bool IREmittor::try_peek(const Tokentype& type,int offset)
 {
-    std::vector<Tokentype> t={type};
-    return try_peek(t,offset);
+    return try_peek(std::vector<Tokentype>{type},offset);
 }
 

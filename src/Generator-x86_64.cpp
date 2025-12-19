@@ -29,20 +29,16 @@ namespace x86_64
     struct Visitor {
         std::stringstream& stream;
         ArgVisitor argvisitor{stream};
-        void operator()(const AutoAssign& autoassign) 
-        {
-            std::visit(argvisitor,autoassign.arg);
-            stream << "    mov QWORD [rbp-" << (autoassign.index+1)*8 << "],r15\n";
-        }
         void operator()(const UnOp& unop)
         {
             std::visit(argvisitor,unop.arg);
             stream << "    mov r14,r15\n";
             switch(unop.type)
             {
-                case Tokentype::sub:stream << "    xor r15,r15\n    sub r15,r14\n";break;
+                case Tokentype::sub:    stream << "    xor r15,r15\n    sub r15,r14\n";break;
                 case Tokentype::not_:   stream << "    cmp r14,0\n    sete al\n    movzx r15,al\n";break;
-                default: assert(false && "TODO More Unary Operations\n");
+                case Tokentype::bit_not:stream << "    mov r15,r14\n    not r15\n";break;
+                default: assert(false && "Unknown Unary Operation\n");
             }
             stream << "    mov QWORD [rbp-" << (unop.index+1)*8 << "],r15\n";
         }
@@ -73,7 +69,7 @@ namespace x86_64
         }
         void operator()(const Funcall& funcall) 
         {
-            if(funcall.args.size()>6)assert(false && "too many args");
+            assert(funcall.args.size() <= 6 && "too many args");
             for(size_t i=0;i<funcall.args.size();i++)
             {
                 std::visit(argvisitor,funcall.args[i]);
@@ -84,7 +80,7 @@ namespace x86_64
         }
         void operator()(const DataSection& data)
         {
-            stream << "section \"data\"\n";
+            stream << "section \"data\" writeable\n";
             int count=0,idx=0;
             while(idx<data.concatedstrings.size())
             {
@@ -135,7 +131,7 @@ Generator_x86_64::Generator_x86_64(const Compiler& compiler) : compiler(compiler
 std::string Generator_x86_64::generate()
 {
     textstream << "format ELF64\n";
-    textstream << "section \".text\" executable\n";
+    textstream << "section \"text\" executable\n";
     x86_64::Visitor visitor{textstream};
     for(const Func& func:compiler.functions)
     {

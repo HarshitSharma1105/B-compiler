@@ -36,11 +36,6 @@ struct FuncResult{
 
 typedef std::variant<Var,Ref,Literal,DataOffset,FuncResult> Arg;
 
-struct AutoAssign{
-    size_t index;
-    Arg arg;
-};
-
 
 struct UnOp{
     size_t index;
@@ -90,7 +85,7 @@ struct Asm{
     std::string asm_code;
 };
 
-typedef std::variant<AutoAssign,UnOp,BinOp,Funcall,DataSection,ReturnValue,JmpIfZero,Jmp,Label,Store,Asm> Op;
+typedef std::variant<UnOp,BinOp,Funcall,DataSection,ReturnValue,JmpIfZero,Jmp,Label,Store,Asm> Op;
 
 typedef std::vector<Op> Ops;
 
@@ -124,10 +119,11 @@ private:
     void compile_prog();
     void compile_func_body(Ops& ops);
     bool compile_while_loops(Ops& ops);
+    bool compile_for_loops(Ops& ops);
     bool compile_return(Ops& ops);
     void compile_stmt(Ops& ops);
     bool autovar_dec(Ops& ops);
-    bool compile_extrn(Ops& ops);
+    bool compile_extrn();
     bool compile_branch(Ops& ops);
     void compile_block(Ops& ops);
     bool compile_scope(Ops& ops);

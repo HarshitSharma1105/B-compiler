@@ -27,24 +27,19 @@ namespace Mips
             stream << "    lw $s0,0($s0)\n";
         }
     };
-
-
     struct Visitor {
         std::stringstream& stream;
         ArgVisitor argvisitor{stream};
-        void operator()(const AutoAssign& autoassign) 
-        {
-            std::visit(argvisitor,autoassign.arg);
-            stream << "    sw $s0,-" << (autoassign.index+1)*4 << "($s1)\n";
-        }
         void operator()(const UnOp& unop)
         {
             std::visit(argvisitor,unop.arg);
             stream << "    li $s2,0\n";
             switch(unop.type)
             {
-                case Tokentype::sub:stream << "    sub $s0,$s2,$s0\n";break;
-                default: assert(false && "TODO More Unary Operations\n");
+                case Tokentype::sub:    stream << "    sub $s0,$s2,$s0\n";break;
+                case Tokentype::not_:   stream << "    seq $s0,$s2,$s0\n";break;
+                case Tokentype::bit_not:stream << "    nor $s0,$s2,$s0\n";break;
+                default: assert(false && "UNREACHABLE\n");
             } 
             stream << "    sw $s0,-" << (unop.index+1)*4 << "($s1)\n";
         }
@@ -67,8 +62,8 @@ namespace Mips
                 case Tokentype::add:        stream << "    add $s0,$s2,$s0\n";break;
                 case Tokentype::sub:        stream << "    sub $s0,$s2,$s0\n";break;
                 case Tokentype::mult:       stream << "    mul $s0,$s2,$s0\n";break;
-                case Tokentype::divi: assert(false && "TODO MIPS Division\n");
-                case Tokentype::remainder: assert(false && "TODO MIPS Division\n");
+                case Tokentype::divi:       stream << "    div $s2,$s0\n    mflo $s0\n";break;
+                case Tokentype::remainder:  stream << "    div $s2,$s0\n    mfhi $s0\n";break;
                 default: assert(false && "Unknown Binary Operation\n");
             }
             stream << "    sw $s0,-" << (binop.index+1)*4 << "($s1)\n";
@@ -107,7 +102,6 @@ namespace Mips
                 stream << "\"\n";
             }
         }
-
         void operator()(const ReturnValue& retval)
         {
             std::visit(argvisitor,retval.arg);

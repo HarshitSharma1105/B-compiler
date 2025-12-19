@@ -18,7 +18,7 @@ int main(int argc,char* argv[])
     std::vector<Token> tokens=tokenizer.tokenize();
 
     IREmittor iremittor(tokens);
-    Compiler compiler =iremittor.EmitIR();
+    Compiler compiler = iremittor.EmitIR();
 
     std::string target_lang=argv[3];
     Runner runner(target_lang,parent_path);

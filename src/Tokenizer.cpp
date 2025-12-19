@@ -14,6 +14,8 @@ void debug(const Tokentype& tokentype)
         case Tokentype::close_curly:       std::cout << "closed_curly "; break;
         case Tokentype::open_paren:        std::cout << "open_paren "; break;
         case Tokentype::close_paren:       std::cout << "close_paren "; break;
+        case Tokentype::open_square:       std::cout << "open_square "; break;
+        case Tokentype::close_square:      std::cout << "close_square "; break;
         case Tokentype::integer_lit:       std::cout << "integer_lit "; break;
         case Tokentype::string_lit:        std::cout << "string_lit ";  break;
         case Tokentype::assignment:        std::cout << "assignment "; break;
@@ -29,6 +31,7 @@ void debug(const Tokentype& tokentype)
         case Tokentype::decr:              std::cout << "decr ";break;
         case Tokentype::return_:           std::cout << "return ";break;
         case Tokentype::while_:            std::cout << "while ";break;
+        case Tokentype::for_:              std::cout << "for ";break;
         case Tokentype::less:              std::cout << "less ";break;
         case Tokentype::greater:           std::cout << "greater ";break;
         case Tokentype::equals:            std::cout << "equals ";break;
@@ -39,7 +42,8 @@ void debug(const Tokentype& tokentype)
         case Tokentype::shift_left:        std::cout << "shift-left ";break;
         case Tokentype::shift_right:       std::cout << "shift-right ";break;
         case Tokentype::bit_and:           std::cout << "bitwise-and ";break;
-        case Tokentype::bit_or:            std::cout << "bitwise-and ";break;
+        case Tokentype::bit_or:            std::cout << "bitwise-or ";break;
+        case Tokentype::bit_not:           std::cout << "bitwise-inverse ";break;
         case Tokentype::assembly:          std::cout << "asm ";break;
         default:                           std::cout << "Unknown token "; break;
     }
@@ -96,6 +100,10 @@ std::vector<Token> Tokenizer::tokenize()
             {
                 tokens.push_back({Tokentype::while_});
             }
+            else if (buffer == "for")
+            {
+                tokens.push_back({Tokentype::for_});
+            }
             else if(buffer=="if")
             {
                 tokens.push_back({Tokentype::if_});
@@ -122,6 +130,16 @@ std::vector<Token> Tokenizer::tokenize()
             }
             tokens.push_back({Tokentype::open_paren,"("});
             consume();   
+        }
+        else if(peek().value()=='[')
+        {
+            tokens.push_back({Tokentype::open_square,"["});
+            consume();
+        }
+        else if(peek().value()==']')
+        {
+            tokens.push_back({Tokentype::close_square,"]"});
+            consume();
         }
         else if(peek().value()==')')
         {
@@ -245,6 +263,11 @@ std::vector<Token> Tokenizer::tokenize()
         else if (peek().value() == '|')
         {
             tokens.push_back({Tokentype::bit_or,"|"});
+            consume();
+        }
+        else if (peek().value() == '~')
+        {
+            tokens.push_back({Tokentype::bit_not,"~"});
             consume();
         }
         else if (peek().value() == '\'')
