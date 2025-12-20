@@ -63,7 +63,7 @@ void Runner::run()
 	{
 		exec("assemblers/fasm "+ path +"/trash/output.asm");
 		exec("cc -no-pie " + path +"/trash/output.o -l:raylib/libraylib.so -o builds/output");
-		exec_c("LD_LIBRARY_PATH=\"/usr/lib/raylib\"  builds/output");
+//		exec_c("LD_LIBRARY_PATH=\"/usr/lib/raylib\"  builds/output");
 	}
 }
 

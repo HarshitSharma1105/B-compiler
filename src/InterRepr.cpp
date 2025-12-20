@@ -127,7 +127,7 @@ Compiler   IREmittor::EmitIR()
         exit(EXIT_FAILURE);
     }
     compiler.data_section=datastring.str();
-    compiler.extrns = std::move(extrns);
+    compiler.extrns = extrns;
     return compiler;
 }
 
@@ -367,7 +367,7 @@ bool IREmittor::compile_extrn()
         {
             std::string extrn_name=consume().val;
             funcs.insert(extrn_name);
-            extrns.push_back(extrn_name);
+            extrns.insert(extrn_name);
         }
         try_consume(Tokentype::semicolon,"Expected ;\n");//semicolon
         return true;

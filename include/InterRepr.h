@@ -7,7 +7,7 @@
 #include<unordered_set>
 #include<algorithm>
 #include<stack>
-
+#include<set>
 struct Variable{
     std::string var_name;
     size_t index;
@@ -99,7 +99,7 @@ struct Func{
 struct Compiler{
     std::vector<Func> functions;
     std::string data_section;
-    std::vector<std::string> extrns;
+    std::set<std::string> extrns;
 };
 
 
@@ -145,7 +145,7 @@ private:
     size_t max_vars_count=0;
     size_t labels_count=0;
     std::unordered_set<std::string> funcs;
-    std::vector<std::string> extrns;
+    std::set<std::string> extrns;
     std::vector<Variable> vars;
     std::stringstream datastring;
     bool is_main_func_present=false;
