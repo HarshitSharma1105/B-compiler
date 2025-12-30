@@ -3,7 +3,10 @@
 struct DebugArgVisitor{
     void operator()(const Var& var)
     {
-        std::cout << "AutoVar(" << var.index << ")";
+        if(var.type == Storage::Auto)std::cout << "AutoVar";
+        else if(var.type == Storage::Global) std::cout << "Global";
+        else assert(false && "Unreachable\n");
+        std::cout << "(" << var.index << ")";
     }
     void operator()(const Ref& ref)
     {
@@ -40,7 +43,8 @@ struct DebugVisitor {
     }
     void operator()(const BinOp& binop) 
     {
-        std::cout << "BinOp (AutoVar(" << binop.index << ")";
+        std::cout << "BinOp (";
+        debugargvisitor(binop.var);
         std::cout << ",lhs=";
         std::visit(debugargvisitor,binop.lhs);
         std::cout << ",rhs=";
@@ -145,7 +149,7 @@ void IREmittor::compile_prog()
         try_consume(Tokentype::open_paren,"expcted '('\n");
         while(peek().value().type==Tokentype::identifier)
         {
-            vars.emplace_back(consume().val,vars_count++);
+            vars.emplace_back(consume().val,vars_count++,Storage::Auto);
             try_consume(Tokentype::comma);
             //"Expected comma between args\n";
         }
@@ -163,6 +167,11 @@ void IREmittor::compile_prog()
     {
         compile_extrn();
     }
+    else if(try_peek(Tokentype::identifier))
+    {
+        vars.emplace_back(consume().val,compiler.globals_count++,Storage::Global);
+        try_consume(Tokentype::semicolon,"Expected ; after global declaration\n");
+    }
     else 
     {
         assert(false && "TODO Global statements");
@@ -170,13 +179,13 @@ void IREmittor::compile_prog()
 }
 
 
-size_t IREmittor::get_var_index(const std::string& name)
+Var IREmittor::get_var(const std::string& name)
 {
     for(size_t i=0;i<vars.size();i++)
     {
-        if(vars[i].var_name==name)return vars[i].index;
+        if(vars[i].var_name==name)return {vars[i].index,vars[i].type};
     }
-    return -1;
+    return {(size_t)-1,Storage::Auto};
 }
 void IREmittor::compile_func_body(Ops& ops)
 {
@@ -332,12 +341,12 @@ bool IREmittor::autovar_dec(Ops& ops)
         {
             try_consume(Tokentype::comma);
             std::string var_name=peek().value().val;
-            if(get_var_index(var_name)!=-1)
+            if(get_var(var_name).index!=-1)
             {
                 std::cerr << "variable already declared " << var_name << "\n";
                 exit(EXIT_FAILURE);
             }
-            vars.emplace_back(var_name,vars_count++);
+            vars.emplace_back(var_name,vars_count++,Storage::Auto);
             compile_expression(0,ops);
         }
         try_consume(Tokentype::semicolon,"Expected ;\n");//semicolon
@@ -394,7 +403,7 @@ Arg IREmittor::compile_expression(int precedence,Ops& ops)
         {
             rhs=compile_expression(0,ops);
             std::visit(overload{
-                [&](const Var& var)  { ops.emplace_back(BinOp{var.index,var,rhs,type});},
+                [&](const Var& var)  { ops.emplace_back(BinOp{var,var,rhs,type});},
                 [&](const Ref& ref)  {  ops.emplace_back(Store{ref.index,rhs});},
                 [](const auto& ){std::cerr << "Assigning to non assignable value\n"; exit(EXIT_FAILURE); }
             }, lhs);
@@ -402,8 +411,8 @@ Arg IREmittor::compile_expression(int precedence,Ops& ops)
         else
         {
             rhs=compile_expression(precedence+1,ops);       
-            ops.emplace_back(BinOp{vars_count,lhs,rhs,type});
-            lhs=Var{vars_count++};
+            ops.emplace_back(BinOp{Var{vars_count,Storage::Auto},lhs,rhs,type});
+            lhs=Var{vars_count++,Storage::Auto};
         }    
     }
     return lhs;
@@ -415,7 +424,7 @@ Arg IREmittor::compile_primary_expression(Ops& ops)
     {
         case Tokentype::identifier:
         {
-            Var var=Var{get_var_index(token.val)};
+            Var var=get_var(token.val);
             if(var.index==-1)
             {
                 std::cerr << "variable not declared " << token.val << "\n";
@@ -424,14 +433,14 @@ Arg IREmittor::compile_primary_expression(Ops& ops)
             if(try_peek({Tokentype::incr,Tokentype::decr}))
             {
                 Tokentype type=consume().type;
-                ops.emplace_back(BinOp{vars_count,Arg{},var,Tokentype::assignment});
+                ops.emplace_back(BinOp{Var{vars_count,Storage::Auto},Arg{},var,Tokentype::assignment});
                 switch(type)
                 {
-                    case Tokentype::incr:ops.emplace_back(BinOp{var.index,var,Literal{1},Tokentype::add});break;
-                    case Tokentype::decr:ops.emplace_back(BinOp{var.index,var,Literal{1},Tokentype::sub});break;
+                    case Tokentype::incr:ops.emplace_back(BinOp{var,var,Literal{1},Tokentype::add});break;
+                    case Tokentype::decr:ops.emplace_back(BinOp{var,var,Literal{1},Tokentype::sub});break;
                     default: assert(false && "UNREACHABLE\n");
                 }
-                return Var{vars_count++};
+                return Var{vars_count++,Storage::Auto};
             }
             else if(try_consume(Tokentype::open_square))
             {
@@ -445,8 +454,8 @@ Arg IREmittor::compile_primary_expression(Ops& ops)
                 }
                 else idx = compile_expression(0,ops);
                 try_consume(Tokentype::close_square,"Expected closing ']'\n");
-                ops.emplace_back(BinOp{vars_count,siz,idx,Tokentype::mult});
-                ops.emplace_back(BinOp{vars_count,var,Var{vars_count},Tokentype::add});
+                ops.emplace_back(BinOp{Var{vars_count},siz,idx,Tokentype::mult});
+                ops.emplace_back(BinOp{Var{vars_count},var,Var{vars_count,Storage::Auto},Tokentype::add});
                 return Ref{vars_count++};
             }
             else return var;
@@ -477,12 +486,12 @@ Arg IREmittor::compile_primary_expression(Ops& ops)
         {
             Arg arg=compile_primary_expression(ops);
             ops.emplace_back(UnOp{vars_count,arg,token.type});
-            return Var{vars_count++};
+            return Var{vars_count++,Storage::Auto};
         }
         case Tokentype::mult:
         {
             Arg arg=compile_primary_expression(ops);
-            ops.emplace_back(BinOp{vars_count,Arg{},arg,Tokentype::assignment});
+            ops.emplace_back(BinOp{Var{vars_count},Arg{},arg,Tokentype::assignment});
             return Ref{vars_count++};
         }
         case Tokentype::open_paren:
@@ -493,27 +502,27 @@ Arg IREmittor::compile_primary_expression(Ops& ops)
         }
         case Tokentype::incr:
         {
-            Token var=try_consume(Tokentype::identifier,"expected identifier after pre decrement\n");
-            size_t val=get_var_index(var.val);
-            if(val==-1)
+            Token tok=try_consume(Tokentype::identifier,"expected identifier after pre decrement\n");
+            Var var=get_var(tok.val);
+            if(var.index==-1)
             {
                 std::cerr << "variable not declared " << token.val << "\n";
                 exit(EXIT_FAILURE);
             }
-            ops.emplace_back(BinOp{val,Var{val},Literal{1},Tokentype::add});
-            return Var{val};
+            ops.emplace_back(BinOp{Var{var.index},var,Literal{1},Tokentype::add});
+            return var;
         }
         case Tokentype::decr:
         {
-            Token var=try_consume(Tokentype::identifier,"expected identifier after pre decrement\n");
-            size_t val=get_var_index(var.val);
-            if(val==-1)
+            Token val=try_consume(Tokentype::identifier,"expected identifier after pre decrement\n");
+            Var var=get_var(val.val);
+            if(var.index==-1)
             {
-                std::cerr << "variable not declared " << var.val << "\n";
+                std::cerr << "variable not declared " << val.val << "\n";
                 exit(EXIT_FAILURE);
             }
-            ops.emplace_back(BinOp{val,Var{val},Literal{1},Tokentype::sub});
-            return Var{val};
+            ops.emplace_back(BinOp{Var{var.index},var,Literal{1},Tokentype::sub});
+            return var;
         }
         case Tokentype::function:
         {
@@ -532,8 +541,8 @@ Arg IREmittor::compile_primary_expression(Ops& ops)
                 std::cerr << "Undeclared function " << funcall_name << "\n";
                 exit(EXIT_FAILURE);
             }
-            ops.emplace_back(BinOp{vars_count,Arg{},FuncResult{funcall_name},Tokentype::assignment});
-            return Var{vars_count++};
+            ops.emplace_back(BinOp{Var{vars_count},Arg{},FuncResult{funcall_name},Tokentype::assignment});
+            return Var{vars_count++,Storage::Auto};
         }
         default: assert(false && "UNREACHEABLE\n"); 
     }

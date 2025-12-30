@@ -116,6 +116,14 @@ std::vector<Token> Tokenizer::tokenize()
             {
                 tokens.push_back({Tokentype::assembly});
             }
+            else if(buffer=="true")
+            {
+                tokens.push_back({Tokentype::integer_lit,"1"});
+            }
+            else if(buffer=="false" || buffer == "null" || buffer == "NULL")
+            {
+                tokens.push_back({Tokentype::integer_lit,"0"});
+            }
             else 
             { 
                 tokens.push_back({Tokentype::identifier,buffer});
@@ -196,8 +204,13 @@ std::vector<Token> Tokenizer::tokenize()
         else if(peek().value()=='"')   
         {
             consume();
-            while(peek().value()!='\"')
+            while(true)
             {
+                if(peek().value() == '\"')
+                {
+                    if(buffer.back()=='\\')buffer.pop_back();
+                    else break;
+                }
                 buffer.push_back(consume());
             }
             consume();

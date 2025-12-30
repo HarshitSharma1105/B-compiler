@@ -8,13 +8,21 @@
 #include<algorithm>
 #include<stack>
 #include<set>
+
+enum Storage{
+    Auto,
+    Global
+};
+
 struct Variable{
     std::string var_name;
     size_t index;
+    Storage type;
 };
 
 struct Var{
     size_t index;
+    Storage type;
 };
 
 struct Ref{
@@ -36,7 +44,6 @@ struct FuncResult{
 
 typedef std::variant<Var,Ref,Literal,DataOffset,FuncResult> Arg;
 
-
 struct UnOp{
     size_t index;
     Arg arg;
@@ -44,7 +51,7 @@ struct UnOp{
 };
 
 struct BinOp{
-    size_t index;
+    Var var;
     Arg lhs,rhs;
     Tokentype type;
 };
@@ -100,6 +107,7 @@ struct Compiler{
     std::vector<Func> functions;
     std::string data_section;
     std::set<std::string> extrns;
+    size_t globals_count;
 };
 
 
@@ -115,7 +123,7 @@ public:
 
 
 private:
-    size_t get_var_index(const std::string& name);
+    Var get_var(const std::string& name);
     void compile_prog();
     void compile_func_body(Ops& ops);
     bool compile_while_loops(Ops& ops);
@@ -137,7 +145,7 @@ private:
     bool try_consume(const Tokentype& type);
     bool try_peek(const std::vector<Tokentype>& types,int offset=0);
     bool try_peek(const Tokentype& type,int offset=0);
-    Compiler compiler;
+    Compiler compiler{};
     std::vector<Token> tokens;
     int token_index=0;
     size_t data_offset=0;

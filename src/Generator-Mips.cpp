@@ -7,7 +7,8 @@ namespace Mips
         std::stringstream& stream;
         void operator()(const Var& var)
         {
-            stream << "    lw $s0,-" << (var.index+1)*4 << "($s1)\n";
+            if(var.type == Storage::Auto)stream << "    lw $s0,-" << (var.index+1)*4 << "($s1)\n";
+            else assert(false && "TODO Mips globals");
         }
         void operator()(const Literal& literal)
         {
@@ -66,7 +67,10 @@ namespace Mips
                 case Tokentype::remainder:  stream << "    div $s2,$s0\n    mfhi $s0\n";break;
                 default: assert(false && "Unknown Binary Operation\n");
             }
-            stream << "    sw $s0,-" << (binop.index+1)*4 << "($s1)\n";
+            stream << "    sw $s0,";
+            if(binop.var.type==Storage::Auto)stream << "-" <<  (binop.var.index+1)*4 << "($s1)\n";
+            else if(binop.var.type == Storage::Global)assert(false && "TODO Mips Globals");
+            else assert(false && "Unreachable\n");
         }
 
         void operator()(const Funcall& funcall) 
@@ -159,6 +163,7 @@ std::string Generator_Mips::generate()
 
 void Generator_Mips::generate_function_prologue(const Func& func)
 {
+    assert(func.num_args <= 4 && "too many arguments");
     textstream << func.function_name << ":\n";
     textstream << "    addi $sp,$sp,-8\n";
     textstream << "    sw $ra,0($sp)\n";

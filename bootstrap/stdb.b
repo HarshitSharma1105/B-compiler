@@ -32,24 +32,42 @@ pushback(ptr,val)
 	{
 		cap = 2 * cap + 1;
 		auto prev = *ptr;
-		*ptr = malloc(8*cap);
+		*ptr = alloc(8*cap);
 		auto new = *ptr;
-		auto i = 0;
-		while(i < siz)
+		for(auto i = 0; i < siz;i++)
 		{
-			new[i]=prev[i++];
+			new[i]=prev[i];
 		}
 		free(prev);
 	}
-	auto base = *ptr;
-	base[siz++]=val;
+	auto base   = *ptr;
+	base[siz++] = val;
 	*(ptr + 16) = cap;
 	*(ptr + 8)  = siz;
 }
 
 
+size(ptr)
+{
+	return *(ptr+8);
+}
 
-pushstr(ptr,ch)
+back(ptr)
+{
+	auto siz = size(ptr);
+	if(siz>0)return (*ptr + 8*(siz - 1));
+	else return 0;
+}
+
+resize(ptr,siz)
+{
+	*(ptr+8) = siz;
+}
+
+
+
+
+pushchar(ptr,ch)
 {
 	auto siz = *(ptr+8);
 	auto cap = *(ptr+16);
@@ -57,7 +75,7 @@ pushstr(ptr,ch)
 	{
 		cap = 2 * cap + 1;
 		auto prev = *ptr;
-		*ptr = malloc(cap);
+		*ptr = alloc(cap+1);
 		auto new = *ptr;
 		auto i = 0;
 		while(i < siz)
@@ -71,4 +89,20 @@ pushstr(ptr,ch)
 	writebyte(base,ch,siz++);
 	*(ptr + 16) = cap;
 	*(ptr + 8)  = siz;
+}
+
+extrn sprintf;
+
+pushstr(ptr,str)
+{
+	for(auto i = 0;readbyte(str,i);i++)pushchar(ptr,readbyte(str,i));
+}
+
+formatstr(src,fmt,x1,x2,x3,x4)
+{
+	auto temp = alloc(100);
+	sprintf(temp,fmt,x1,x2,x3,x4);
+	pushstr(src,temp);
+	pushchar(src,10);
+	free(temp);
 }

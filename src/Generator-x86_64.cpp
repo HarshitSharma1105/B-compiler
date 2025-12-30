@@ -6,7 +6,11 @@ namespace x86_64
         std::stringstream& stream;
         void operator()(const Var& var)
         {
-            stream << "    mov r15,[rbp-" << (var.index+1)*8 << "]\n";
+            stream << "    mov r15,";
+            if(var.type == Storage::Auto)stream << "[rbp-" << (var.index+1)*8;
+            else if(var.type == Storage::Global)  stream << "[global_" << var.index; 
+            else assert(false && "Unreachable\n");
+            stream << "]\n";
         }
         void operator()(const Literal& literal)
         {
@@ -65,7 +69,10 @@ namespace x86_64
                 case Tokentype::remainder:  stream    << "    xor rdx,rdx\n    mov rax,r15\n    idiv r14\n    mov r15,rdx\n";break;
                 default: assert(false && "Unknown Binary Operand type\n");
             }
-            stream << "    mov QWORD [rbp-" << (binop.index+1)*8 << "],r15\n";
+            if(binop.var.type==Storage::Auto)stream << "    mov QWORD [rbp-" << (binop.var.index+1)*8;
+            else if(binop.var.type == Storage::Global)stream << "    mov [global_" << binop.var.index;
+            else assert(false && "Unreachable\n");
+            stream << "],r15\n";
         }
         void operator()(const Funcall& funcall) 
         {
@@ -144,11 +151,13 @@ std::string Generator_x86_64::generate()
         textstream << "    extrn " << name << "\n";
     }
     std::visit(visitor,Op{DataSection{compiler.data_section}});
+    for(size_t i=0;i<compiler.globals_count;i++) textstream << "global_" << i << "  dq 0\n";
     return textstream.str();
 }
 
 void Generator_x86_64::generate_function_prologue(const Func& func)
 {
+    assert(func.num_args <= 6 && "too many args");
     size_t alloc_size=func.max_vars_count;
     if(alloc_size%2)alloc_size++;
     textstream << "public " << func.function_name << "\n" << func.function_name << ":\n";

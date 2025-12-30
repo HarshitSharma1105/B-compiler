@@ -5,7 +5,7 @@
 
 void debug(const Compiler& compiler)
 {
-	for(auto func:compiler.functions)
+	for(const auto& func:compiler.functions)
     {
 		std::cout << "Function " <<  func.function_name << '(' << func.num_args << ',' << func.max_vars_count << "):\n";
         debug(func.function_body); 
@@ -21,7 +21,7 @@ Runner::Runner(std::string target_lang,const std::string& path) : path(path)
 	{
 		target=Target::X86_64;
 	}
-	else if(target_lang=="Mips")
+	else if(target_lang=="mips")
 	{
 		target=Target::MIPS;
 	}
