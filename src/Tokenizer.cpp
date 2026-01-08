@@ -68,7 +68,7 @@ std::vector<Token> Tokenizer::tokenize()
         if(std::isalpha(peek().value()))
         {
             buffer.push_back(consume());
-            while (std::isalnum(peek().value()))
+            while (std::isalnum(peek().value()) || peek().value() == '_')
             {
                 buffer.push_back(consume());
             }
@@ -189,15 +189,15 @@ std::vector<Token> Tokenizer::tokenize()
                 consume();
                 continue;
             }
-	    else if(peek(1).value()=='*')
-	    {
-		    consume();
-		    consume();
-		    while(!(peek().has_value() && peek().value()=='*' && peek(1).has_value() && peek(1).value()=='/'))consume();
-		    consume();
-            consume();
-		    continue;
-	    }
+            else if(peek(1).value()=='*')
+            {
+                consume();
+                consume();
+                while(!(peek().has_value() && peek().value()=='*' && peek(1).has_value() && peek(1).value()=='/'))consume();
+                consume();
+                consume();
+                continue;
+            }
             tokens.push_back({Tokentype::divi,"/"});
             consume();
         }
@@ -332,7 +332,7 @@ std::vector<Token> Tokenizer::tokenize()
 }
 std::optional<char> Tokenizer::peek(int offset){
     if(index+offset>=src.size())return {};
-    return src[index+offset]; //segfault prone lol
+    return src[index+offset];
 }
 char Tokenizer::consume(){
     return src[index++];

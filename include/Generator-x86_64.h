@@ -1,7 +1,38 @@
 #pragma once
 
 #include<InterRepr.h>
+#include<array>
 
+namespace x86_64
+{
+    inline std::array<std::string,6> regs = {"rdi","rsi","rdx","rcx","r8","r9"};
+    struct ArgVisitor
+    {
+        std::stringstream& stream;
+        std::vector<std::string>& globals;
+        void operator()(const Var& var);
+        void operator()(const Literal& literal);
+        void operator()(const DataOffset& data);
+        void operator()(const FuncResult& funcresult);
+        void operator()(const Ref& ref);
+    };
+    struct Visitor
+    {
+        std::stringstream& stream;
+        std::vector<std::string>& globals;
+        ArgVisitor argvisitor{stream,globals};
+        void operator()(const UnOp& unop);
+        void operator()(const BinOp& binop);
+        void operator()(const DataSection& data);
+        void operator()(const Funcall& funcall); 
+        void operator()(const ReturnValue& retval);
+        void operator()(const Label& label);
+        void operator()(const JmpIfZero& jz);
+        void operator()(const Jmp& jmp);
+        void operator()(const Store& store);
+        void operator()(const Asm& assembly);
+    };
+};
 
 
 
@@ -18,6 +49,6 @@ private:
     void generate_stdlib();
     Compiler compiler;
     std::stringstream textstream;
-    std::unordered_set<std::string> extrns;
+    x86_64::Visitor visitor{textstream,compiler.globals};
     bool is_main;
 };

@@ -100,14 +100,14 @@ struct Func{
     Ops function_body;
     std::string function_name;
     size_t max_vars_count,num_args;
+    std::vector<size_t> default_args;
 };
 
 
 struct Compiler{
     std::vector<Func> functions;
     std::string data_section;
-    std::set<std::string> extrns;
-    size_t globals_count;
+    std::vector<std::string> extrns,globals;
 };
 
 
@@ -152,8 +152,6 @@ private:
     size_t vars_count=0;
     size_t max_vars_count=0;
     size_t labels_count=0;
-    std::unordered_set<std::string> funcs;
-    std::set<std::string> extrns;
     std::vector<Variable> vars;
     std::stringstream datastring;
     bool is_main_func_present=false;
