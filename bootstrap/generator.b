@@ -1,202 +1,101 @@
-#include"tokenizer.b"
+#include"ir.b"
 
-gen;
 
-consume()
+
+asm_str;
+regs;
+
+
+
+set_up_regs()
 {
-	auto ptr = *(gen[0]);
-	auto idx = gen[1];
-	auto tok = ptr[idx];
-	gen[1] = idx + 1;
-	return tok;
+	
+	regs = alloc(48);
+	regs[0] = "rdi";
+	regs[1] = "rsi";
+	regs[2] = "rdx";
+	regs[3] = "rcx";
+	regs[4] = "r8";
+	regs[5] = "r9";
 }
 
-tryconsumeerror(tokentype,msg)
+generate_arg(arg)
 {
-	auto ptr = *(gen[0]);
-	auto idx = gen[1];
-	auto token = ptr[idx];
-	if(tokentype == token[0])
+	if(arg[0] == LIT) format_str(asm_str,"	mov r15,%d",arg[1]);
+	else if(arg[0] == VAR) format_str(asm_str,"	mov r15,[rbp-%d]",8*arg[1]);
+	else error("UNREACHABLE\n");
+}
+
+
+
+generate_op(op)
+{
+    auto type = op[0];
+    if(type == AUTOASSIGN)
 	{
-		gen[1] = idx + 1;
-		return token;
+		generate_arg(op[2]);
+		format_str(asm_str,"	mov QWORD[rbp-%d],r15",8*op[1]);
 	}
-	printf("%s\n",msg);
-	exit(1);
-}
-
-tryconsume(tokentype)
-{
-	auto ptr = *(gen[0]);
-	auto idx = gen[1];
-	auto token = ptr[idx];
-	if(tokentype == token[0])
+	else if(type == FUNCALL)
 	{
-		gen[1] = idx + 1;
-		return true;
-	}
-	return false;
-}
-
-
-peek(off)
-{
-	auto ptr = *(gen[0]);
-	auto idx = gen[1];
-	return ptr[idx+off];
-}	
-
-trypeek(tokentype,off)
-{
-	auto tok = peek(off);
-	return tokentype == tok[0];
-}
-
-
-findvar(da,name)
-{
-	auto siz = *(da+8);
-	auto ptr = *da;
-	for(auto i = 0;i<siz;i++)
-	{
-		auto cur = ptr[i];
-		if(!strcmp(cur[0],name)) return cur[1];
-	}
-	return -1;
-}
-
-
-compfunc(src)
-{
-	while(!tryconsume(CLOSECURLY))
-	{
-		if(trypeek(AUTO,0))
+		auto args = (op+16);
+		auto size = size(args);
+		for(auto i=0;i<size;i++)
 		{
-			consume();
-			if(trypeek(IDENTIFIER,0))
-			{
-				auto ident = consume();
-				auto curr = gen[3];
-				auto variable = alloc(16);
-				variable[0] = *(ident[1]);
-				variable[1] = curr++;
-				gen[3] = curr;
-				pushback(gen[2],variable);
-				tryconsumeerror(SEMICOLON,"Expected ;");
-				formatstr(src,"    sub rsp,8");
-			}
-			else 
-			{
-				printf("Expected identifier\n");
-			}
+			generate_arg(op[2][i]);
+			format_str(asm_str,"	mov %s,r15",regs[i]);
 		}
-		else if(trypeek(IDENTIFIER,0))
-		{
-			auto lhs = consume();
-			auto idx = findvar(gen[2],*(lhs[1]));
-			if(idx == -1)
-			{
-				printf("Undeclared variable %s\n",*(lhs[1]));
-				exit(1);
-			}
-			tryconsumeerror(ASSIGN,"Expected =");
-			auto rhs = consume();
-			if(rhs[0] == INTLIT)
-			{
-				formatstr(src,"    mov rax,%s",*(rhs[1]));
-			}
-			else if(rhs[0] == IDENTIFIER)
-			{
-				auto i2 = findvar(gen[2],*(rhs[1]));
-				if(i2 == -1)
-				{
-					printf("Undeclared variable %s",*(rhs[1]));
-					exit(1);
-				}
-				formatstr(src,"    mov rax,[rbp-%d]",8*(i2+1));
-			}
-			else 
-			{
-				printf("Not supported\n");
-				exit(1);
-			}
-			formatstr(src,"    mov QWORD [rbp-%d],rax",8*(idx+1));
-			tryconsumeerror(SEMICOLON,"Expected ;");
-		}
-		else if(tryconsume(EXTRN))
-		{
-			auto name = tryconsumeerror(IDENTIFIER,"Expected identifier");
-			tryconsumeerror(SEMICOLON,"Expected ;");
-			formatstr(src,"    extrn %s",*(name[1]));
-		}
-		else if(trypeek(FUNCTION,0))
-		{
-			auto func = consume();
-			tryconsumeerror(OPENPAREN,"Expected (");
-			auto rhs = consume();
-			if(rhs[0] == INTLIT)
-			{
-				formatstr(src,"    mov rax,%s",*(rhs[1]));
-			}
-			else if(rhs[0] == IDENTIFIER)
-			{
-				auto i2 = findvar(gen[2],*(rhs[1]));
-				if(i2 == -1)
-				{
-					printf("Undeclared variable %s",*(rhs[1]));
-					exit(1);
-				}
-				formatstr(src,"    mov rax,[rbp-%d]",8*(i2+1));
-			}
-			else 
-			{
-				printf("Not supported\n");
-				exit(1);
-			}
-			tryconsumeerror(CLOSEPAREN,"Expected )");
-			formatstr(src,"    mov rdi,rax");
-			formatstr(src,"    call %s",*(func[1]));
-			tryconsumeerror(SEMICOLON,"Expected ;");
-		}
-		else 
-		{
-			printf("Unexpected statement\n");
-		}
+		format_str(asm_str,"	xor rax,rax");
+		format_str(asm_str,"	call %s",op[1]);
 	}
 }
 
-generate(tokens)
+
+generate_func(func)
 {
-	auto str = alloc(24);
-	formatstr(str,"format ELF64");
-	formatstr(str,"section \".text\" executable");
-	gen = alloc(32);
-	gen[0] = tokens;
-	gen[2] = alloc(24);
-	auto len = *(tokens+8);
-	while(gen[1] < len)
+    auto name = func[0];
+    auto size = size(func[1]);
+    auto ops = *(func[1]);
+    for(auto i = 0;i<size;i++)generate_op(ops[i]);
+}
+
+generate_func_prologue(func)
+{
+	auto num_args = func[2],alloc_vars = func[3];
+	if(num_args>6)error("Too many args");
+	if(alloc_vars%2)alloc_vars++;
+	format_str(asm_str,"public %s",func[0]);
+	format_str(asm_str,"%s:",func[0]);
+	format_str(asm_str,"	push rbp");
+    format_str(asm_str,"	mov rbp,rsp");
+	format_str(asm_str,"	sub rsp,%d",8*alloc_vars);
+}
+
+generate_func_epilogue()
+{
+	format_str(asm_str,"	mov rsp,rbp");
+	format_str(asm_str,"	pop rbp");
+	format_str(asm_str,"	xor rax,rax");
+	format_str(asm_str,"	ret");
+}
+
+
+generate()
+{
+	set_up_regs();
+	asm_str = alloc(24);
+	format_str(asm_str,"format ELF64");
+	format_str(asm_str,"section \".text\" executable");
+	auto size = size(compiler);
+    auto funcs = compiler[0];
+    for(auto i=0;i<size;i++)
 	{
-		if(trypeek(FUNCTION,0))
-		{
-			auto tok = consume();
-			auto name =  tok[1];
-			tryconsumeerror(OPENPAREN,"Expected (");
-			tryconsumeerror(CLOSEPAREN,"Expected )");
-			tryconsumeerror(OPENCURLY,"Expected {");
-			formatstr(str,"public %s\n %s:",*name,*name);
-			formatstr(str,"    push rbp");
-			formatstr(str,"    mov rbp,rsp");
-			compfunc(str);
-			formatstr(str,"    mov rsp,rbp");
-			formatstr(str,"    pop rbp");
-			formatstr(str,"    xor rax,rax");
-			formatstr(str,"    ret");
-		}
-		else
-		{
-			printf("expected identifier %s\n",*str);
-			exit(1);
-		}
+		generate_func_prologue(funcs[i]);
+		generate_func(funcs[i]);
+		generate_func_epilogue();
 	}
-	return str;
+	size = size(extrns_arr);
+	auto base = extrns_arr[0];
+	for(auto i=0;i<size;i++)format_str(asm_str,"	extrn %s",base[i]);
+	return asm_str;
 }

@@ -1,4 +1,4 @@
-readbyte(ptr,idx)
+read_byte(ptr,idx)
 {
     auto rem = idx % 8;
     idx = idx - rem;
@@ -7,7 +7,7 @@ readbyte(ptr,idx)
 }
 
 
-writebyte(ptr,ch,idx)
+write_byte(ptr,ch,idx)
 {
     auto rem = idx % 8;
     idx = idx - rem;
@@ -15,16 +15,47 @@ writebyte(ptr,ch,idx)
     *(ptr + idx) = *(ptr + idx) & (~ (255 << rem)) | (ch << rem);
 }
 
-extrn malloc,memset,free;
+extrn free,malloc,memset,calloc;
+extrn sprintf,printf,exit;
+extrn read,open,write;
 
-alloc(bytes)
+
+
+arena_cap;
+alloced;
+curr_arena;
+arena_list;
+alloc_size;
+arena;
+
+alloc(size)
 {
-	auto ptr = malloc(bytes);
-	memset(ptr,0,bytes);
+	if(size+alloc_size>arena_cap & alloced)
+	{
+		printf("Ran out of arena memory. Please change arena_cap initialization here\n");
+		exit(1);
+	}
+	if(!alloced)
+	{
+		arena_cap = 20480;
+		arena = malloc(arena_cap);
+		memset(arena,0,arena_cap);
+		alloced = true;
+	}
+	auto ptr = arena + alloc_size;
+	alloc_size = alloc_size + size;
 	return ptr;
 }
 
-pushback(ptr,val)
+error(msg,x1=0,x2=0,x3=0,x4=0,x5=0) 
+{
+	printf(msg,x1,x2,x3,x4,x5);
+	printf("\n");
+	exit(1);
+}
+
+
+push_back(ptr,val)
 {
 	auto siz = *(ptr+8);
 	auto cap = *(ptr+16);
@@ -34,11 +65,7 @@ pushback(ptr,val)
 		auto prev = *ptr;
 		*ptr = alloc(8*cap);
 		auto new = *ptr;
-		for(auto i = 0; i < siz;i++)
-		{
-			new[i]=prev[i];
-		}
-		free(prev);
+		for(auto i = 0; i < siz;i++) new[i] = prev[i];
 	}
 	auto base   = *ptr;
 	base[siz++] = val;
@@ -62,12 +89,19 @@ back(ptr)
 resize(ptr,siz)
 {
 	*(ptr+8) = siz;
+	auto cap = *(ptr+16);
+	while(cap<siz) cap = 2*cap+1;
+	auto prev = *ptr;
+	*ptr = alloc(8*cap);
+	auto new = *ptr;
+	for(auto i = 0; i < siz;i++) new[i] = prev[i];
+	*(ptr+16) = cap;
 }
 
 
 
 
-pushchar(ptr,ch)
+push_char(ptr,ch)
 {
 	auto siz = *(ptr+8);
 	auto cap = *(ptr+16);
@@ -77,32 +111,25 @@ pushchar(ptr,ch)
 		auto prev = *ptr;
 		*ptr = alloc(cap+1);
 		auto new = *ptr;
-		auto i = 0;
-		while(i < siz)
-		{
-			writebyte(new,readbyte(prev,i),i);
-			i++;
-		}
-		free(prev);
+		for(auto i = 0;i < siz;i++)write_byte(new,read_byte(prev,i),i);
 	}
 	auto base = *ptr;
-	writebyte(base,ch,siz++);
+	write_byte(base,ch,siz++);
 	*(ptr + 16) = cap;
 	*(ptr + 8)  = siz;
 }
 
-extrn sprintf;
 
-pushstr(ptr,str)
+push_str(ptr,str)
 {
-	for(auto i = 0;readbyte(str,i);i++)pushchar(ptr,readbyte(str,i));
+	for(auto i = 0;read_byte(str,i);i++)push_char(ptr,read_byte(str,i));
 }
 
-formatstr(src,fmt,x1,x2,x3,x4)
+format_str(src,fmt,x1=0,x2=0,x3=0,x4=0)
 {
-	auto temp = alloc(100);
+	auto temp = calloc(100,1);
 	sprintf(temp,fmt,x1,x2,x3,x4);
-	pushstr(src,temp);
-	pushchar(src,10);
+	push_str(src,temp);
+	push_char(src,10);
 	free(temp);
 }

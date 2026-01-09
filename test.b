@@ -1,11 +1,9 @@
-main()
+main(a,b)
 {
-	auto x;
-	auto y;
-	auto z;
-	x = 4;
-	y = x;
+	auto x,y,z;
+	x = 10;
+	y = 68;
 	extrn putchar;
-	putchar(69);
-	putchar(10);
+	putchar(y);
+	putchar(x);
 }

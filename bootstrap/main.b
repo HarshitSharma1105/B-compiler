@@ -1,6 +1,6 @@
 #include"generator.b"
 
-extrn lseek,write,system;
+extrn lseek,system;
 
 siz(fd)
 {
@@ -17,22 +17,21 @@ main(argc,argv)
 		exit(1);
 	}
 	auto fd = open(argv[1],0);
+
 	auto siz = siz(fd);
+
 	auto buff = alloc(siz+1);
+
 	read(fd,buff,siz);
-	//printf("%s\n",buff);
+
 	auto tokens = tokenize(buff);
-	/*
-	auto base = *tokens,len = *(tokens+8);
-	for(auto i=0;i<len;i++)
-	{
-		debug(base[i]);
-	}
-	*/
-	auto str = generate(tokens);
-	//printf("%s",*str);
+
+	IrGenerate(tokens);
+
+	asm_str = generate();
+
 	auto file = open("output.asm",64 | 1,420);
-	write(file,*str,*(str+8));
+	write(file,*asm_str,*(asm_str+8));
 	system("fasm output.asm");
 	system("cc -no-pie output.o -o output");
 	system("./output");

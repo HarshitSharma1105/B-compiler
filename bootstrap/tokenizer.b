@@ -1,122 +1,124 @@
 #include"stdb.b"
 
-extrn printf,puts;
-extrn read,open,exit;
 extrn isdigit,isspace,isalnum;
 extrn strlen,strcmp;
 
 
-count;
+tok_count;
 
 
-OPENPAREN;
-CLOSEPAREN;
-OPENCURLY;
-CLOSECURLY;
+OPEN_PAREN;
+CLOSE_PAREN;
+OPEN_CURLY;
+CLOSE_CURLY;
 INTLIT;
 IDENTIFIER;
 AUTO;
-EXTRN;
+EXTERN;
 ASSIGN;
 SEMICOLON;
 FUNCTION;
+COMMA;
 
 
-init()
+
+
+
+tok_init()
 {
-	OPENPAREN  = count++;
-	CLOSEPAREN = count++;
-	OPENCURLY  = count++;
-	CLOSECURLY = count++;
-	INTLIT     = count++;
-	AUTO       = count++;
-	EXTRN      = count++;
-	IDENTIFIER = count++;
-	ASSIGN     = count++;
-	SEMICOLON  = count++;
-	FUNCTION   = count++;
+	OPEN_PAREN  = tok_count++;
+	CLOSE_PAREN = tok_count++;
+	OPEN_CURLY  = tok_count++;
+	CLOSE_CURLY = tok_count++;
+	INTLIT      = tok_count++;
+	AUTO        = tok_count++;
+	EXTERN      = tok_count++;
+	IDENTIFIER  = tok_count++;
+	ASSIGN      = tok_count++;
+	SEMICOLON   = tok_count++;
+	FUNCTION    = tok_count++;
+	COMMA       = tok_count++;
 }
 
 tokenize(src)
 {
-	init();
+	tok_init();
 	auto tokens = alloc(24);
 	auto idx = 0;
 	auto len = strlen(src);
 	while(idx < len)
 	{
-		auto ch = readbyte(src,idx);
+		auto tok = alloc(16);
+		auto ch = read_byte(src,idx);
 		if(isspace(ch))idx++;
 		else if(ch == 10)idx++;
 		else if(ch == '(')
 		{
-			auto tok = alloc(16);
-			tok[0] = OPENPAREN;
+			tok[0] = OPEN_PAREN;
 			auto last = *(back(tokens));
 			if(last[0] == IDENTIFIER) last[0] = FUNCTION;
-			pushback(tokens,tok);
+			push_back(tokens,tok);
 			idx++;
 		}
 		else if(ch == ')')
 		{
-			auto tok = alloc(16);
-			tok[0] = CLOSEPAREN;
-			pushback(tokens,tok);
+			tok[0] = CLOSE_PAREN;
+			push_back(tokens,tok);
 			idx++;
 		}
 		else if(ch == '{')
 		{
-			auto tok = alloc(16);
-			tok[0] = OPENCURLY;
-			pushback(tokens,tok);
+			tok[0] = OPEN_CURLY;
+			push_back(tokens,tok);
 			idx++;
 		}
 		else if(ch == '}')
 		{
-			auto tok = alloc(16);
-			tok[0] = CLOSECURLY;
-			pushback(tokens,tok);
+			tok[0] = CLOSE_CURLY;
+			push_back(tokens,tok);
+			idx++;
+		}
+		else if (ch == ',')
+		{
+			tok[0] = COMMA;
+			push_back(tokens,tok);
 			idx++;
 		}
 		else if(isdigit(ch))
 		{
-			auto tok = alloc(16);
 			auto buff = alloc(24);
 							
-			while(isdigit(readbyte(src,idx)))pushchar(buff,readbyte(src,idx++));				
+			while(isdigit(read_byte(src,idx)))push_char(buff,read_byte(src,idx++));
 			tok[0] = INTLIT;
 			tok[1] = buff;
-			pushback(tokens,tok);
+			push_back(tokens,tok);
 		}
 		else if(isalnum(ch))
 		{
-			auto tok  = alloc(16);
 			auto buff = alloc(24);
 			tok[1] = buff;
-			while(isalnum(readbyte(src,idx)))pushchar(buff,readbyte(src,idx++));
+			while(isalnum(read_byte(src,idx)))push_char(buff,read_byte(src,idx++));
 			if(!strcmp(*buff,"auto"))tok[0] = AUTO;
-			else if(!strcmp(*buff,"extrn"))tok[0] = EXTRN;
+			else if(!strcmp(*buff,"extrn"))tok[0] = EXTERN;
 			else tok[0] = IDENTIFIER;
-			pushback(tokens,tok);
+			push_back(tokens,tok);
 		}
 		else if(ch == '=')
 		{
-			auto tok = alloc(16);
 			tok[0] = ASSIGN;
-			pushback(tokens,tok);
+			push_back(tokens,tok);
 			idx++;
 		}
 		else if(ch == ';')
 		{
-			auto tok = alloc(16);
 			tok[0] = SEMICOLON;
-			pushback(tokens,tok);
+			push_back(tokens,tok);
 			idx++;
 		}
 		else 
 		{
 			printf("Unrecognized token: ");
-			for(auto i = 0;i<10;i++)printf("%c",readbyte(src,idx+i));
+			for(auto i = 0;i<10;i++)printf("%c",read_byte(src,idx+i));
 			printf("\n");
 			exit(1);
 		}
@@ -127,15 +129,26 @@ tokenize(src)
 debug(token)
 {
 	auto type = token[0];
-	if(type == OPENPAREN)printf("open-curly (\n");
-	else if(type == CLOSEPAREN)printf("close-curly )\n");
-	else if(type == OPENCURLY)printf("open-brace {\n");
-	else if(type == CLOSECURLY)printf("close-brace }\n");
+	if(type == OPEN_PAREN)printf("open-curly (\n");
+	else if(type == CLOSE_PAREN)printf("close-curly )\n");
+	else if(type == OPEN_CURLY)printf("open-brace {\n");
+	else if(type == CLOSE_CURLY)printf("close-brace }\n");
 	else if(type == INTLIT)printf("Int-lit %s\n",*(token[1]));
 	else if(type == AUTO)printf("auto\n");
 	else if(type == IDENTIFIER)printf("Identifier %s\n",*(token[1]));
 	else if(type == FUNCTION)printf("Function %s\n",*(token[1]));
-	else if(type == EXTRN )printf("Extrn\n");
+	else if(type == EXTERN )printf("Extrn\n");
 	else if(type == ASSIGN)printf("assignment =\n");
 	else if(type == SEMICOLON)printf("semicolon ;\n");
+	else if(type == COMMA)printf("comma ,\n");
+}
+
+
+debug_tokens(tokens)
+{
+	auto base = *tokens,len = *(tokens+8);
+	for(auto i=0;i<len;i++)
+	{
+		debug(base[i]);
+	}
 }
