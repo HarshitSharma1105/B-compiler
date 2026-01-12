@@ -45,6 +45,7 @@ void debug(const Tokentype& tokentype)
         case Tokentype::bit_or:            std::cout << "bitwise-or ";break;
         case Tokentype::bit_not:           std::cout << "bitwise-inverse ";break;
         case Tokentype::assembly:          std::cout << "asm ";break;
+        case Tokentype::dot:               std::cout << "dot ";break;
         default:                           std::cout << "Unknown token "; break;
     }
 }
@@ -199,6 +200,11 @@ std::vector<Token> Tokenizer::tokenize()
                 continue;
             }
             tokens.push_back({Tokentype::divi,"/"});
+            consume();
+        }
+        else if(peek().value() == '.')
+        {
+            tokens.push_back({Tokentype::dot,"."});
             consume();
         }
         else if(peek().value()=='"')   

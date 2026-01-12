@@ -2,7 +2,36 @@
 
 
 #include<InterRepr.h>
-
+namespace Mips
+{
+    inline std::array<std::string,4> regs = {"$a0","$a1","$a2","$a3"};
+    struct ArgVisitor
+    {
+        std::stringstream& stream;
+        std::vector<std::string>& globals;
+        void operator()(const Var& var);
+        void operator()(const Literal& literal);
+        void operator()(const DataOffset& data);
+        void operator()(const FuncResult& funcresult);
+        void operator()(const Ref& ref);
+    };
+    struct Visitor
+    {
+        std::stringstream& stream;
+        std::vector<std::string>& globals;
+        ArgVisitor argvisitor{stream,globals};
+        void operator()(const UnOp& unop);
+        void operator()(const BinOp& binop);
+        void operator()(const DataSection& data);
+        void operator()(const Funcall& funcall); 
+        void operator()(const ReturnValue& retval);
+        void operator()(const Label& label);
+        void operator()(const JmpIfZero& jz);
+        void operator()(const Jmp& jmp);
+        void operator()(const Store& store);
+        void operator()(const Asm& assembly);
+    };
+};
 
 
 class Generator_Mips
@@ -17,7 +46,7 @@ private:
     void generate_function_prologue(const Func& func);
     void generate_stdlib();
     Compiler compiler;
+    Mips::Visitor visitor{textstream,compiler.globals};
     std::stringstream textstream;
-    std::unordered_set<std::string> extrns;
     bool is_main=false;
 };

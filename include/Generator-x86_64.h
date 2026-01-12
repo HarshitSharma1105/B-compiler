@@ -1,7 +1,6 @@
 #pragma once
 
 #include<InterRepr.h>
-#include<array>
 
 namespace x86_64
 {

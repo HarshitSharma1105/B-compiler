@@ -447,6 +447,37 @@ Arg IREmittor::compile_primary_expression(Ops& ops)
                 }
                 return temp;
             }
+            else if(try_peek(Tokentype::dot))
+            {
+                Var temp;
+                Arg ret = var;
+                while(try_consume(Tokentype::dot))
+                {
+                    Arg idx = compile_primary_expression(ops);
+                    temp = Var{vars_count++,Storage::Auto};
+                    ops.emplace_back(BinOp{temp,Literal{8},idx,Tokentype::mult});
+                    ops.emplace_back(BinOp{temp,ret,temp,Tokentype::add});
+                    ret = Ref{temp.index};
+                }
+                if(try_peek({Tokentype::incr,Tokentype::decr}))
+                {
+                    size_t curr = temp.index;
+                    size_t new_curr = vars_count++;
+                    ops.emplace_back(BinOp{Var{new_curr},Arg{},ret,Tokentype::assignment});
+                    Tokentype type=consume().type;
+                    temp.index = vars_count++;
+                    ops.emplace_back(BinOp{temp,Arg{},ret,Tokentype::assignment});
+                    switch(type)
+                    {
+                        case Tokentype::incr:ops.emplace_back(BinOp{temp,temp,Literal{1},Tokentype::add});break;
+                        case Tokentype::decr:ops.emplace_back(BinOp{temp,temp,Literal{1},Tokentype::sub});break;
+                        default: assert(false && "UNREACHABLE\n");
+                    }
+                    ops.emplace_back(Store{curr,temp});
+                    return Var{new_curr};
+                }
+                return ret;
+            }
             else if(try_peek(Tokentype::open_square))
             {
                 Var temp;
@@ -592,8 +623,7 @@ Arg IREmittor::compile_primary_expression(Ops& ops)
                 }
             }
             ops.emplace_back(Funcall{funcall_name,args});
-            ops.emplace_back(BinOp{Var{vars_count},Arg{},FuncResult{funcall_name},Tokentype::assignment});
-            return Var{vars_count++,Storage::Auto};
+            return FuncResult(funcall_name);
         }
         default: assert(false && "UNREACHEABLE\n"); 
     }

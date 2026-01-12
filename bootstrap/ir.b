@@ -40,10 +40,10 @@ consume()
 
 try_consume_error(tokentype,msg)
 {
-	auto ptr = *(IrGen[0]);
-	auto idx = IrGen[1]++;
+	auto ptr = IrGen.0.0;
+	auto idx = IrGen.1++;
 	auto token = ptr[idx];
-	if(tokentype == token[0])
+	if(tokentype == token.0)
 	{
 		return token;
 	}
@@ -53,8 +53,8 @@ try_consume_error(tokentype,msg)
 
 try_consume(tokentype)
 {
-	auto ptr = *(IrGen[0]);
-	auto idx = IrGen[1];
+	auto ptr = IrGen.0.0;
+	auto idx = IrGen.1;
 	auto token = ptr[idx];
 	if(tokentype == token[0])
 	{
@@ -67,27 +67,28 @@ try_consume(tokentype)
 
 peek(off=0)
 {
-	auto ptr = *(IrGen[0]);
-	auto idx = IrGen[1];
+	auto ptr = IrGen.0.0;
+	auto idx = IrGen.1;
 	return ptr[idx+off];
 }	
 
 try_peek(tokentype,off=0)
 {
 	auto tok = peek(off);
-	return tokentype == tok[0];
+	return tokentype == tok.0;
 }
 
-tok_name(tok) return tok[1][0];
+tok_name(tok) return tok.1.0;
 
 
 find_var(name)
 {
 	auto siz = size(vars);
-	auto ptr = *vars;
+	auto ptr = vars.0;
 	for(auto i = 0;i<siz;i++)
 	{
-		if(!strcmp(ptr[i][0],name)) return ptr[i][1];
+		auto cur = ptr[i];
+		if(!strcmp(cur.0,name)) return cur.1;
 	}
 	return -1;
 }
@@ -96,8 +97,8 @@ find_var(name)
 decl_var(name)
 {
 	auto var = alloc(16);
-	var[0] = name;
-	var[1] = vars_count++;
+	var.0 = name;
+	var.1 = vars_count++;
 	push_back(vars,var);
 }
 
@@ -106,18 +107,18 @@ extrn atoll;
 compile_primary_expression()
 {
 	auto tok = consume();
-	if(tok[0] == INTLIT)
+	if(tok.0 == INTLIT)
 	{
 		auto var = alloc(16);
-		var[0] = LIT;
-		var[1] = atoll(tok[1][0]);
+		var.0 = LIT;
+		var.1 = atoll(tok.1.0);
 		return var;
 	}
-	else if(tok[0] == IDENTIFIER)
+	else if(tok.0 == IDENTIFIER)
 	{
 		auto var = alloc(16);
-		var[0] = VAR;
-		var[1] = find_var(tok[1][0]);
+		var.0 = VAR;
+		var.1 = find_var(tok.1.0);
 		return var;
 	}
 	else error("UNREACHABLE\n");
@@ -158,9 +159,9 @@ comp_func(ops)
 			}
 			try_consume_error(ASSIGN,"Expected =");
 			auto op = alloc(24);
-			op[0] = AUTOASSIGN;
-			op[1] = idx;
-			op[2] = compile_expression();
+			op.0 = AUTOASSIGN;
+			op.1 = idx;
+			op.2 = compile_expression();
 			push_back(ops,op);
 			try_consume_error(SEMICOLON,"Expected ;");
 		}
@@ -199,44 +200,49 @@ comp_func(ops)
 }
 
 
+compile_prog()
+{
+	if(try_peek(FUNCTION))
+	{
+		auto func = alloc(32);
+		func.0 = tok_name(consume());
+		func.1 = alloc(24);
+		auto ops = func[1];
+		try_consume_error(OPEN_PAREN,"Expected (");
+		while(try_peek(IDENTIFIER))
+		{
+			decl_var(tok_name(consume()));
+			try_consume(COMMA);
+		}
+		func.2 = vars_count;
+		try_consume_error(CLOSE_PAREN,"Expected )");
+		try_consume_error(OPEN_CURLY,"Expected {");
+		comp_func(ops);
+		func.3 = vars_count;
+		push_back(compiler,func);
+		vars_count = 0;
+	}
+	else
+	{
+		printf("Global statements not done\n");
+		exit(1);
+	}
+}
+
 
 
 IrGenerate(tokens)
 {
     ir_init();
 	IrGen = alloc(16);
-	IrGen[0] = tokens;
+	IrGen.0 = tokens;
 	vars = alloc(24);
     compiler = alloc(24);
 	extrns_arr = alloc(24);
 	auto len = size(tokens);
-	while(IrGen[1] < len)
+	while(IrGen.1 < len)
 	{
-		if(try_peek(FUNCTION))
-		{
-            auto func = alloc(32);
-			func[0] = tok_name(consume());
-            func[1] = alloc(24);
-            auto ops = func[1];
-			try_consume_error(OPEN_PAREN,"Expected (");
-			while(try_peek(IDENTIFIER))
-			{
-				decl_var(tok_name(consume()));
-				try_consume(COMMA);
-			}
-			func[2] = vars_count;
-			try_consume_error(CLOSE_PAREN,"Expected )");
-			try_consume_error(OPEN_CURLY,"Expected {");
-			comp_func(ops);
-			func[3] = vars_count;
-            push_back(compiler,func);
-			vars_count = 0;
-		}
-		else
-		{
-			printf("Global statements not done\n");
-			exit(1);
-		}
+		compile_prog();
 	}
 }
 
@@ -250,8 +256,8 @@ dbg_arg(arg)
 
 dbg_op(op)
 {
-    auto type = op[0];
-    if(type == AUTOASSIGN)
+	auto type = op[0];
+	if(type == AUTOASSIGN)
 	{
 		printf("Auto Assign(%d,",op[1]);
 		dbg_arg(op[2]);

@@ -20,21 +20,23 @@ extrn sprintf,printf,exit;
 extrn read,open,write;
 
 
+error(msg,x1=0,x2=0,x3=0,x4=0,x5=0) 
+{
+	printf(msg,x1,x2,x3,x4,x5);
+	printf("\n");
+	exit(1);
+}
+
+
 
 arena_cap;
 alloced;
-curr_arena;
-arena_list;
 alloc_size;
 arena;
 
 alloc(size)
 {
-	if(size+alloc_size>arena_cap & alloced)
-	{
-		printf("Ran out of arena memory. Please change arena_cap initialization here\n");
-		exit(1);
-	}
+	if(size+alloc_size>arena_cap & alloced) error("Ran out of arena memory . Please change capacity of arena\n");
 	if(!alloced)
 	{
 		arena_cap = 20480;
@@ -47,37 +49,24 @@ alloc(size)
 	return ptr;
 }
 
-error(msg,x1=0,x2=0,x3=0,x4=0,x5=0) 
-{
-	printf(msg,x1,x2,x3,x4,x5);
-	printf("\n");
-	exit(1);
-}
-
-
 push_back(ptr,val)
 {
-	auto siz = *(ptr+8);
-	auto cap = *(ptr+16);
+	auto siz = ptr.1;
+	auto cap = ptr.2;
 	if(siz == cap)
 	{
 		cap = 2 * cap + 1;
-		auto prev = *ptr;
-		*ptr = alloc(8*cap);
-		auto new = *ptr;
-		for(auto i = 0; i < siz;i++) new[i] = prev[i];
+		auto new = alloc(8*cap);
+		for(auto i = 0; i < siz;i++) new[i] = ptr.0.i;
+		ptr.0 = new;
 	}
-	auto base   = *ptr;
-	base[siz++] = val;
-	*(ptr + 16) = cap;
-	*(ptr + 8)  = siz;
+	ptr.0.(siz++) = val;
+	ptr.2 = cap;
+	ptr.1= siz;
 }
 
 
-size(ptr)
-{
-	return *(ptr+8);
-}
+size(ptr) return ptr.1;
 
 back(ptr)
 {
@@ -88,14 +77,13 @@ back(ptr)
 
 resize(ptr,siz)
 {
-	*(ptr+8) = siz;
-	auto cap = *(ptr+16);
+	ptr.1 = siz;
+	auto cap = ptr.2;
 	while(cap<siz) cap = 2*cap+1;
-	auto prev = *ptr;
-	*ptr = alloc(8*cap);
-	auto new = *ptr;
-	for(auto i = 0; i < siz;i++) new[i] = prev[i];
-	*(ptr+16) = cap;
+	auto new = alloc(8*cap);
+	for(auto i = 0; i < siz;i++) new[i] = ptr.0.i;
+	ptr.0 = new;
+	ptr.2 = cap;
 }
 
 
@@ -103,20 +91,18 @@ resize(ptr,siz)
 
 push_char(ptr,ch)
 {
-	auto siz = *(ptr+8);
-	auto cap = *(ptr+16);
+	auto siz = ptr.1;
+	auto cap = ptr.2;
 	if(siz == cap)
 	{
 		cap = 2 * cap + 1;
-		auto prev = *ptr;
-		*ptr = alloc(cap+1);
-		auto new = *ptr;
-		for(auto i = 0;i < siz;i++)write_byte(new,read_byte(prev,i),i);
+		auto new = alloc(cap+1);
+		for(auto i = 0;i < siz;i++)write_byte(new,read_byte(ptr.0,i),i);
+		ptr.0 = new;
 	}
-	auto base = *ptr;
-	write_byte(base,ch,siz++);
-	*(ptr + 16) = cap;
-	*(ptr + 8)  = siz;
+	write_byte(ptr.0,ch,siz++);
+	ptr.2 = cap;
+	ptr.1  = siz;
 }
 
 

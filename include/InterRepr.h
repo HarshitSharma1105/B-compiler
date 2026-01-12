@@ -4,10 +4,8 @@
 
 
 #include<variant>
-#include<unordered_set>
 #include<algorithm>
-#include<stack>
-#include<set>
+#include<array>
 
 enum Storage{
     Auto,

@@ -11,11 +11,7 @@ siz(fd)
 
 main(argc,argv)
 {
-	if(argc < 2)
-	{
-		printf("Incorrect usage\n");
-		exit(1);
-	}
+	if(argc < 2) error("Incorrect Usage");
 	auto fd = open(argv[1],0);
 
 	auto siz = siz(fd);
@@ -36,4 +32,5 @@ main(argc,argv)
 	system("cc -no-pie output.o -o output");
 	system("./output");
 	system("rm output*");
+	free(arena);
 }

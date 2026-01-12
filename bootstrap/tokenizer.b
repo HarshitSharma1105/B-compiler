@@ -54,33 +54,33 @@ tokenize(src)
 		else if(ch == 10)idx++;
 		else if(ch == '(')
 		{
-			tok[0] = OPEN_PAREN;
+			tok.0 = OPEN_PAREN;
 			auto last = *(back(tokens));
-			if(last[0] == IDENTIFIER) last[0] = FUNCTION;
+			if(last.0 == IDENTIFIER) last.0 = FUNCTION;
 			push_back(tokens,tok);
 			idx++;
 		}
 		else if(ch == ')')
 		{
-			tok[0] = CLOSE_PAREN;
+			tok.0 = CLOSE_PAREN;
 			push_back(tokens,tok);
 			idx++;
 		}
 		else if(ch == '{')
 		{
-			tok[0] = OPEN_CURLY;
+			tok.0 = OPEN_CURLY;
 			push_back(tokens,tok);
 			idx++;
 		}
 		else if(ch == '}')
 		{
-			tok[0] = CLOSE_CURLY;
+			tok.0 = CLOSE_CURLY;
 			push_back(tokens,tok);
 			idx++;
 		}
 		else if (ch == ',')
 		{
-			tok[0] = COMMA;
+			tok.0 = COMMA;
 			push_back(tokens,tok);
 			idx++;
 		}
@@ -89,29 +89,29 @@ tokenize(src)
 			auto buff = alloc(24);
 							
 			while(isdigit(read_byte(src,idx)))push_char(buff,read_byte(src,idx++));
-			tok[0] = INTLIT;
-			tok[1] = buff;
+			tok.0 = INTLIT;
+			tok.1 = buff;
 			push_back(tokens,tok);
 		}
 		else if(isalnum(ch))
 		{
 			auto buff = alloc(24);
-			tok[1] = buff;
+			tok.1 = buff;
 			while(isalnum(read_byte(src,idx)))push_char(buff,read_byte(src,idx++));
-			if(!strcmp(*buff,"auto"))tok[0] = AUTO;
-			else if(!strcmp(*buff,"extrn"))tok[0] = EXTERN;
-			else tok[0] = IDENTIFIER;
+			if(!strcmp(*buff,"auto"))tok.0 = AUTO;
+			else if(!strcmp(*buff,"extrn"))tok.0 = EXTERN;
+			else tok.0 = IDENTIFIER;
 			push_back(tokens,tok);
 		}
 		else if(ch == '=')
 		{
-			tok[0] = ASSIGN;
+			tok.0 = ASSIGN;
 			push_back(tokens,tok);
 			idx++;
 		}
 		else if(ch == ';')
 		{
-			tok[0] = SEMICOLON;
+			tok.0 = SEMICOLON;
 			push_back(tokens,tok);
 			idx++;
 		}
@@ -128,15 +128,15 @@ tokenize(src)
 
 debug(token)
 {
-	auto type = token[0];
+	auto type = token.0;
 	if(type == OPEN_PAREN)printf("open-curly (\n");
 	else if(type == CLOSE_PAREN)printf("close-curly )\n");
 	else if(type == OPEN_CURLY)printf("open-brace {\n");
 	else if(type == CLOSE_CURLY)printf("close-brace }\n");
-	else if(type == INTLIT)printf("Int-lit %s\n",*(token[1]));
+	else if(type == INTLIT)printf("Int-lit %s\n",token.1.0);
 	else if(type == AUTO)printf("auto\n");
-	else if(type == IDENTIFIER)printf("Identifier %s\n",*(token[1]));
-	else if(type == FUNCTION)printf("Function %s\n",*(token[1]));
+	else if(type == IDENTIFIER)printf("Identifier %s\n",token.1.0);
+	else if(type == FUNCTION)printf("Function %s\n",token.1.0);
 	else if(type == EXTERN )printf("Extrn\n");
 	else if(type == ASSIGN)printf("assignment =\n");
 	else if(type == SEMICOLON)printf("semicolon ;\n");

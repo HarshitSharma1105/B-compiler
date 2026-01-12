@@ -46,7 +46,8 @@ shift_right,
 bit_or,
 bit_and,
 bit_not,
-assembly
+assembly,
+dot
 };
 
 struct Token{
