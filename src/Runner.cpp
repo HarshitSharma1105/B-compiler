@@ -8,6 +8,7 @@ void debug(const Compiler& compiler)
 	for(const auto& func:compiler.functions)
     {
 		std::cout << "Function " <<  func.function_name << '(' << func.num_args << ',' << func.max_vars_count << "):\n";
+		std::cout << "Func flags = " << func.func_flags << '\n';
         debug(func.function_body); 
 		std::cout << "Function " << func.function_name << " end\n";
     }

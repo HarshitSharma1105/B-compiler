@@ -47,12 +47,15 @@ bit_or,
 bit_and,
 bit_not,
 assembly,
-dot
+dot,
+attribute,
+invalid
 };
 
 struct Token{
     Tokentype type;
     std::string val;
+    operator bool();
 };
 void debug(const Tokentype& tokentype);
 void debug(const std::vector<Token>& tokens);

@@ -3,9 +3,13 @@
 struct DebugArgVisitor{
     void operator()(const Var& var)
     {
-        if(var.type == Storage::Auto)std::cout << "AutoVar";
-        else if(var.type == Storage::Global) std::cout << "Global";
-        else assert(false && "Unreachable\n");
+        switch(var.type)
+        {
+            case Storage::Auto   :  std::cout << "AutoVar"; break;
+            case Storage::Global :  std::cout << "Global"; break;
+            case Storage::Array  :  std::cout << "Array"; break;
+            default: assert(false && "Unreachable\n");
+        }
         std::cout << "(" << var.index << ")";
     }
     void operator()(const Ref& ref)
@@ -94,7 +98,7 @@ struct DebugVisitor {
     }
     void operator()(const Asm& assembly)
     {
-        std::cout << "Assembly Code " << assembly.asm_code << "\n";
+        std::cout << "Assembly Code " << assembly.asm_code;
     }
 };
 
@@ -137,32 +141,31 @@ Compiler   IREmittor::EmitIR()
 
 void IREmittor::compile_prog()
 {
-    if(try_peek(Tokentype::function))
+    if(Token attrib = try_consume(Tokentype::attribute); attrib || try_peek(Tokentype::function))
     {
         Func func{};
+        if(attrib.val=="asm")func.func_flags |= Flag::AsmFunc;
         func.function_name=consume().val;
-        size_t curr_vars=vars_count;
         size_t vars_size=vars.size();
         if(func.function_name=="main")is_main_func_present=true;
         try_consume(Tokentype::open_paren,"expcted '('\n");
         while(peek().value().type==Tokentype::identifier)
         {
-            vars.emplace_back(consume().val,vars_count,Storage::Auto);
+            vars.emplace_back(consume().val,vars_count++,Storage::Auto);
             if(try_consume(Tokentype::assignment))
             {
                 Token def_val = try_consume(Tokentype::integer_lit,"Only integer literals are supported as default args for now\n");
-                func.default_args.emplace_back(atoll(def_val.val.c_str()));
+                func.default_args.push_back(atoll(def_val.val.c_str()));  
             }
-            vars_count++;
             try_consume(Tokentype::comma);
             //"Expected comma between args\n";
         }
-        func.num_args=vars_count-curr_vars;
+        func.num_args=vars_count;
         try_consume(Tokentype::close_paren,"expected ')'\n");
         compile_block(func.function_body);
         vars.resize(vars_size);
         max_vars_count=std::max(max_vars_count,vars_count);
-        vars_count=curr_vars;
+        vars_count=0;
         func.max_vars_count=max_vars_count;
         max_vars_count=0;
         compiler.functions.push_back(func);
@@ -173,8 +176,19 @@ void IREmittor::compile_prog()
     }
     else if(try_peek(Tokentype::identifier))
     {
-        vars.emplace_back(consume().val,compiler.globals.size(),Storage::Global);
-        compiler.globals.push_back(vars.back().var_name);
+        std::string name = consume().val;
+        if(try_consume(Tokentype::open_square))
+        {
+            vars.emplace_back(name,compiler.arrays.size(),Storage::Array);
+            size_t val = atoll(try_consume(Tokentype::integer_lit,"Only integer sizes supported for now\n").val.c_str());
+            try_consume(Tokentype::close_square,"Expected ]\n");
+            compiler.arrays.emplace_back(name,val);
+        }
+        else 
+        {
+            vars.emplace_back(name,compiler.globals.size(),Storage::Global);
+            compiler.globals.emplace_back(name);
+        }
         try_consume(Tokentype::semicolon,"Expected ; after global declaration\n");
     }
     else 
@@ -366,6 +380,7 @@ bool IREmittor::compile_asm(Ops& ops)
     {
         try_consume(Tokentype::open_paren,"Expected open paren after asm statement");
         std::string code = consume().val;
+        code.push_back('\n');
         ops.emplace_back(Asm{code});
         try_consume(Tokentype::close_paren,"Expected closed paren");
         try_consume(Tokentype::semicolon,"Expected semicolon");
@@ -560,6 +575,26 @@ Arg IREmittor::compile_primary_expression(Ops& ops)
             try_consume(Tokentype::close_paren,"expected )\n");
             return arg;
         }
+        case Tokentype::open_curly:
+        {
+            std::vector<Arg> args;
+            while(try_peek(Tokentype::close_curly)==false)
+            {   
+                args.emplace_back(compile_expression(0,ops));
+                try_consume(Tokentype::comma);
+            }
+            try_consume(Tokentype::close_curly,"Expected }");
+            ops.emplace_back(Funcall{"alloc",{Literal{8*args.size()}}});
+            Var ptr  = Var{vars_count++,Storage::Auto};
+            Var temp = Var{vars_count++,Storage::Auto};
+            ops.emplace_back(BinOp{ptr,Arg{},FuncResult{"alloc"},Tokentype::assignment});
+            for(size_t i = 0; i < args.size();i++)
+            {
+                ops.emplace_back(BinOp{temp,ptr,Literal{8*i},Tokentype::add});
+                ops.emplace_back(Store{temp.index,args[i]});
+            }
+            return ptr;
+        }
         case Tokentype::incr:
         {
             Token tok=try_consume(Tokentype::identifier,"expected identifier after pre decrement\n");
@@ -623,7 +658,8 @@ Arg IREmittor::compile_primary_expression(Ops& ops)
                 }
             }
             ops.emplace_back(Funcall{funcall_name,args});
-            return FuncResult(funcall_name);
+            ops.emplace_back(BinOp{Var{vars_count},Arg{},FuncResult{funcall_name},Tokentype::assignment});
+            return Var{vars_count++};
         }
         default: assert(false && "UNREACHEABLE\n"); 
     }
@@ -646,13 +682,12 @@ Token IREmittor::try_consume(const Tokentype& type, const std::string& err_msg)
     std::cerr << err_msg << std::endl;
     exit(EXIT_FAILURE);
 }
-bool IREmittor::try_consume(const Tokentype& type)
+Token IREmittor::try_consume(const Tokentype& type)
 {
     if (peek().value().type == type) {
-        consume();
-        return true;
+        return consume();
     }
-    return false;
+    return {Tokentype::invalid};
 }
 bool IREmittor::try_peek(const std::vector<Tokentype>& types,int offset)
 {

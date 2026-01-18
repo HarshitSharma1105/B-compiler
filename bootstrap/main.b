@@ -27,10 +27,11 @@ main(argc,argv)
 	asm_str = generate();
 
 	auto file = open("output.asm",64 | 1,420);
-	write(file,*asm_str,*(asm_str+8));
+	write(file,asm_str.0,asm_str.1);
+
 	system("fasm output.asm");
 	system("cc -no-pie output.o -o output");
 	system("./output");
 	system("rm output*");
-	free(arena);
+
 }

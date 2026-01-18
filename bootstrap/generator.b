@@ -6,22 +6,10 @@ asm_str;
 regs;
 
 
-
-set_up_regs()
-{
-	regs = alloc(48);
-	regs[0] = "rdi";
-	regs[1] = "rsi";
-	regs[2] = "rdx";
-	regs[3] = "rcx";
-	regs[4] = "r8";
-	regs[5] = "r9";
-}
-
 generate_arg(arg)
 {
-	if(arg.0 == LIT) format_str(asm_str,"	mov r15,%d",arg.1);
-	else if(arg.0 == VAR) format_str(asm_str,"	mov r15,[rbp-%d]",8*arg.1);
+	if(arg.0 == LIT) format_str(asm_str,"    mov r15,%d",arg.1);
+	else if(arg.0 == VAR) format_str(asm_str,"    mov r15,[rbp-%d]",8*arg.1);
 	else error("UNREACHABLE\n");
 }
 
@@ -67,6 +55,7 @@ generate_func_prologue(func)
 	format_str(asm_str,"	push rbp");
 	format_str(asm_str,"	mov rbp,rsp");
 	format_str(asm_str,"	sub rsp,%d",8*alloc_vars);
+	for(auto i=0;i<num_args;i++) format_str(asm_str,"    mov [rbp-%d],%s",8*(i+1),regs[i]);
 }
 
 generate_func_epilogue()
@@ -74,13 +63,13 @@ generate_func_epilogue()
 	format_str(asm_str,"	mov rsp,rbp");
 	format_str(asm_str,"	pop rbp");
 	format_str(asm_str,"	xor rax,rax");
-	format_str(asm_str,"	ret");
+	format_str(asm_str,"	ret"); 
 }
 
 
 generate()
 {
-	set_up_regs();
+	regs = {"rdi","rsi","rdx","rcx","r8","r9"};
 	asm_str = alloc(24);
 	format_str(asm_str,"format ELF64");
 	format_str(asm_str,"section \".text\" executable");

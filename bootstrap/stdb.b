@@ -1,21 +1,16 @@
+[[asm]]
 read_byte(ptr,idx)
 {
-    auto rem = idx % 8;
-    idx = idx - rem;
-    rem = rem * 8;
-    return (*(ptr + idx) & (255 << rem)) >> rem;
+	asm("	movzx eax,BYTE [rdi+rsi]");
+	asm("	ret");
 }
-
-
+[[asm]]
 write_byte(ptr,ch,idx)
 {
-    auto rem = idx % 8;
-    idx = idx - rem;
-    rem = rem * 8;
-    *(ptr + idx) = *(ptr + idx) & (~ (255 << rem)) | (ch << rem);
+	asm("	mov BYTE [rdi+rdx], sil");
+	asm("	ret");
 }
 
-extrn free,malloc,memset,calloc;
 extrn sprintf,printf,exit;
 extrn read,open,write;
 
@@ -29,21 +24,12 @@ error(msg,x1=0,x2=0,x3=0,x4=0,x5=0)
 
 
 
-arena_cap;
-alloced;
 alloc_size;
-arena;
+arena[20480];
 
 alloc(size)
 {
-	if(size+alloc_size>arena_cap & alloced) error("Ran out of arena memory . Please change capacity of arena\n");
-	if(!alloced)
-	{
-		arena_cap = 20480;
-		arena = malloc(arena_cap);
-		memset(arena,0,arena_cap);
-		alloced = true;
-	}
+	if(size+alloc_size> 20480) error("Ran out of arena memory . Please change capacity of arena\n");
 	auto ptr = arena + alloc_size;
 	alloc_size = alloc_size + size;
 	return ptr;
@@ -111,11 +97,11 @@ push_str(ptr,str)
 	for(auto i = 0;read_byte(str,i);i++)push_char(ptr,read_byte(str,i));
 }
 
+
+temp[100];
 format_str(src,fmt,x1=0,x2=0,x3=0,x4=0)
 {
-	auto temp = calloc(100,1);
 	sprintf(temp,fmt,x1,x2,x3,x4);
 	push_str(src,temp);
 	push_char(src,10);
-	free(temp);
 }

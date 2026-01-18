@@ -7,6 +7,7 @@ void x86_64::ArgVisitor::operator()(const Var& var)
     {
         case Storage::Auto:   stream << "    mov r15,[rbp-" << (var.index+1)*8 << "]\n";break;
         case Storage::Global: stream << "    mov r15,[" << globals[var.index] << "]\n";break;
+        case Storage::Array : stream << "    mov r15," <<  arrays[var.index].first << "\n";break;
         default: assert(false && "UNREACHABLE\n");
     }
 }
@@ -61,13 +62,14 @@ void x86_64::Visitor::operator()(const BinOp& binop)
         case Tokentype::sub:        stream    << "    sub r15,r14\n";break;
         case Tokentype::mult:       stream    << "    imul r15,r14\n";break;
         case Tokentype::divi:       stream    << "    xor rdx,rdx\n    mov rax,r15\n    idiv r14\n    mov r15,rax\n";break;
-        case Tokentype::remainder:  stream    << "    xor rdx,rdx\n    mov rax,r15\n    idiv r14\n    mov r15,rdx\n";break;
+        case Tokentype::remainder:  stream    << "    xor rdx,rdx\n    mov rax,r15\n    idiv r14\n    mov r15,rax\n";break;
         default: assert(false && "Unknown Binary Operand type\n");
     }
     switch(binop.var.type)
     {
         case Storage::Auto:   stream << "    mov QWORD [rbp-" << (binop.var.index+1)*8 << "],r15\n";break;
         case Storage::Global: stream << "    mov [" << globals[binop.var.index] << "],r15\n";break;
+        case Storage::Array:  stream << "    mov " << arrays[binop.var.index].first << ",r15\n";break;
         default: assert(false && "UNREACHABLE\n");
     }
 }
@@ -141,7 +143,7 @@ std::string Generator_x86_64::generate()
     {
         generate_function_prologue(func);
         generate_func(func);
-        generate_function_epilogue();
+        generate_function_epilogue(func);
     }
     for(const auto& name : compiler.extrns)
     {
@@ -149,6 +151,8 @@ std::string Generator_x86_64::generate()
     }
     std::visit(visitor,Op{DataSection{compiler.data_section}});
     for(const std::string& name : compiler.globals) textstream << name << "  dq 0\n";
+    textstream << "section \".bss\"  writeable\n";
+    for(const auto& [name,size] : compiler.arrays) textstream << name << "  rb " << size << '\n';
     return textstream.str();
 }
 
@@ -158,19 +162,25 @@ void Generator_x86_64::generate_function_prologue(const Func& func)
     size_t alloc_size=func.max_vars_count;
     if(alloc_size%2)alloc_size++;
     textstream << "public " << func.function_name << "\n" << func.function_name << ":\n";
-    textstream << "    push rbp\n";
-    textstream << "    mov rbp,rsp\n";
-    textstream << "    sub rsp," << 8*alloc_size << "\n";
-    for (int i=0;i<func.num_args; i++)
+    if((func.func_flags & Flag::AsmFunc) == 0)
     {
-        textstream << "    mov [rbp-" << (i+1)*8 << "]," << x86_64::regs[i] << "\n";
+        textstream << "    push rbp\n";
+        textstream << "    mov rbp,rsp\n";
+        textstream << "    sub rsp," << 8*alloc_size << "\n";
+        for (int i=0;i<func.num_args; i++)
+        {
+            textstream << "    mov [rbp-" << (i+1)*8 << "]," << x86_64::regs[i] << "\n";
+        }
     }
 }
-void Generator_x86_64::generate_function_epilogue()
+void Generator_x86_64::generate_function_epilogue(const Func& func)
 {
-    textstream << "    mov rsp,rbp\n";
-    textstream << "    pop rbp\n";
-    textstream << "    mov rax,0\n    ret\n";
+    if((func.func_flags & Flag::AsmFunc) == 0)
+    {
+        textstream << "    mov rsp,rbp\n";
+        textstream << "    pop rbp\n";
+        textstream << "    mov rax,0\n    ret\n";
+    }
 }
 void Generator_x86_64::generate_func(const Func& func)
 {

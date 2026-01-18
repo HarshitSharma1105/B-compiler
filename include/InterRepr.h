@@ -9,7 +9,8 @@
 
 enum Storage{
     Auto,
-    Global
+    Global,
+    Array
 };
 
 struct Variable{
@@ -97,7 +98,7 @@ typedef std::vector<Op> Ops;
 struct Func{
     Ops function_body;
     std::string function_name;
-    size_t max_vars_count,num_args;
+    size_t max_vars_count,num_args,func_flags;
     std::vector<size_t> default_args;
 };
 
@@ -106,8 +107,14 @@ struct Compiler{
     std::vector<Func> functions;
     std::string data_section;
     std::vector<std::string> extrns,globals;
+    std::vector<std::pair<std::string,size_t>> arrays;
 };
 
+
+enum Flag
+{
+    AsmFunc = 1 << 1
+};
 
 void debug(const Ops& ops);
 
@@ -140,7 +147,7 @@ private:
     std::optional<Token> peek(int offset=0);
     Token consume();
     Token try_consume(const Tokentype& type, const std::string& err_msg);
-    bool try_consume(const Tokentype& type);
+    Token try_consume(const Tokentype& type);
     bool try_peek(const std::vector<Tokentype>& types,int offset=0);
     bool try_peek(const Tokentype& type,int offset=0);
     Compiler compiler{};

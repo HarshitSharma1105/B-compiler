@@ -57,6 +57,10 @@ void debug(const std::vector<Token>& tokens)
         std::cout << token.val << std::endl;
     }
 }
+Token::operator bool()
+{
+    return type != Tokentype::invalid;
+}
 
 
 
@@ -142,8 +146,23 @@ std::vector<Token> Tokenizer::tokenize()
         }
         else if(peek().value()=='[')
         {
-            tokens.push_back({Tokentype::open_square,"["});
-            consume();
+            if(peek(1).value() == '[')
+            {
+                consume();
+                consume();
+                buffer.clear();
+                while (std::isalnum(peek().value())) buffer.push_back(consume());
+                assert(buffer.empty()==false);
+                tokens.push_back({Tokentype::attribute,buffer});
+                buffer.clear();
+                assert(consume()==']');
+                assert(consume()==']');
+            }
+            else
+            {
+                tokens.push_back({Tokentype::open_square,"["});
+                consume();
+            }
         }
         else if(peek().value()==']')
         {
