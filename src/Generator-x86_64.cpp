@@ -6,8 +6,8 @@ void x86_64::ArgVisitor::operator()(const Var& var)
     switch(var.type)
     {
         case Storage::Auto:   stream << "    mov r15,[rbp-" << (var.index+1)*8 << "]\n";break;
-        case Storage::Global: stream << "    mov r15,[" << globals[var.index] << "]\n";break;
-        case Storage::Array : stream << "    mov r15," <<  arrays[var.index].first << "\n";break;
+        case Storage::Global: stream << "    mov r15,[" << var.var_name << "]\n";break;
+        case Storage::Array : stream << "    mov r15," <<  var.var_name << "\n";break;
         default: assert(false && "UNREACHABLE\n");
     }
 }
@@ -68,8 +68,8 @@ void x86_64::Visitor::operator()(const BinOp& binop)
     switch(binop.var.type)
     {
         case Storage::Auto:   stream << "    mov QWORD [rbp-" << (binop.var.index+1)*8 << "],r15\n";break;
-        case Storage::Global: stream << "    mov [" << globals[binop.var.index] << "],r15\n";break;
-        case Storage::Array:  stream << "    mov " << arrays[binop.var.index].first << ",r15\n";break;
+        case Storage::Global: stream << "    mov [" << binop.var.var_name << "],r15\n";break;
+        case Storage::Array:  stream << "    mov " << binop.var.var_name << ",r15\n";break;
         default: assert(false && "UNREACHABLE\n");
     }
 }
@@ -139,7 +139,7 @@ std::string Generator_x86_64::generate()
 {
     textstream << "format ELF64\n";
     textstream << "section \"text\" executable\n";
-    for(const Func& func:compiler.functions)
+    for(const auto& func:compiler.functions)
     {
         generate_function_prologue(func);
         generate_func(func);
@@ -150,9 +150,17 @@ std::string Generator_x86_64::generate()
         textstream << "    extrn " << name << "\n";
     }
     std::visit(visitor,Op{DataSection{compiler.data_section}});
-    for(const std::string& name : compiler.globals) textstream << name << "  dq 0\n";
+    for(const auto& name : compiler.globals) 
+    {
+        textstream << "    public " << name << '\n';
+        textstream << name << "  dq 0\n";
+    }
     textstream << "section \".bss\"  writeable\n";
-    for(const auto& [name,size] : compiler.arrays) textstream << name << "  rb " << size << '\n';
+    for(const auto& [name,size] : compiler.arrays)
+    {
+        textstream << "    public " << name << '\n';
+        textstream << name << "  rb " << size << '\n';
+    }
     return textstream.str();
 }
 
@@ -184,7 +192,7 @@ void Generator_x86_64::generate_function_epilogue(const Func& func)
 }
 void Generator_x86_64::generate_func(const Func& func)
 {
-    for(const Op& op:func.function_body) std::visit(visitor,op);
+    for(const auto& op:func.function_body) std::visit(visitor,op);
 }
 void Generator_x86_64::generate_stdlib()
 {

@@ -29,7 +29,7 @@ arena[20480];
 
 alloc(size)
 {
-	if(size+alloc_size> 20480) error("Ran out of arena memory . Please change capacity of arena\n");
+	if(size+alloc_size > 20480) error("Ran out of arena memory . Please change capacity of arena\n");
 	auto ptr = arena + alloc_size;
 	alloc_size = alloc_size + size;
 	return ptr;
@@ -43,10 +43,10 @@ push_back(ptr,val)
 	{
 		cap = 2 * cap + 1;
 		auto new = alloc(8*cap);
-		for(auto i = 0; i < siz;i++) new[i] = ptr.0.i;
+		for(auto i = 0; i < siz;i++) new[i] = ptr.0[i];
 		ptr.0 = new;
 	}
-	ptr.0.(siz++) = val;
+	ptr.0[siz++] = val;
 	ptr.2 = cap;
 	ptr.1= siz;
 }
@@ -67,7 +67,7 @@ resize(ptr,siz)
 	auto cap = ptr.2;
 	while(cap<siz) cap = 2*cap+1;
 	auto new = alloc(8*cap);
-	for(auto i = 0; i < siz;i++) new[i] = ptr.0.i;
+	for(auto i = 0; i < siz;i++) new[i] = ptr.0[i];
 	ptr.0 = new;
 	ptr.2 = cap;
 }

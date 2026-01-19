@@ -8,7 +8,6 @@ namespace Mips
     struct ArgVisitor
     {
         std::stringstream& stream;
-        std::vector<std::string>& globals;
         void operator()(const Var& var);
         void operator()(const Literal& literal);
         void operator()(const DataOffset& data);
@@ -18,8 +17,7 @@ namespace Mips
     struct Visitor
     {
         std::stringstream& stream;
-        std::vector<std::string>& globals;
-        ArgVisitor argvisitor{stream,globals};
+        ArgVisitor argvisitor{stream};
         void operator()(const UnOp& unop);
         void operator()(const BinOp& binop);
         void operator()(const DataSection& data);
@@ -46,7 +44,7 @@ private:
     void generate_function_prologue(const Func& func);
     void generate_stdlib();
     Compiler compiler;
-    Mips::Visitor visitor{textstream,compiler.globals};
+    Mips::Visitor visitor{textstream};
     std::stringstream textstream;
     bool is_main=false;
 };

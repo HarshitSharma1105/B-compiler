@@ -8,8 +8,6 @@ namespace x86_64
     struct ArgVisitor
     {
         std::stringstream& stream;
-        std::vector<std::string>& globals;
-        std::vector<std::pair<std::string,size_t>>& arrays;
         void operator()(const Var& var);
         void operator()(const Literal& literal);
         void operator()(const DataOffset& data);
@@ -19,9 +17,7 @@ namespace x86_64
     struct Visitor
     {
         std::stringstream& stream;
-        std::vector<std::string>& globals;
-        std::vector<std::pair<std::string,size_t>>& arrays;
-        ArgVisitor argvisitor{stream,globals,arrays};
+        ArgVisitor argvisitor{stream};
         void operator()(const UnOp& unop);
         void operator()(const BinOp& binop);
         void operator()(const DataSection& data);
@@ -50,6 +46,6 @@ private:
     void generate_stdlib();
     Compiler compiler;
     std::stringstream textstream;
-    x86_64::Visitor visitor{textstream,compiler.globals,compiler.arrays};
+    x86_64::Visitor visitor{textstream};
     bool is_main;
 };

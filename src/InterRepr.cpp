@@ -151,7 +151,7 @@ void IREmittor::compile_prog()
         try_consume(Tokentype::open_paren,"expcted '('\n");
         while(peek().value().type==Tokentype::identifier)
         {
-            vars.emplace_back(consume().val,vars_count++,Storage::Auto);
+            vars.emplace_back(vars_count++,Storage::Auto,consume().val);
             if(try_consume(Tokentype::assignment))
             {
                 Token def_val = try_consume(Tokentype::integer_lit,"Only integer literals are supported as default args for now\n");
@@ -161,14 +161,15 @@ void IREmittor::compile_prog()
             //"Expected comma between args\n";
         }
         func.num_args=vars_count;
+        compiler.functions.push_back(func);
+        Func& back = compiler.functions.back();
         try_consume(Tokentype::close_paren,"expected ')'\n");
-        compile_block(func.function_body);
+        compile_block(back.function_body);
         vars.resize(vars_size);
         max_vars_count=std::max(max_vars_count,vars_count);
         vars_count=0;
-        func.max_vars_count=max_vars_count;
+        back.max_vars_count=max_vars_count;
         max_vars_count=0;
-        compiler.functions.push_back(func);
     }
     else if (try_peek(Tokentype::extrn))
     {
@@ -179,14 +180,14 @@ void IREmittor::compile_prog()
         std::string name = consume().val;
         if(try_consume(Tokentype::open_square))
         {
-            vars.emplace_back(name,compiler.arrays.size(),Storage::Array);
+            vars.emplace_back(compiler.arrays.size(),Storage::Array,name);
             size_t val = atoll(try_consume(Tokentype::integer_lit,"Only integer sizes supported for now\n").val.c_str());
             try_consume(Tokentype::close_square,"Expected ]\n");
             compiler.arrays.emplace_back(name,val);
         }
         else 
         {
-            vars.emplace_back(name,compiler.globals.size(),Storage::Global);
+            vars.emplace_back(compiler.globals.size(),Storage::Global,name);
             compiler.globals.emplace_back(name);
         }
         try_consume(Tokentype::semicolon,"Expected ; after global declaration\n");
@@ -200,11 +201,11 @@ void IREmittor::compile_prog()
 
 Var IREmittor::get_var(const std::string& name)
 {
-    for(size_t i=0;i<vars.size();i++)
+    for(const auto& var:vars)
     {
-        if(vars[i].var_name==name)return {vars[i].index,vars[i].type};
+        if(var.var_name==name)return var;
     }
-    return {(size_t)-1,Storage::Auto};
+    return {(size_t)-1,Storage::Auto,"INVALID"};
 }
 void IREmittor::compile_func_body(Ops& ops)
 {
@@ -365,7 +366,7 @@ bool IREmittor::autovar_dec(Ops& ops)
                 std::cerr << "variable already declared " << var_name << "\n";
                 exit(EXIT_FAILURE);
             }
-            vars.emplace_back(var_name,vars_count++,Storage::Auto);
+            vars.emplace_back(vars_count++,Storage::Auto,var_name);
             compile_expression(0,ops);
         }
         try_consume(Tokentype::semicolon,"Expected ;\n");//semicolon
@@ -414,7 +415,7 @@ void IREmittor::compile_stmt(Ops& ops)
 
 Arg IREmittor::compile_expression(int precedence,Ops& ops)
 {
-    if(precedence==precedences.size())return compile_primary_expression(ops);
+    if(precedence==precedences.size())return compile_prim_expr(ops);
     Arg lhs=compile_expression(precedence+1,ops),rhs;
     while(try_peek(precedences[precedence])){
         Tokentype type=consume().type;
@@ -436,6 +437,75 @@ Arg IREmittor::compile_expression(int precedence,Ops& ops)
     }
     return lhs;
 }
+
+Arg IREmittor::compile_prim_expr(Ops& ops)
+{
+    Arg ret = compile_primary_expression(ops);
+    Var temp;
+    if(try_peek({Tokentype::dot,Tokentype::open_square,Tokentype::incr,Tokentype::decr}))
+    {
+        while(try_peek({Tokentype::dot,Tokentype::open_square}))
+        {
+            if(try_consume(Tokentype::dot))
+            {
+                Arg idx = compile_primary_expression(ops);
+                temp = Var{vars_count++,Storage::Auto};
+                ops.emplace_back(BinOp{temp,Literal{8},idx,Tokentype::mult});
+                ops.emplace_back(BinOp{temp,ret,temp,Tokentype::add});
+                ret = Ref{temp.index};
+            }
+            else if(try_consume(Tokentype::open_square))
+            {
+                Arg idx = compile_expression(0,ops);
+                try_consume(Tokentype::close_square,"Expected closing ']'\n");
+                temp = Var{vars_count++,Storage::Auto};
+                ops.emplace_back(BinOp{temp,Literal{8},idx,Tokentype::mult});
+                ops.emplace_back(BinOp{temp,ret,temp,Tokentype::add});
+                ret = Ref{temp.index};
+            }
+        }
+        if(try_peek({Tokentype::incr,Tokentype::decr}))
+        {
+            if(Var* var = std::get_if<Var>(&ret))
+            {
+                Tokentype type=consume().type;
+                temp = Var{vars_count++,Storage::Auto};
+                ops.emplace_back(BinOp{temp,Arg{},ret,Tokentype::assignment});
+                switch(type)
+                {
+                    case Tokentype::incr:ops.emplace_back(BinOp{*var,temp,Literal{1},Tokentype::add});break;
+                    case Tokentype::decr:ops.emplace_back(BinOp{*var,temp,Literal{1},Tokentype::sub});break;
+                    default: assert(false && "UNREACHABLE\n");
+                }
+                ret = temp;
+            }
+            else if(Ref* ref = std::get_if<Ref>(&ret))
+            {
+                if(try_peek({Tokentype::incr,Tokentype::decr}))
+                {
+                    size_t curr = ref->index;
+                    size_t new_curr = vars_count++;
+                    ops.emplace_back(BinOp{Var{new_curr},Arg{},ret,Tokentype::assignment});
+                    Tokentype type=consume().type;
+                    temp = Var{vars_count++,Storage::Auto};
+                    ops.emplace_back(BinOp{temp,Arg{},ret,Tokentype::assignment});
+                    switch(type)
+                    {
+                        case Tokentype::incr:ops.emplace_back(BinOp{temp,temp,Literal{1},Tokentype::add});break;
+                        case Tokentype::decr:ops.emplace_back(BinOp{temp,temp,Literal{1},Tokentype::sub});break;
+                        default: assert(false && "UNREACHABLE\n");
+                    }
+                    ops.emplace_back(Store{curr,temp});
+                    ret = Var{new_curr};
+                }
+            }
+            else assert(false && "MESSED UP");
+        }
+    }
+    return ret;
+}
+
+
 Arg IREmittor::compile_primary_expression(Ops& ops)
 {
     Token token=consume();
@@ -448,90 +518,6 @@ Arg IREmittor::compile_primary_expression(Ops& ops)
             {
                 std::cerr << "variable not declared " << token.val << "\n";
                 exit(EXIT_FAILURE);
-            }
-            if(try_peek({Tokentype::incr,Tokentype::decr}))
-            {
-                Tokentype type=consume().type;
-                Var temp = Var{vars_count++,Storage::Auto};
-                ops.emplace_back(BinOp{temp,Arg{},var,Tokentype::assignment});
-                switch(type)
-                {
-                    case Tokentype::incr:ops.emplace_back(BinOp{var,var,Literal{1},Tokentype::add});break;
-                    case Tokentype::decr:ops.emplace_back(BinOp{var,var,Literal{1},Tokentype::sub});break;
-                    default: assert(false && "UNREACHABLE\n");
-                }
-                return temp;
-            }
-            else if(try_peek(Tokentype::dot))
-            {
-                Var temp;
-                Arg ret = var;
-                while(try_consume(Tokentype::dot))
-                {
-                    Arg idx = compile_primary_expression(ops);
-                    temp = Var{vars_count++,Storage::Auto};
-                    ops.emplace_back(BinOp{temp,Literal{8},idx,Tokentype::mult});
-                    ops.emplace_back(BinOp{temp,ret,temp,Tokentype::add});
-                    ret = Ref{temp.index};
-                }
-                if(try_peek({Tokentype::incr,Tokentype::decr}))
-                {
-                    size_t curr = temp.index;
-                    size_t new_curr = vars_count++;
-                    ops.emplace_back(BinOp{Var{new_curr},Arg{},ret,Tokentype::assignment});
-                    Tokentype type=consume().type;
-                    temp.index = vars_count++;
-                    ops.emplace_back(BinOp{temp,Arg{},ret,Tokentype::assignment});
-                    switch(type)
-                    {
-                        case Tokentype::incr:ops.emplace_back(BinOp{temp,temp,Literal{1},Tokentype::add});break;
-                        case Tokentype::decr:ops.emplace_back(BinOp{temp,temp,Literal{1},Tokentype::sub});break;
-                        default: assert(false && "UNREACHABLE\n");
-                    }
-                    ops.emplace_back(Store{curr,temp});
-                    return Var{new_curr};
-                }
-                return ret;
-            }
-            else if(try_peek(Tokentype::open_square))
-            {
-                Var temp;
-                Arg ret = var;
-                while(try_consume(Tokentype::open_square))
-                {
-                    Arg siz = Literal{8},idx;
-                    if(try_consume(Tokentype::open_paren))
-                    {
-                        siz = compile_expression(0,ops);
-                        try_consume(Tokentype::comma,"Expected comma\n");
-                        idx = compile_expression(0,ops);
-                        try_consume(Tokentype::close_paren,"Expected close parenthesis\n");
-                    }
-                    else idx = compile_expression(0,ops);
-                    try_consume(Tokentype::close_square,"Expected closing ']'\n");
-                    temp = Var{vars_count++,Storage::Auto};
-                    ops.emplace_back(BinOp{temp,siz,idx,Tokentype::mult});
-                    ops.emplace_back(BinOp{temp,ret,temp,Tokentype::add});
-                    ret = Ref{temp.index};
-                }
-                if(try_peek({Tokentype::incr,Tokentype::decr}))
-                {
-                    size_t curr = temp.index;
-                    size_t new_curr = vars_count++;
-                    ops.emplace_back(BinOp{Var{new_curr},Arg{},ret,Tokentype::assignment});
-                    Tokentype type=consume().type;
-                    temp.index = vars_count++;
-                    ops.emplace_back(BinOp{temp,Arg{},ret,Tokentype::assignment});
-                    switch(type)
-                    {
-                        case Tokentype::incr:ops.emplace_back(BinOp{temp,temp,Literal{1},Tokentype::add});break;
-                        case Tokentype::decr:ops.emplace_back(BinOp{temp,temp,Literal{1},Tokentype::sub});break;
-                        default: assert(false && "UNREACHABLE\n");
-                    }
-                    ops.emplace_back(Store{curr,temp});
-                    return Var{new_curr};
-                }
-                return ret;
             }
             return var;
         }
@@ -653,7 +639,9 @@ Arg IREmittor::compile_primary_expression(Ops& ops)
                 }
                 else if(num_args!=args_size)
                 {
+                    for(int i=-10;i<10;i++)debug(std::vector<Token>{peek(i).value()});
                     std::cout << "Function signature for " << funcall_name  << " not matched . Please give default args or provide all non-default arguments to function call\n";
+                    std::cout << num_args << ' ' << args_size << ' ' << default_size << '\n';
                     exit(EXIT_FAILURE);
                 }
             }

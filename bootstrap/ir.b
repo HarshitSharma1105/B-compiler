@@ -83,10 +83,9 @@ find_var(name)
 	auto ptr = vars.0;
 	for(auto i = 0;i<siz;i++)
 	{
-		auto cur = ptr[i];
-		if(!strcmp(cur.0,name)) return cur.1;
+		if(!strcmp(ptr[i].0,name)) return ptr[i];
 	}
-	return -1;
+	return {NULL,-1};
 }
 
 
@@ -96,7 +95,7 @@ compile_primary_expression()
 {
 	auto tok = consume();
 	if(tok.0 == INTLIT)return {LIT,atoll(tok.1.0)};
-	else if(tok.0 == IDENTIFIER)return {VAR,find_var(tok.1.0)};
+	else if(tok.0 == IDENTIFIER)return {VAR,find_var(tok.1.0).1};
 	else error("UNREACHABLE\n");
 }
 
@@ -112,11 +111,9 @@ auto_vardec(ops)
 	{
 		while(try_peek(IDENTIFIER))
 		{
-			auto name = tok_name(consume());
-			if(find_var(name) != -1 )
-			{
-				error("variable already declared %s\n");
-			}
+			auto name = consume().1.0;
+			if(find_var(name).1 != -1 ) error("variable already declared %s\n",name);
+
 			push_back(vars,{name,vars_count++});
 			try_consume(COMMA);
 		}
@@ -132,7 +129,7 @@ extrn_decl(ops)
 	{
 		while(try_peek(IDENTIFIER))
 		{
-			auto name = tok_name(consume());
+			auto name = consume().1.0;
 			push_back(extrns_arr,name);	
 			try_consume(COMMA);
 		}
@@ -147,14 +144,9 @@ auto_assign(ops)
 {
 	if(try_peek(IDENTIFIER))
 	{
-		auto name = tok_name(consume());
-		auto idx = find_var(name);
-		if(idx == -1)
-		{
-			printf("Undeclared variable %s\n",name);
-			for(auto i=-5;i<5;i++)debug(peek(i));
-			exit(1);
-		}
+		auto name = consume().1.0;
+		auto idx = find_var(name).1;
+		if(idx == -1) error("Undeclared variable %s\n",name);
 		try_consume_error(ASSIGN,"Expected =");
 		push_back(ops,{AUTOASSIGN,idx,compile_expression()});
 		try_consume_error(SEMICOLON,"Expected ;");
@@ -171,7 +163,7 @@ comp_block(ops)
 	else if(extrn_decl(ops)) return 1;
 	else if(try_peek(FUNCTION))
 	{
-		auto func = tok_name(consume());
+		auto func = consume().1.0;
 		try_consume_error(OPEN_PAREN,"Expected (");
 		auto args = alloc(24);
 		while(try_consume(CLOSE_PAREN) == false)
@@ -202,12 +194,12 @@ compile_prog()
 {
 	if(try_peek(FUNCTION))
 	{
-		auto name = tok_name(consume());
+		auto name = consume().1.0;
 		auto ops = alloc(24);
 		try_consume_error(OPEN_PAREN,"Expected (");
 		while(try_peek(IDENTIFIER))
 		{
-			push_back(vars,{tok_name(consume()),vars_count++});
+			push_back(vars,{consume().1.0,vars_count++});
 			try_consume(COMMA);
 		}
 		auto curr = vars_count;

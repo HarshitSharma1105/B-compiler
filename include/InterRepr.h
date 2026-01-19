@@ -13,15 +13,10 @@ enum Storage{
     Array
 };
 
-struct Variable{
-    std::string var_name;
-    size_t index;
-    Storage type;
-};
-
 struct Var{
     size_t index;
     Storage type;
+    std::string var_name;
 };
 
 struct Ref{
@@ -109,6 +104,7 @@ struct Compiler{
     std::vector<std::string> extrns,globals;
     std::vector<std::pair<std::string,size_t>> arrays;
 };
+void debug(const Compiler& compiler);
 
 
 enum Flag
@@ -142,6 +138,7 @@ private:
     bool compile_scope(Ops& ops);
     bool compile_asm(Ops& ops);
     Arg compile_expression(int precedence,Ops& ops);
+    Arg compile_prim_expr(Ops& ops);
     Arg compile_primary_expression(Ops& ops);
 
     std::optional<Token> peek(int offset=0);
@@ -157,7 +154,7 @@ private:
     size_t vars_count=0;
     size_t max_vars_count=0;
     size_t labels_count=0;
-    std::vector<Variable> vars;
+    std::vector<Var> vars;
     std::stringstream datastring;
     bool is_main_func_present=false;
 };

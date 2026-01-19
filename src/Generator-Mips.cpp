@@ -3,8 +3,11 @@
 
 void Mips::ArgVisitor::operator()(const Var& var)
 {
-    if(var.type == Storage::Auto)stream << "    lw $s0,-" << (var.index+1)*4 << "($s1)\n";
-    else assert(false && "TODO Mips globals");
+    switch(var.type)
+    {
+        case Storage::Auto: stream << "    lw $s0,-" << (var.index+1)*4 << "($s1)\n";
+        default: assert(false && "TODO Mips globals");
+    }
 }
 void Mips::ArgVisitor::operator()(const Literal& literal)
 {
@@ -60,9 +63,12 @@ void Mips::Visitor::operator()(const BinOp& binop)
         default: assert(false && "Unknown Binary Operation\n");
     }
     stream << "    sw $s0,";
-    if(binop.var.type==Storage::Auto)stream << "-" <<  (binop.var.index+1)*4 << "($s1)\n";
-    else if(binop.var.type == Storage::Global)assert(false && "TODO Mips Globals");
-    else assert(false && "Unreachable\n");
+    switch(binop.var.type)
+    {
+        case Storage::Auto : stream << "-" <<  (binop.var.index+1)*4 << "($s1)\n";
+        case Storage::Global : assert(false && "TODO Mips Globals");
+        default: assert(false && "Unreachable\n");
+    }
 }
 
 void Mips::Visitor::operator()(const Funcall& funcall) 

@@ -11,7 +11,6 @@ enum Target{
 };
 
 
-void debug(const Compiler& compiler);
 
 class Runner
 {
