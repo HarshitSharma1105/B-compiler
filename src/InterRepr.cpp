@@ -8,7 +8,7 @@ struct DebugArgVisitor{
             case Storage::Auto   :  std::cout << "AutoVar"; break;
             case Storage::Global :  std::cout << "Global"; break;
             case Storage::Array  :  std::cout << "Array"; break;
-            default: assert(false && "Unreachable\n");
+            default: assert(false && "Unreachable");
         }
         std::cout << "(" << var.index << ")";
     }
@@ -38,11 +38,7 @@ struct DebugVisitor {
         std::cout << ",arg=";
         std::visit(debugargvisitor,unop.arg);
         std::cout << ",type=";
-        switch(unop.type)
-        {
-            case sub :std::cout << "negate";break;
-            case not_:   std::cout << "not";break;
-        }
+        debug(unop.type);
         std::cout << " )\n";
     }
     void operator()(const BinOp& binop) 
@@ -148,22 +144,22 @@ void IREmittor::compile_prog()
         func.function_name=consume().val;
         size_t vars_size=vars.size();
         if(func.function_name=="main")is_main_func_present=true;
-        try_consume(Tokentype::open_paren,"expcted '('\n");
+        try_consume(Tokentype::open_paren,"expcted '('");
         while(peek().value().type==Tokentype::identifier)
         {
             vars.emplace_back(vars_count++,Storage::Auto,consume().val);
             if(try_consume(Tokentype::assignment))
             {
-                Token def_val = try_consume(Tokentype::integer_lit,"Only integer literals are supported as default args for now\n");
+                Token def_val = try_consume(Tokentype::integer_lit,"Only integer literals are supported as default args for now");
                 func.default_args.push_back(atoll(def_val.val.c_str()));  
             }
             try_consume(Tokentype::comma);
-            //"Expected comma between args\n";
+            //"Expected comma between args";
         }
         func.num_args=vars_count;
         compiler.functions.push_back(func);
         Func& back = compiler.functions.back();
-        try_consume(Tokentype::close_paren,"expected ')'\n");
+        try_consume(Tokentype::close_paren,"expected ')'");
         compile_block(back.function_body);
         vars.resize(vars_size);
         max_vars_count=std::max(max_vars_count,vars_count);
@@ -181,8 +177,8 @@ void IREmittor::compile_prog()
         if(try_consume(Tokentype::open_square))
         {
             vars.emplace_back(compiler.arrays.size(),Storage::Array,name);
-            size_t val = atoll(try_consume(Tokentype::integer_lit,"Only integer sizes supported for now\n").val.c_str());
-            try_consume(Tokentype::close_square,"Expected ]\n");
+            size_t val = atoll(try_consume(Tokentype::integer_lit,"Only integer sizes supported for now").val.c_str());
+            try_consume(Tokentype::close_square,"Expected ]");
             compiler.arrays.emplace_back(name,val);
         }
         else 
@@ -190,7 +186,7 @@ void IREmittor::compile_prog()
             vars.emplace_back(compiler.globals.size(),Storage::Global,name);
             compiler.globals.emplace_back(name);
         }
-        try_consume(Tokentype::semicolon,"Expected ; after global declaration\n");
+        try_consume(Tokentype::semicolon,"Expected ; after global declaration");
     }
     else 
     {
@@ -218,6 +214,7 @@ void IREmittor::compile_func_body(Ops& ops)
     else if(compile_for_loops(ops))return;
     else if(compile_branch(ops))return;
     else if(compile_asm(ops))return;
+    else if(compile_switch(ops))return;
     compile_stmt(ops);
 }
 
@@ -232,6 +229,47 @@ void IREmittor::compile_block(Ops& ops)
     }
     else compile_func_body(ops);
 }
+
+
+
+bool IREmittor::compile_switch(Ops& ops)
+{
+    if(try_consume(Tokentype::switch_))
+    {
+        Var temp = Var{vars_count++,Storage::Auto};
+        Arg arg = compile_expression(0,ops);
+        try_consume(Tokentype::open_curly,"Expected {");
+        std::vector<size_t> backpath_indexes;
+        while(try_consume(Tokentype::case_))
+        {
+            ops.emplace_back(Label{labels_count++});
+            Arg match = compile_primary_expression(ops);
+            try_consume(Tokentype::colon,"Expected :");
+            ops.emplace_back(BinOp{temp,arg,match,Tokentype::equals});
+            size_t cur = ops.size();
+            ops.emplace_back(JmpIfZero{temp,0});
+            compile_block(ops);
+            std::get<JmpIfZero>(ops[cur]).idx = labels_count;
+            backpath_indexes.push_back(ops.size());
+            ops.emplace_back(Jmp{0});
+        }
+        if(try_consume(Tokentype::default_))
+        {
+            try_consume(Tokentype::colon,"Expected :");
+            ops.emplace_back(Label{labels_count});
+            std::get<Jmp>(ops[backpath_indexes.back()]).idx = labels_count++;
+            backpath_indexes.pop_back();
+            compile_block(ops);
+        }
+        for(size_t idx : backpath_indexes) std::get<Jmp>(ops[idx]).idx = labels_count;
+        ops.emplace_back(Label{labels_count++});
+        try_consume(Tokentype::close_curly,"Expected }");
+        return true;
+    }
+    return false;
+}
+
+
 bool IREmittor::compile_scope(Ops& ops)
 {
     if(try_consume(Tokentype::open_curly))
@@ -315,16 +353,16 @@ bool IREmittor::compile_for_loops(Ops& ops)
         Ops temp{};
         size_t curr_vars=vars_count;
         size_t vars_size=vars.size();
-        try_consume(Tokentype::open_paren,"Expected (\n");
+        try_consume(Tokentype::open_paren,"Expected (");
         if(!autovar_dec(ops))compile_stmt(ops);
         ops.emplace_back(Label{labels_count});
         size_t start=labels_count++;
         Arg arg=compile_expression(0,ops);
-        try_consume(Tokentype::semicolon,"Expected ;\n");  
+        try_consume(Tokentype::semicolon,"Expected ;");  
         size_t curr=ops.size();
         ops.emplace_back(JmpIfZero{arg,0});
         compile_expression(0,temp);
-        try_consume(Tokentype::close_paren,"Expected )\n");
+        try_consume(Tokentype::close_paren,"Expected )");
         compile_block(ops);
         ops.insert(ops.end(),temp.begin(),temp.end());
         ops.emplace_back(Jmp{start});
@@ -343,7 +381,7 @@ bool IREmittor::compile_return(Ops& ops)
     if(try_consume(Tokentype::return_))
     {
         Arg arg=compile_expression(0,ops);
-        try_consume(Tokentype::semicolon,"Expected ;\n");
+        try_consume(Tokentype::semicolon,"Expected ;");
         ops.emplace_back(ReturnValue{arg});
         return true;
     }
@@ -369,7 +407,7 @@ bool IREmittor::autovar_dec(Ops& ops)
             vars.emplace_back(vars_count++,Storage::Auto,var_name);
             compile_expression(0,ops);
         }
-        try_consume(Tokentype::semicolon,"Expected ;\n");//semicolon
+        try_consume(Tokentype::semicolon,"Expected ;");//semicolon
         return true;
     }
     return false;
@@ -398,18 +436,17 @@ bool IREmittor::compile_extrn()
             std::string extrn_name=consume().val;
             compiler.extrns.push_back(extrn_name);
         }
-        try_consume(Tokentype::semicolon,"Expected ;\n");//semicolon
+        try_consume(Tokentype::semicolon,"Expected ;");//semicolon
         return true;
     }
     return false;
 }
-template<class... Ts> struct overload : Ts... { using Ts::operator()...; };
-template<class... Ts> overload(Ts...) -> overload<Ts...>;
+
 
 void IREmittor::compile_stmt(Ops& ops)
 {
     compile_expression(0,ops);
-    try_consume(Tokentype::semicolon,"Expected ;\n");
+    try_consume(Tokentype::semicolon,"Expected ;");
 }
 
 
@@ -442,65 +479,59 @@ Arg IREmittor::compile_prim_expr(Ops& ops)
 {
     Arg ret = compile_primary_expression(ops);
     Var temp;
-    if(try_peek({Tokentype::dot,Tokentype::open_square,Tokentype::incr,Tokentype::decr}))
+    while(try_peek({Tokentype::dot,Tokentype::open_square}))
     {
-        while(try_peek({Tokentype::dot,Tokentype::open_square}))
+        if(try_consume(Tokentype::dot))
         {
-            if(try_consume(Tokentype::dot))
-            {
-                Arg idx = compile_primary_expression(ops);
-                temp = Var{vars_count++,Storage::Auto};
-                ops.emplace_back(BinOp{temp,Literal{8},idx,Tokentype::mult});
-                ops.emplace_back(BinOp{temp,ret,temp,Tokentype::add});
-                ret = Ref{temp.index};
-            }
-            else if(try_consume(Tokentype::open_square))
-            {
-                Arg idx = compile_expression(0,ops);
-                try_consume(Tokentype::close_square,"Expected closing ']'\n");
-                temp = Var{vars_count++,Storage::Auto};
-                ops.emplace_back(BinOp{temp,Literal{8},idx,Tokentype::mult});
-                ops.emplace_back(BinOp{temp,ret,temp,Tokentype::add});
-                ret = Ref{temp.index};
-            }
+            Arg idx = compile_primary_expression(ops);
+            temp = Var{vars_count++,Storage::Auto};
+            ops.emplace_back(BinOp{temp,Literal{8},idx,Tokentype::mult});
+            ops.emplace_back(BinOp{temp,ret,temp,Tokentype::add});
+            ret = Ref{temp.index};
         }
-        if(try_peek({Tokentype::incr,Tokentype::decr}))
+        else if(try_consume(Tokentype::open_square))
         {
-            if(Var* var = std::get_if<Var>(&ret))
-            {
-                Tokentype type=consume().type;
-                temp = Var{vars_count++,Storage::Auto};
-                ops.emplace_back(BinOp{temp,Arg{},ret,Tokentype::assignment});
-                switch(type)
-                {
-                    case Tokentype::incr:ops.emplace_back(BinOp{*var,temp,Literal{1},Tokentype::add});break;
-                    case Tokentype::decr:ops.emplace_back(BinOp{*var,temp,Literal{1},Tokentype::sub});break;
-                    default: assert(false && "UNREACHABLE\n");
-                }
-                ret = temp;
-            }
-            else if(Ref* ref = std::get_if<Ref>(&ret))
-            {
-                if(try_peek({Tokentype::incr,Tokentype::decr}))
-                {
-                    size_t curr = ref->index;
-                    size_t new_curr = vars_count++;
-                    ops.emplace_back(BinOp{Var{new_curr},Arg{},ret,Tokentype::assignment});
-                    Tokentype type=consume().type;
-                    temp = Var{vars_count++,Storage::Auto};
-                    ops.emplace_back(BinOp{temp,Arg{},ret,Tokentype::assignment});
-                    switch(type)
-                    {
-                        case Tokentype::incr:ops.emplace_back(BinOp{temp,temp,Literal{1},Tokentype::add});break;
-                        case Tokentype::decr:ops.emplace_back(BinOp{temp,temp,Literal{1},Tokentype::sub});break;
-                        default: assert(false && "UNREACHABLE\n");
-                    }
-                    ops.emplace_back(Store{curr,temp});
-                    ret = Var{new_curr};
-                }
-            }
-            else assert(false && "MESSED UP");
+            Arg idx = compile_expression(0,ops);
+            try_consume(Tokentype::close_square,"Expected closing ']'");
+            temp = Var{vars_count++,Storage::Auto};
+            ops.emplace_back(BinOp{temp,Literal{8},idx,Tokentype::mult});
+            ops.emplace_back(BinOp{temp,ret,temp,Tokentype::add});
+            ret = Ref{temp.index};
         }
+    }
+    if(try_peek({Tokentype::incr,Tokentype::decr}))
+    {
+        if(Var* var = std::get_if<Var>(&ret))
+        {
+            Tokentype type=consume().type;
+            temp = Var{vars_count++,Storage::Auto};
+            ops.emplace_back(BinOp{temp,Arg{},ret,Tokentype::assignment});
+            switch(type)
+            {
+                case Tokentype::incr:ops.emplace_back(BinOp{*var,temp,Literal{1},Tokentype::add});break;
+                case Tokentype::decr:ops.emplace_back(BinOp{*var,temp,Literal{1},Tokentype::sub});break;
+                default: assert(false && "UNREACHABLE");
+            }
+            ret = temp;
+        }
+        else if(Ref* ref = std::get_if<Ref>(&ret))
+        {
+            size_t curr = ref->index;
+            size_t new_curr = vars_count++;
+            ops.emplace_back(BinOp{Var{new_curr},Arg{},ret,Tokentype::assignment});
+            Tokentype type=consume().type;
+            temp = Var{vars_count++,Storage::Auto};
+            ops.emplace_back(BinOp{temp,Arg{},ret,Tokentype::assignment});
+            switch(type)
+            {
+                case Tokentype::incr:ops.emplace_back(BinOp{temp,temp,Literal{1},Tokentype::add});break;
+                case Tokentype::decr:ops.emplace_back(BinOp{temp,temp,Literal{1},Tokentype::sub});break;
+                default: assert(false && "UNREACHABLE");
+            }
+            ops.emplace_back(Store{curr,temp});
+            ret = Var{new_curr};
+        }
+        else assert(false && "MESSED UP");
     }
     return ret;
 }
@@ -533,7 +564,7 @@ Arg IREmittor::compile_primary_expression(Ops& ops)
                     i++;
                     if(lit[i]=='n')datastring << 10;
                     else if(lit[i]=='t')datastring << 9;
-                    else assert(false && "messed up escape characters\n");
+                    else assert(false && "messed up escape characters");
                     i++;
                 }
                 datastring << ",";
@@ -544,6 +575,7 @@ Arg IREmittor::compile_primary_expression(Ops& ops)
         case Tokentype::sub: 
         case Tokentype::not_:
         case Tokentype::bit_not:
+        case Tokentype::bit_and:
         {
             Arg arg=compile_primary_expression(ops);
             ops.emplace_back(UnOp{vars_count,arg,token.type});
@@ -558,7 +590,7 @@ Arg IREmittor::compile_primary_expression(Ops& ops)
         case Tokentype::open_paren:
         {
             Arg arg=compile_expression(0,ops);
-            try_consume(Tokentype::close_paren,"expected )\n");
+            try_consume(Tokentype::close_paren,"expected )");
             return arg;
         }
         case Tokentype::open_curly:
@@ -583,7 +615,7 @@ Arg IREmittor::compile_primary_expression(Ops& ops)
         }
         case Tokentype::incr:
         {
-            Token tok=try_consume(Tokentype::identifier,"expected identifier after pre decrement\n");
+            Token tok=try_consume(Tokentype::identifier,"expected identifier after pre decrement");
             Var var=get_var(tok.val);
             if(var.index==-1)
             {
@@ -595,7 +627,7 @@ Arg IREmittor::compile_primary_expression(Ops& ops)
         }
         case Tokentype::decr:
         {
-            Token val=try_consume(Tokentype::identifier,"expected identifier after pre decrement\n");
+            Token val=try_consume(Tokentype::identifier,"expected identifier after pre decrement");
             Var var=get_var(val.val);
             if(var.index==-1)
             {
@@ -608,14 +640,14 @@ Arg IREmittor::compile_primary_expression(Ops& ops)
         case Tokentype::function:
         {
             std::string funcall_name=token.val;
-            try_consume(Tokentype::open_paren,"expected '('\n");
+            try_consume(Tokentype::open_paren,"expected '('");
             std::vector<Arg> args;
             while(try_peek(Tokentype::close_paren)==false)
             {   
                 args.emplace_back(compile_expression(0,ops));
                 try_consume(Tokentype::comma);
             }
-            try_consume(Tokentype::close_paren,"expected ')'\n");
+            try_consume(Tokentype::close_paren,"expected ')'");
             if(
                 (
                 std::any_of(compiler.functions.begin(),compiler.functions.end(),[funcall_name](const Func& func){return func.function_name==funcall_name;}) 
@@ -649,7 +681,7 @@ Arg IREmittor::compile_primary_expression(Ops& ops)
             ops.emplace_back(BinOp{Var{vars_count},Arg{},FuncResult{funcall_name},Tokentype::assignment});
             return Var{vars_count++};
         }
-        default: assert(false && "UNREACHEABLE\n"); 
+        default: assert(false && "UNREACHEABLE"); 
     }
 }
 

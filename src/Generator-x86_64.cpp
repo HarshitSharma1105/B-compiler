@@ -31,14 +31,33 @@ void x86_64::ArgVisitor::operator()(const Ref& ref)
 
 void x86_64::Visitor::operator()(const UnOp& unop)
 {
-    std::visit(argvisitor,unop.arg);
-    stream << "    mov r14,r15\n";
-    switch(unop.type)
+    if(unop.type==Tokentype::bit_and)
     {
-        case Tokentype::sub:    stream << "    xor r15,r15\n    sub r15,r14\n";break;
-        case Tokentype::not_:   stream << "    cmp r14,0\n    sete al\n    movzx r15,al\n";break;
-        case Tokentype::bit_not:stream << "    mov r15,r14\n    not r15\n";break;
-        default: assert(false && "Unknown Unary Operation\n");
+        std::visit(overload{
+                [&stream=stream](const Var& var){
+                    switch(var.type)
+                    {
+                        case Storage::Auto: stream <<   "    lea r15,[rbp-" << 8*(var.index+1) << "]\n";break;
+                        case Storage::Global:
+                        case Storage::Array: 
+                        stream << "    mov r15, " << var.var_name << "\n";break;
+                        default:assert(false && "UNREACHABLE\n");
+                    }
+                },
+                [](const auto&){assert(false && "TODO:Address of other variables");}
+        },unop.arg);
+    }
+    else
+    {
+        std::visit(argvisitor,unop.arg);
+        stream << "    mov r14,r15\n";
+        switch(unop.type)
+        {
+            case Tokentype::sub:    stream << "    xor r15,r15\n    sub r15,r14\n";break;
+            case Tokentype::not_:   stream << "    cmp r14,0\n    sete al\n    movzx r15,al\n";break;
+            case Tokentype::bit_not:stream << "    mov r15,r14\n    not r15\n";break;
+            default: assert(false && "Unknown Unary Operation\n");
+        }
     }
     stream << "    mov QWORD [rbp-" << (unop.index+1)*8 << "],r15\n";
 }
@@ -62,7 +81,7 @@ void x86_64::Visitor::operator()(const BinOp& binop)
         case Tokentype::sub:        stream    << "    sub r15,r14\n";break;
         case Tokentype::mult:       stream    << "    imul r15,r14\n";break;
         case Tokentype::divi:       stream    << "    xor rdx,rdx\n    mov rax,r15\n    idiv r14\n    mov r15,rax\n";break;
-        case Tokentype::remainder:  stream    << "    xor rdx,rdx\n    mov rax,r15\n    idiv r14\n    mov r15,rax\n";break;
+        case Tokentype::remainder:  stream    << "    xor rdx,rdx\n    mov rax,r15\n    idiv r14\n    mov r15,rdx\n";break;
         default: assert(false && "Unknown Binary Operand type\n");
     }
     switch(binop.var.type)

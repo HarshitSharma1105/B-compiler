@@ -31,6 +31,9 @@ alloc(size)
 {
 	if(size+alloc_size > 20480) error("Ran out of arena memory . Please change capacity of arena\n");
 	auto ptr = arena + alloc_size;
+
+	size = (size + 7) & (~7);
+	
 	alloc_size = alloc_size + size;
 	return ptr;
 }
@@ -57,7 +60,7 @@ size(ptr) return ptr.1;
 back(ptr)
 {
 	auto siz = size(ptr);
-	if(siz>0)return (*ptr + 8*(siz - 1));
+	if(siz>0)return (ptr.0 + 8*(siz - 1));
 	else return 0;
 }
 

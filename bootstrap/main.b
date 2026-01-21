@@ -33,5 +33,5 @@ main(argc,argv)
 	system("cc -no-pie output.o -o output");
 	system("./output");
 	system("rm output*");
-
-}
+	printf("%p %p %p\n",&siz,&arena,&alloc_size);
+} 

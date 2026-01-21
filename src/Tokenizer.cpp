@@ -46,6 +46,12 @@ void debug(const Tokentype& tokentype)
         case Tokentype::bit_not:           std::cout << "bitwise-inverse ";break;
         case Tokentype::assembly:          std::cout << "asm ";break;
         case Tokentype::dot:               std::cout << "dot ";break;
+        case Tokentype::attribute:         std::cout << "attribute";break; 
+        case Tokentype::switch_:           std::cout << "switch ";break; 
+        case Tokentype::case_:             std::cout << "case ";break; 
+        case Tokentype::default_:          std::cout << "default ";break; 
+        case Tokentype::break_:            std::cout << "break ";break; 
+        case Tokentype::colon:             std::cout << "colon ";break;  
         default:                           std::cout << "Unknown token "; break;
     }
 }
@@ -124,6 +130,22 @@ std::vector<Token> Tokenizer::tokenize()
             else if(buffer=="true")
             {
                 tokens.push_back({Tokentype::integer_lit,"1"});
+            }
+            else if(buffer=="switch")
+            {
+                tokens.push_back({Tokentype::switch_});
+            }
+            else if(buffer=="break")
+            {
+                tokens.push_back({Tokentype::break_});
+            }
+            else if(buffer=="case")
+            {
+                tokens.push_back({Tokentype::case_});
+            }
+            else if(buffer=="default")
+            {
+                tokens.push_back({Tokentype::default_});
             }
             else if(buffer=="false" || buffer == "null" || buffer == "NULL")
             {
@@ -270,6 +292,11 @@ std::vector<Token> Tokenizer::tokenize()
                 consume();
             }
             else tokens.push_back({Tokentype::not_,"!"});
+            consume();
+        }
+        else if(peek().value()==':')
+        {
+            tokens.push_back({Tokentype::colon,":"});
             consume();
         }
         else if(peek().value()==',')

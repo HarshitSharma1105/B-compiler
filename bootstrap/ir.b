@@ -74,7 +74,6 @@ try_peek(tokentype,off=0)
 	return tokentype == tok.0;
 }
 
-tok_name(tok) return tok.1.0;
 
 
 find_var(name)
@@ -94,9 +93,12 @@ extrn atoll;
 compile_primary_expression()
 {
 	auto tok = consume();
-	if(tok.0 == INTLIT)return {LIT,atoll(tok.1.0)};
-	else if(tok.0 == IDENTIFIER)return {VAR,find_var(tok.1.0).1};
-	else error("UNREACHABLE\n");
+	switch(tok.0)
+	{
+		case INTLIT: return {LIT,atoll(tok.1.0)};
+		case IDENTIFIER:return {VAR,find_var(tok.1.0).1};
+		default : error("UNREACHABLE\n");
+	}
 }
 
 compile_expression()
@@ -237,9 +239,12 @@ IrGenerate(tokens)
 
 dbg_arg(arg)
 {
-	if(arg.0 == LIT) printf("Literal(%d)",arg.1);
-	else if(arg.0 == VAR) printf("AutoVar(%d)",arg.1);
-	else error("UNREACHABLES\n");
+	switch(arg.0)
+	{
+		case LIT: printf("Literal(%d)",arg.1);
+		case VAR: printf("AutoVar(%d)",arg.1);
+		default : error("UNREACHABLES\n");
+	}
 }
 
 dbg_op(op)

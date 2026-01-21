@@ -97,6 +97,8 @@ struct Func{
     std::vector<size_t> default_args;
 };
 
+template<class... Ts> struct overload : Ts... { using Ts::operator()...; };
+template<class... Ts> overload(Ts...) -> overload<Ts...>;
 
 struct Compiler{
     std::vector<Func> functions;
@@ -123,7 +125,7 @@ public:
 
 
 
-private:
+public:
     Var get_var(const std::string& name);
     void compile_prog();
     void compile_func_body(Ops& ops);
@@ -137,6 +139,7 @@ private:
     void compile_block(Ops& ops);
     bool compile_scope(Ops& ops);
     bool compile_asm(Ops& ops);
+    bool compile_switch(Ops& ops);
     Arg compile_expression(int precedence,Ops& ops);
     Arg compile_prim_expr(Ops& ops);
     Arg compile_primary_expression(Ops& ops);

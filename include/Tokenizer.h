@@ -49,6 +49,11 @@ bit_not,
 assembly,
 dot,
 attribute,
+switch_,
+case_,
+default_,
+break_,
+colon,
 invalid
 };
 
