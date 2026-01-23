@@ -169,10 +169,10 @@ std::string Generator_x86_64::generate()
         textstream << "    extrn " << name << "\n";
     }
     std::visit(visitor,Op{DataSection{compiler.data_section}});
-    for(const auto& name : compiler.globals) 
+    for(const auto& [name,val] : compiler.globals) 
     {
         textstream << "    public " << name << '\n';
-        textstream << name << "  dq 0\n";
+        textstream << name << "  dq " << val << "\n";
     }
     textstream << "section \".bss\"  writeable\n";
     for(const auto& [name,size] : compiler.arrays)

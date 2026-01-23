@@ -6,7 +6,8 @@ compiler;
 vars;
 vars_count;
 extrns_arr;
-
+data_count;
+data_string;
 
 
 ir_count;
@@ -15,7 +16,7 @@ AUTOASSIGN;
 arg_count;
 VAR;
 LIT;
-
+DATA_OFFSET;
 
 ir_init()
 {
@@ -28,6 +29,7 @@ ir_init()
 
 	VAR = arg_count++;
 	LIT = arg_count++;
+	DATA_OFFSET = arg_count++;
 }
 
 consume()
@@ -43,8 +45,7 @@ try_consume_error(tokentype,msg)
 	auto idx = IrGen.1++;
 	auto token = ptr[idx];
 	if(tokentype == token.0) return token;
-	printf("%s\n",msg);
-	exit(1);
+	error(msg);
 }
 
 try_consume(tokentype)
@@ -97,6 +98,26 @@ compile_primary_expression()
 	{
 		case INTLIT: return {LIT,atoll(tok.1.0)};
 		case IDENTIFIER:return {VAR,find_var(tok.1.0).1};
+		case STRING_LIT:
+		{
+			auto str = tok.1.0;
+			auto size = size(tok.1);
+			for(auto i=0;i<size;i++)
+			{
+				if(read_byte(str,i)!='\')format_str_2(data_string,"%d",read_byte(str,i));
+				else 
+				{
+					i++;
+					if(read_byte(str,i)=='n')format_str_2(data_string,"10");
+					else error("Unknown escape character");
+					i++;
+				}
+				push_char(data_string,',');
+			}
+			push_char(data_string,'0');
+			push_char(data_string,10);
+			return {DATA_OFFSET,data_count++};
+		}
 		default : error("UNREACHABLE\n");
 	}
 }
@@ -211,12 +232,7 @@ compile_prog()
 		push_back(compiler,{name,ops,curr,vars_count});
 		vars_count = 0;
 	}
-	else
-	{
-		printf("Global statements not done\n");
-		debug(peek());
-		exit(1);
-	}
+	else error("Global statements not done");
 }
 
 
@@ -227,6 +243,7 @@ IrGenerate(tokens)
 	IrGen = alloc(16);
 	IrGen.0 = tokens;
 	vars = alloc(24);
+	data_string = alloc(24);
     compiler = alloc(24);
 	extrns_arr = alloc(24);
 	auto len = size(tokens);
@@ -243,30 +260,34 @@ dbg_arg(arg)
 	{
 		case LIT: printf("Literal(%d)",arg.1);
 		case VAR: printf("AutoVar(%d)",arg.1);
-		default : error("UNREACHABLES\n");
+		case DATA_OFFSET: printf("DataOffset[%d]",arg.1);
+		default : error("UNREACHABLE\n");
 	}
 }
 
 dbg_op(op)
 {
-	auto type = op.0;
-	if(type == AUTOASSIGN)
+	switch(op.0)
 	{
-		printf("Auto Assign(%d,",op.1);
-		dbg_arg(op.2);
-		printf(")\n");
-	}
-	else if(type == FUNCALL)
-	{
-		printf("Function call %s(",op[1]);
-		auto args = (op+16);
-		auto size = size(args);
-		for(auto i=0;i<size;i++)
+		case AUTOASSIGN:
 		{
-			dbg_arg(op[2][i]);
-			if(i != size-1)printf(",");
+			printf("Auto Assign(%d,",op.1);
+			dbg_arg(op.2);
+			printf(")\n");
 		}
-		printf(")\n");
+		case FUNCALL:
+		{
+			printf("Function call %s(",op[1]);
+			auto args = (op+16);
+			auto size = size(args);
+			for(auto i=0;i<size;i++)
+			{
+				dbg_arg(op[2][i]);
+				if(i != size-1)printf(",");
+			}
+			printf(")\n");
+		}
+		default : error("UNREACHABLE");
 	}
 }
 
@@ -288,5 +309,5 @@ dbg_compiler(compiler)
     for(auto i=0;i<size;i++)dbg_func(funcs[i]);
 	size = size(extrns_arr);
 	auto base = extrns_arr.0;
-	for(auto i=0;i<size;i++)printf("%s\n",base[i]);
+	for(auto i=0;i<size;i++)printf("extrn %s\n",base[i]);
 }

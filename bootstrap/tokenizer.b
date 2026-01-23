@@ -19,7 +19,7 @@ ASSIGN;
 SEMICOLON;
 FUNCTION;
 COMMA;
-
+STRING_LIT;
 
 
 
@@ -38,6 +38,7 @@ tok_init()
 	SEMICOLON   = tok_count++;
 	FUNCTION    = tok_count++;
 	COMMA       = tok_count++;
+	STRING_LIT  = tok_count++;
 }
 
 tokenize(src)
@@ -84,6 +85,16 @@ tokenize(src)
 			push_back(tokens,tok);
 			idx++;
 		}
+		else if(ch == '"')
+		{
+			idx++;
+			tok.0 = STRING_LIT;
+			auto buff = alloc(24);
+			while(read_byte(src,idx)!='"')push_char(buff,read_byte(src,idx++));
+			idx++;
+			tok.1 = buff;
+			push_back(tokens,tok);
+		}
 		else if(isdigit(ch))
 		{
 			auto buff = alloc(24);
@@ -115,13 +126,7 @@ tokenize(src)
 			push_back(tokens,tok);
 			idx++;
 		}
-		else 
-		{
-			printf("Unrecognized token: ");
-			for(auto i = 0;i<10;i++)printf("%c",read_byte(src,idx+i));
-			printf("\n");
-			exit(1);
-		}
+		else error("Unrecognized token %c",ch);
 	}
 	return tokens;
 }
@@ -129,18 +134,23 @@ tokenize(src)
 debug(token)
 {
 	auto type = token.0;
-	if(type == OPEN_PAREN)printf("open-curly (\n");
-	else if(type == CLOSE_PAREN)printf("close-curly )\n");
-	else if(type == OPEN_CURLY)printf("open-brace {\n");
-	else if(type == CLOSE_CURLY)printf("close-brace }\n");
-	else if(type == INTLIT)printf("Int-lit %s\n",token.1.0);
-	else if(type == AUTO)printf("auto\n");
-	else if(type == IDENTIFIER)printf("Identifier %s\n",token.1.0);
-	else if(type == FUNCTION)printf("Function %s\n",token.1.0);
-	else if(type == EXTERN )printf("Extrn\n");
-	else if(type == ASSIGN)printf("assignment =\n");
-	else if(type == SEMICOLON)printf("semicolon ;\n");
-	else if(type == COMMA)printf("comma ,\n");
+	switch(token.0)
+	{
+		case OPEN_PAREN:printf("open-curly (\n");
+		case CLOSE_PAREN: printf("close-curly )\n");
+		case OPEN_CURLY: printf("open-brace {\n");
+		case CLOSE_CURLY: printf("close-brace }\n");
+		case INTLIT: printf("Int-lit %s\n",token.1.0);
+		case AUTO: printf("auto\n");
+		case IDENTIFIER: printf("Identifier %s\n",token.1.0);
+		case FUNCTION: printf("Function %s\n",token.1.0);
+		case EXTERN: printf("Extrn\n");
+		case ASSIGN: printf("assignment =\n");
+		case SEMICOLON: printf("semicolon ;\n");
+		case COMMA: printf("comma ,\n");
+		case STRING_LIT:  printf("string lit %s\n",token.1.0);
+		default : printf("Unknown token\n");
+	}
 }
 
 

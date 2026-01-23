@@ -8,32 +8,39 @@ regs;
 
 generate_arg(arg)
 {
-	if(arg.0 == LIT) format_str(asm_str,"    mov r15,%d",arg.1);
-	else if(arg.0 == VAR) format_str(asm_str,"    mov r15,[rbp-%d]",8*arg.1);
-	else error("UNREACHABLE\n");
+	switch(arg.0)
+	{
+		case LIT: format_str(asm_str,"    mov r15,%d",arg.1);
+		case VAR: format_str(asm_str,"    mov r15,[rbp-%d]",8*arg.1);
+		case DATA_OFFSET : format_str(asm_str,"    mov r15,data_%d",arg.1);
+		default: error("UNREACHABLE\n");
+	}
 }
 
 
 
 generate_op(op)
 {
-	auto type = op.0;
-	if(type == AUTOASSIGN)
+	switch(op.0)
 	{
-		generate_arg(op.2);
-		format_str(asm_str,"	mov QWORD[rbp-%d],r15",8*op.1);
-	}
-	else if(type == FUNCALL)
-	{
-		auto args = (op+16);
-		auto size = size(args);
-		for(auto i=0;i<size;i++)
+		case AUTOASSIGN: 
 		{
-			generate_arg(op[2][i]);
-			format_str(asm_str,"	mov %s,r15",regs[i]);
+			generate_arg(op.2);
+			format_str(asm_str,"	mov QWORD[rbp-%d],r15",8*op.1);
 		}
-		format_str(asm_str,"	xor rax,rax");
-		format_str(asm_str,"	call %s",op.1);
+		case FUNCALL:
+		{
+			auto args = (op+16);
+			auto size = size(args);
+			for(auto i=0;i<size;i++)
+			{
+				generate_arg(op.2[i]);
+				format_str(asm_str,"	mov %s,r15",regs[i]);
+			}
+			format_str(asm_str,"	xor rax,rax");
+			format_str(asm_str,"	call %s",op.1);
+		}
+		default : error("UNREACHABLE");
 	}
 }
 
@@ -67,12 +74,35 @@ generate_func_epilogue()
 }
 
 
+generate_extrns()
+{
+	auto size = size(extrns_arr);
+	auto base = extrns_arr.0;
+	for(auto i=0;i<size;i++)format_str(asm_str,"	extrn %s",base[i]);
+}
+
+generate_data_seg()
+{
+	format_str(asm_str,"section \"data\" writeable");
+	auto count = 0,idx = 0,size=size(data_string);
+	while(idx<size)
+	{
+		format_str_2(asm_str,"data_%d db ",count++);
+		while(read_byte(data_string.0,idx)!=10)
+		{
+			push_char(asm_str,read_byte(data_string.0,idx++));
+		}
+		idx++;
+		push_char(asm_str,10);
+	}
+}
+
 generate()
 {
 	regs = {"rdi","rsi","rdx","rcx","r8","r9"};
 	asm_str = alloc(24);
 	format_str(asm_str,"format ELF64");
-	format_str(asm_str,"section \".text\" executable");
+	format_str(asm_str,"section \"text\" executable");
 	auto size = size(compiler);
 	auto funcs = compiler.0;
 	for(auto i=0;i<size;i++)
@@ -81,8 +111,7 @@ generate()
 		generate_func(funcs[i]);
 		generate_func_epilogue();
 	}
-	size = size(extrns_arr);
-	auto base = extrns_arr.0;
-	for(auto i=0;i<size;i++)format_str(asm_str,"	extrn %s",base[i]);
+	generate_extrns();
+	generate_data_seg();
 	return asm_str;
 }

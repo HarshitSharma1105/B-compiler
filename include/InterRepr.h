@@ -103,8 +103,8 @@ template<class... Ts> overload(Ts...) -> overload<Ts...>;
 struct Compiler{
     std::vector<Func> functions;
     std::string data_section;
-    std::vector<std::string> extrns,globals;
-    std::vector<std::pair<std::string,size_t>> arrays;
+    std::vector<std::string> extrns;
+    std::vector<std::pair<std::string,size_t>> arrays,globals;
 };
 void debug(const Compiler& compiler);
 

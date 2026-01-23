@@ -108,6 +108,31 @@ void debug(const Ops& ops)
     }
 }
 
+
+void debug(const Compiler& compiler)
+{
+	for(const auto& func:compiler.functions)
+    {
+		std::cout << "Function " <<  func.function_name << '(' << func.num_args << ',' << func.max_vars_count << "):\n";
+		std::cout << "Func flags = " << func.func_flags << '\n';
+        debug(func.function_body); 
+		std::cout << "Function " << func.function_name << " end\n";
+    }
+	for(const auto& name : compiler.extrns)
+    {
+        std::cout << "extrn " << name << "\n";
+    }
+    for(const auto& [name,val] : compiler.globals) 
+    {
+        std::cout << "global " << name << "value " << val << '\n';
+    }
+    for(const auto& [name,size] : compiler.arrays)
+    {
+        std::cout << "array " << name << "[" << size << "]\n"; 
+    }
+	std::cout << "data:\n" << compiler.data_section << '\n';
+}
+
 static std::vector<std::vector<Tokentype>> precedences =
 {
     {Tokentype::assignment},   // we can put plus equals,minus equals,mult equals,assignment everything here
@@ -183,8 +208,10 @@ void IREmittor::compile_prog()
         }
         else 
         {
+            size_t val{};
+            if(Token token = try_consume(Tokentype::integer_lit)) val = atoll(token.val.c_str());
             vars.emplace_back(compiler.globals.size(),Storage::Global,name);
-            compiler.globals.emplace_back(name);
+            compiler.globals.emplace_back(name,val);
         }
         try_consume(Tokentype::semicolon,"Expected ; after global declaration");
     }
@@ -240,25 +267,30 @@ bool IREmittor::compile_switch(Ops& ops)
         Arg arg = compile_expression(0,ops);
         try_consume(Tokentype::open_curly,"Expected {");
         std::vector<size_t> backpath_indexes;
+        size_t curr{};
         while(try_consume(Tokentype::case_))
         {
             ops.emplace_back(Label{labels_count++});
             Arg match = compile_primary_expression(ops);
             try_consume(Tokentype::colon,"Expected :");
             ops.emplace_back(BinOp{temp,arg,match,Tokentype::equals});
-            size_t cur = ops.size();
+            curr = ops.size();
             ops.emplace_back(JmpIfZero{temp,0});
             compile_block(ops);
-            std::get<JmpIfZero>(ops[cur]).idx = labels_count;
+            std::get<JmpIfZero>(ops[curr]).idx = labels_count;
             backpath_indexes.push_back(ops.size());
             ops.emplace_back(Jmp{0});
         }
         if(try_consume(Tokentype::default_))
         {
+            if(curr == 0)
+            {
+                std::cerr << "Default case without any previous cases isn't allowed\n";
+                exit(EXIT_FAILURE);
+            }
             try_consume(Tokentype::colon,"Expected :");
             ops.emplace_back(Label{labels_count});
-            std::get<Jmp>(ops[backpath_indexes.back()]).idx = labels_count++;
-            backpath_indexes.pop_back();
+            std::get<JmpIfZero>(ops[curr]).idx = labels_count++;
             compile_block(ops);
         }
         for(size_t idx : backpath_indexes) std::get<Jmp>(ops[idx]).idx = labels_count;
@@ -418,8 +450,7 @@ bool IREmittor::compile_asm(Ops& ops)
     if(try_consume(Tokentype::assembly))
     {
         try_consume(Tokentype::open_paren,"Expected open paren after asm statement");
-        std::string code = consume().val;
-        code.push_back('\n');
+        std::string code = try_consume(Tokentype::string_lit,"Expected string lit").val;
         ops.emplace_back(Asm{code});
         try_consume(Tokentype::close_paren,"Expected closed paren");
         try_consume(Tokentype::semicolon,"Expected semicolon");
