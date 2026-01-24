@@ -4,5 +4,5 @@ main(a,b)
 	x = 10;
 	y = 68;
 	extrn printf;
-	printf("hello world %c\n",y);
+	printf("hello world %c\n",y-1);
 }

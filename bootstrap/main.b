@@ -23,7 +23,7 @@ main(argc,argv)
 	auto tokens = tokenize(buff);
 
 	IrGenerate(tokens);
-
+	dbg_compiler(compiler);
 	asm_str = generate();
 
 	auto file = open("output.asm",64 | 1,420);

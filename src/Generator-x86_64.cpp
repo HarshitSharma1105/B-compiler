@@ -6,8 +6,8 @@ void x86_64::ArgVisitor::operator()(const Var& var)
     switch(var.type)
     {
         case Storage::Auto:   stream << "    mov r15,[rbp-" << (var.index+1)*8 << "]\n";break;
-        case Storage::Global: stream << "    mov r15,[" << var.var_name << "]\n";break;
-        case Storage::Array : stream << "    mov r15," <<  var.var_name << "\n";break;
+        case Storage::Global: stream << "    mov r15,[_" << var.var_name << "]\n";break;
+        case Storage::Array : stream << "    mov r15,_" <<  var.var_name << "\n";break;
         default: assert(false && "UNREACHABLE\n");
     }
 }
@@ -87,8 +87,8 @@ void x86_64::Visitor::operator()(const BinOp& binop)
     switch(binop.var.type)
     {
         case Storage::Auto:   stream << "    mov QWORD [rbp-" << (binop.var.index+1)*8 << "],r15\n";break;
-        case Storage::Global: stream << "    mov [" << binop.var.var_name << "],r15\n";break;
-        case Storage::Array:  stream << "    mov " << binop.var.var_name << ",r15\n";break;
+        case Storage::Global: stream << "    mov [_" << binop.var.var_name << "],r15\n";break;
+        case Storage::Array:  stream << "    mov _" << binop.var.var_name << ",r15\n";break;
         default: assert(false && "UNREACHABLE\n");
     }
 }
@@ -101,7 +101,7 @@ void x86_64::Visitor::operator()(const Funcall& funcall)
         stream << "    mov " << x86_64::regs[i] << ",r15\n";
     }
     stream << "    xor rax,rax\n";
-    stream << "    call " << funcall.name << "\n";
+    stream << "    call _" << funcall.name << "\n";
 }
 void x86_64::Visitor::operator()(const DataSection& data)
 {
@@ -157,6 +157,11 @@ Generator_x86_64::Generator_x86_64(const Compiler& compiler) : compiler(compiler
 std::string Generator_x86_64::generate()
 {
     textstream << "format ELF64\n";
+    for(const auto& name : compiler.extrns)
+    {
+        textstream << "    extrn " << name << "\n";
+        textstream << "_" << name << " equ " << name << "\n";
+    }
     textstream << "section \"text\" executable\n";
     for(const auto& func:compiler.functions)
     {
@@ -164,20 +169,16 @@ std::string Generator_x86_64::generate()
         generate_func(func);
         generate_function_epilogue(func);
     }
-    for(const auto& name : compiler.extrns)
-    {
-        textstream << "    extrn " << name << "\n";
-    }
     std::visit(visitor,Op{DataSection{compiler.data_section}});
     for(const auto& [name,val] : compiler.globals) 
     {
-        textstream << "    public " << name << '\n';
+        textstream << "    public _" << name << "\n_";
         textstream << name << "  dq " << val << "\n";
     }
     textstream << "section \".bss\"  writeable\n";
     for(const auto& [name,size] : compiler.arrays)
     {
-        textstream << "    public " << name << '\n';
+        textstream << "    public _" << name << "\n_";
         textstream << name << "  rb " << size << '\n';
     }
     return textstream.str();
@@ -188,7 +189,9 @@ void Generator_x86_64::generate_function_prologue(const Func& func)
     assert(func.num_args <= 6 && "too many args");
     size_t alloc_size=func.max_vars_count;
     if(alloc_size%2)alloc_size++;
-    textstream << "public " << func.function_name << "\n" << func.function_name << ":\n";
+    textstream << "public " << func.function_name << "\n";
+    textstream << "_" << func.function_name << " equ " << func.function_name << '\n';
+    textstream << func.function_name << ":\n";
     if((func.func_flags & Flag::AsmFunc) == 0)
     {
         textstream << "    push rbp\n";

@@ -13,24 +13,110 @@ data_string;
 ir_count;
 FUNCALL;
 AUTOASSIGN;
+BINOP;
+
 arg_count;
 VAR;
 LIT;
 DATA_OFFSET;
 
+
+precedences;
+add_sub;
+
 ir_init()
 {
+	precedences = alloc(24);
+	add_sub     = alloc(24);
+	push_back(add_sub,ADD);
+	push_back(add_sub,SUB);
+	push_back(precedences,add_sub);
+
+
+
     FUNCALL     = ir_count++;
     AUTOASSIGN  = ir_count++;
+	BINOP		= ir_count++;
 
 
 
 
-
-	VAR = arg_count++;
-	LIT = arg_count++;
+	VAR 		= arg_count++;
+	LIT 		= arg_count++;
 	DATA_OFFSET = arg_count++;
 }
+
+dbg_arg(arg)
+{
+	switch(arg.0)
+	{
+		case LIT: printf("Literal(%d)",arg.1);
+		case VAR: printf("AutoVar(%d)",arg.1);
+		case DATA_OFFSET: printf("DataOffset[%d]",arg.1);
+		default : error("UNREACHABLE\n");
+	}
+}
+
+dbg_op(op)
+{
+	switch(op.0)
+	{
+		case AUTOASSIGN:
+		{
+			printf("Auto Assign(%d,",op.1);
+			dbg_arg(op.2);
+			printf(")\n");
+		}
+		case FUNCALL:
+		{
+			printf("Function call %s(",op[1]);
+			auto args = (op+16);
+			auto size = size(args);
+			for(auto i=0;i<size;i++)
+			{
+				dbg_arg(op[2][i]);
+				if(i != size-1)printf(",");
+			}
+			printf(")\n");
+		}
+		case BINOP :
+		{
+			printf("BinOp AutoVar(%d)",op.1);
+			printf(",lhs=");
+			dbg_arg(op.2);
+			printf(",rhs=");
+			dbg_arg(op.3);
+			printf(",type=");
+			debug({op.4,NULL});
+
+		}
+		default : error("UNREACHABLE");
+	}
+}
+
+
+dbg_func(func)
+{
+    auto name = func.0;
+    printf("Function %s(%d,%d):\n",name,func.2,func.3);
+    auto size = size(func.1);
+    auto ops = func.1.0;
+    for(auto i = 0;i<size;i++)dbg_op(ops[i]);
+    printf("Function %s end\n",name);
+}
+
+dbg_compiler(compiler)
+{
+    auto size = size(compiler);
+    auto funcs = compiler.0;
+    for(auto i=0;i<size;i++)dbg_func(funcs[i]);
+	size = size(extrns_arr);
+	auto base = extrns_arr.0;
+	for(auto i=0;i<size;i++)printf("extrn %s\n",base[i]);
+}
+
+
+
 
 consume()
 {
@@ -71,10 +157,21 @@ peek(off=0)
 
 try_peek(tokentype,off=0)
 {
-	auto tok = peek(off);
-	return tokentype == tok.0;
+	auto type = peek(off).0;
+	return tokentype == type;
 }
 
+
+try_peek_vec(tokentypes,off=0)
+{
+	auto type = peek(off).0;
+	auto size = size(tokentypes);
+	for(auto i=0;i<size;i++)
+	{
+		if(type == tokentypes.0[i])return true;
+	}
+	return false;
+}
 
 
 find_var(name)
@@ -91,7 +188,7 @@ find_var(name)
 
 extrn atoll;
 
-compile_primary_expression()
+compile_primary_expression(ops)
 {
 	auto tok = consume();
 	switch(tok.0)
@@ -109,6 +206,7 @@ compile_primary_expression()
 				{
 					i++;
 					if(read_byte(str,i)=='n')format_str_2(data_string,"10");
+					else if(read_byte(str,i)=='t')format_str_2(data_string,"9");
 					else error("Unknown escape character");
 					i++;
 				}
@@ -122,9 +220,18 @@ compile_primary_expression()
 	}
 }
 
-compile_expression()
+compile_expression(prec,ops)
 {
-	return compile_primary_expression();
+	if(prec==size(precedences))return compile_primary_expression(ops);
+	auto lhs = compile_expression(prec+1,ops),rhs;
+	while(try_peek_vec(precedences.0[prec]))
+	{
+		auto type = consume().0;
+		rhs = compile_expression(prec+1,ops);
+		push_back(ops,{BINOP,vars_count,lhs,rhs,type});
+		lhs = {VAR,vars_count++};
+	}
+	return lhs;
 }
 
 
@@ -171,7 +278,7 @@ auto_assign(ops)
 		auto idx = find_var(name).1;
 		if(idx == -1) error("Undeclared variable %s\n",name);
 		try_consume_error(ASSIGN,"Expected =");
-		push_back(ops,{AUTOASSIGN,idx,compile_expression()});
+		push_back(ops,{AUTOASSIGN,idx,compile_expression(0,ops)});
 		try_consume_error(SEMICOLON,"Expected ;");
 		return true;
 	}
@@ -191,17 +298,14 @@ comp_block(ops)
 		auto args = alloc(24);
 		while(try_consume(CLOSE_PAREN) == false)
 		{
-			auto arg = compile_expression();
+			auto arg = compile_expression(0,ops);
 			push_back(args,arg);
 			try_consume(COMMA);
 		}
 		try_consume_error(SEMICOLON,"Expected ;");
 		push_back(ops,{FUNCALL,func,args.0,args.1,args.2});
 	}
-	else 
-	{
-		printf("Unexpected statement\n");
-	}
+	else error("Unexpected statements");
 }
 
 comp_func(ops)
@@ -254,60 +358,3 @@ IrGenerate(tokens)
 }
 
 
-dbg_arg(arg)
-{
-	switch(arg.0)
-	{
-		case LIT: printf("Literal(%d)",arg.1);
-		case VAR: printf("AutoVar(%d)",arg.1);
-		case DATA_OFFSET: printf("DataOffset[%d]",arg.1);
-		default : error("UNREACHABLE\n");
-	}
-}
-
-dbg_op(op)
-{
-	switch(op.0)
-	{
-		case AUTOASSIGN:
-		{
-			printf("Auto Assign(%d,",op.1);
-			dbg_arg(op.2);
-			printf(")\n");
-		}
-		case FUNCALL:
-		{
-			printf("Function call %s(",op[1]);
-			auto args = (op+16);
-			auto size = size(args);
-			for(auto i=0;i<size;i++)
-			{
-				dbg_arg(op[2][i]);
-				if(i != size-1)printf(",");
-			}
-			printf(")\n");
-		}
-		default : error("UNREACHABLE");
-	}
-}
-
-
-dbg_func(func)
-{
-    auto name = func.0;
-    printf("Function %s(%d,%d):\n",name,func.2,func.3);
-    auto size = size(func.1);
-    auto ops = func.1.0;
-    for(auto i = 0;i<size;i++)dbg_op(ops[i]);
-    printf("Function %s end\n",name);
-}
-
-dbg_compiler(compiler)
-{
-    auto size = size(compiler);
-    auto funcs = compiler.0;
-    for(auto i=0;i<size;i++)dbg_func(funcs[i]);
-	size = size(extrns_arr);
-	auto base = extrns_arr.0;
-	for(auto i=0;i<size;i++)printf("extrn %s\n",base[i]);
-}

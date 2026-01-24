@@ -11,7 +11,7 @@ generate_arg(arg)
 	switch(arg.0)
 	{
 		case LIT: format_str(asm_str,"    mov r15,%d",arg.1);
-		case VAR: format_str(asm_str,"    mov r15,[rbp-%d]",8*arg.1);
+		case VAR: format_str(asm_str,"    mov r15,[rbp-%d]",8*(arg.1+1));
 		case DATA_OFFSET : format_str(asm_str,"    mov r15,data_%d",arg.1);
 		default: error("UNREACHABLE\n");
 	}
@@ -26,7 +26,7 @@ generate_op(op)
 		case AUTOASSIGN: 
 		{
 			generate_arg(op.2);
-			format_str(asm_str,"	mov QWORD[rbp-%d],r15",8*op.1);
+			format_str(asm_str,"	mov QWORD[rbp-%d],r15",8*(op.1+1));
 		}
 		case FUNCALL:
 		{
@@ -39,6 +39,19 @@ generate_op(op)
 			}
 			format_str(asm_str,"	xor rax,rax");
 			format_str(asm_str,"	call %s",op.1);
+		}
+		case BINOP :
+		{
+			generate_arg(op.3);
+			format_str(asm_str,"	mov r14,r15");
+			generate_arg(op.2);
+			switch(op.4)
+			{
+				case ADD : format_str(asm_str,"add r15,r14");
+				case SUB : format_str(asm_str,"sub r15,r14");
+				default : error("UNKNOWN BINOP");
+			}
+			format_str(asm_str,"	mov QWORD [rbp-%d],r15",8*(op.1+1));
 		}
 		default : error("UNREACHABLE");
 	}

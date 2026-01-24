@@ -20,7 +20,8 @@ SEMICOLON;
 FUNCTION;
 COMMA;
 STRING_LIT;
-
+ADD;
+SUB;
 
 
 
@@ -39,6 +40,8 @@ tok_init()
 	FUNCTION    = tok_count++;
 	COMMA       = tok_count++;
 	STRING_LIT  = tok_count++;
+	ADD			= tok_count++;
+	SUB			= tok_count++;
 }
 
 tokenize(src)
@@ -49,81 +52,76 @@ tokenize(src)
 	auto len = strlen(src);
 	while(idx < len)
 	{
-		auto tok = alloc(16);
 		auto ch = read_byte(src,idx);
 		if(isspace(ch))idx++;
 		else if(ch == 10)idx++;
 		else if(ch == '(')
 		{
-			tok.0 = OPEN_PAREN;
 			auto last = *(back(tokens));
 			if(last.0 == IDENTIFIER) last.0 = FUNCTION;
-			push_back(tokens,tok);
+			push_back(tokens,{OPEN_PAREN,NULL});
 			idx++;
 		}
 		else if(ch == ')')
 		{
-			tok.0 = CLOSE_PAREN;
-			push_back(tokens,tok);
+			push_back(tokens,{CLOSE_PAREN,NULL});
 			idx++;
 		}
 		else if(ch == '{')
 		{
-			tok.0 = OPEN_CURLY;
-			push_back(tokens,tok);
+			push_back(tokens,{OPEN_CURLY,NULL});
 			idx++;
 		}
 		else if(ch == '}')
 		{
-			tok.0 = CLOSE_CURLY;
-			push_back(tokens,tok);
+			push_back(tokens,{CLOSE_CURLY,NULL});
+			idx++;
+		}
+		else if(ch=='+')
+		{
+			push_back(tokens,{ADD,NULL});
+			idx++;
+		}
+		else if(ch=='-')
+		{
+			push_back(tokens,{SUB,NULL});
 			idx++;
 		}
 		else if (ch == ',')
 		{
-			tok.0 = COMMA;
-			push_back(tokens,tok);
+			push_back(tokens,{COMMA,NULL});
 			idx++;
 		}
 		else if(ch == '"')
 		{
 			idx++;
-			tok.0 = STRING_LIT;
 			auto buff = alloc(24);
 			while(read_byte(src,idx)!='"')push_char(buff,read_byte(src,idx++));
 			idx++;
-			tok.1 = buff;
-			push_back(tokens,tok);
+			push_back(tokens,{STRING_LIT,buff});
 		}
 		else if(isdigit(ch))
 		{
 			auto buff = alloc(24);
-							
 			while(isdigit(read_byte(src,idx)))push_char(buff,read_byte(src,idx++));
-			tok.0 = INTLIT;
-			tok.1 = buff;
-			push_back(tokens,tok);
+			push_back(tokens,{INTLIT,buff});
 		}
 		else if(isalnum(ch))
 		{
 			auto buff = alloc(24);
-			tok.1 = buff;
 			while(isalnum(read_byte(src,idx)))push_char(buff,read_byte(src,idx++));
-			if(!strcmp(*buff,"auto"))tok.0 = AUTO;
-			else if(!strcmp(*buff,"extrn"))tok.0 = EXTERN;
-			else tok.0 = IDENTIFIER;
-			push_back(tokens,tok);
+			if(!strcmp(*buff,"auto"))push_back(tokens,{AUTO,NULL});
+			else if(!strcmp(*buff,"extrn"))push_back(tokens,{EXTERN,NULL});
+			else push_back(tokens,{IDENTIFIER,buff});
 		}
 		else if(ch == '=')
 		{
-			tok.0 = ASSIGN;
-			push_back(tokens,tok);
+			push_back(tokens,{ASSIGN,NULL});
 			idx++;
 		}
 		else if(ch == ';')
 		{
-			tok.0 = SEMICOLON;
-			push_back(tokens,tok);
+			push_back(tokens,{SEMICOLON,NULL});
 			idx++;
 		}
 		else error("Unrecognized token %c",ch);
@@ -149,6 +147,8 @@ debug(token)
 		case SEMICOLON: printf("semicolon ;\n");
 		case COMMA: printf("comma ,\n");
 		case STRING_LIT:  printf("string lit %s\n",token.1.0);
+		case ADD : 		  printf("add\n");
+		case SUB : 		  printf("sub\n");
 		default : printf("Unknown token\n");
 	}
 }
