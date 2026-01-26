@@ -3,11 +3,7 @@
 
 int main(int argc,char* argv[])
 {
-    if(argc<4)
-    {
-        std::cerr << "Incorrect Usage\n";
-        exit(EXIT_FAILURE);
-    }
+    if(argc<4) errorf("Incorrect usage. compiler <file-path> <debug-options> <target-lang>");
     std::string b_sourcecode,path=argv[1],parent_path=std::filesystem::absolute(path).parent_path().string();
     bool debugging=(std::string)argv[2]=="debug";
     open_file(path,b_sourcecode);

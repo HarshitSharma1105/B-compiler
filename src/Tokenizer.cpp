@@ -147,6 +147,10 @@ std::vector<Token> Tokenizer::tokenize()
             {
                 tokens.push_back({Tokentype::default_});
             }
+            else if(buffer=="decl")
+            {
+                tokens.push_back({Tokentype::decl});
+            }
             else if(buffer=="false" || buffer == "null" || buffer == "NULL")
             {
                 tokens.push_back({Tokentype::integer_lit,"0"});
@@ -348,11 +352,7 @@ std::vector<Token> Tokenizer::tokenize()
         {
             consume();
             char ch = consume();
-            if(consume()!='\'')
-            {
-                std::cerr << "Character literals can only be one character long\n";
-                exit(EXIT_FAILURE);
-            }
+            if(consume()!='\'') errorf("Character literals can only be one character long\n");
             tokens.push_back({Tokentype::integer_lit,std::to_string(int(ch))});
         }
         else if (std::isdigit(peek().value())) 
@@ -374,11 +374,7 @@ std::vector<Token> Tokenizer::tokenize()
             consume();
             tokens.push_back({Tokentype::semicolon,";"});
         }
-        else
-        {
-            std::cerr << "Unrecognized Token: " << peek().value() << "\n";
-            exit(EXIT_FAILURE);
-        }
+        else errorf("Unrecognized Token {}",peek().value());
     }
     return tokens;
 }

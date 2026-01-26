@@ -159,8 +159,7 @@ std::string Generator_x86_64::generate()
     textstream << "format ELF64\n";
     for(const auto& name : compiler.extrns)
     {
-        textstream << "    extrn " << name << "\n";
-        textstream << "_" << name << " equ " << name << "\n";
+        textstream << "extrn '" << name << "' as _" << name  << "\n";
     }
     textstream << "section \"text\" executable\n";
     for(const auto& func:compiler.functions)
@@ -189,9 +188,8 @@ void Generator_x86_64::generate_function_prologue(const Func& func)
     assert(func.num_args <= 6 && "too many args");
     size_t alloc_size=func.max_vars_count;
     if(alloc_size%2)alloc_size++;
-    textstream << "public " << func.function_name << "\n";
-    textstream << "_" << func.function_name << " equ " << func.function_name << '\n';
-    textstream << func.function_name << ":\n";
+    textstream << "public _" << func.function_name << " as '" << func.function_name << "'\n";
+    textstream << "_" << func.function_name << ":\n";
     if((func.func_flags & Flag::AsmFunc) == 0)
     {
         textstream << "    push rbp\n";

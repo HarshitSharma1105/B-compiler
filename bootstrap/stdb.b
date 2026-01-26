@@ -55,11 +55,10 @@ push_back(ptr,val)
 }
 
 
-size(ptr) return ptr.1;
 
 back(ptr)
 {
-	auto siz = size(ptr);
+	auto siz = ptr.1;
 	if(siz>0)return (ptr.0 + 8*(siz - 1));
 	else return 0;
 }
@@ -75,6 +74,9 @@ resize(ptr,siz)
 	ptr.2 = cap;
 }
 
+
+span_to_vec(span) return {span.0,span.1,span.1};
+vec_to_span(vec)  return {vec.0,vec.1};
 
 
 

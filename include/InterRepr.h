@@ -6,6 +6,8 @@
 #include<variant>
 #include<algorithm>
 #include<array>
+#include<unordered_set>
+
 
 enum Storage{
     Auto,
@@ -159,5 +161,6 @@ public:
     size_t labels_count=0;
     std::vector<Var> vars;
     std::stringstream datastring;
+    std::unordered_set<std::string> functions;
     bool is_main_func_present=false;
 };

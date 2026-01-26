@@ -22,15 +22,11 @@ DATA_OFFSET;
 
 
 precedences;
-add_sub;
 
 ir_init()
 {
-	precedences = alloc(24);
-	add_sub     = alloc(24);
-	push_back(add_sub,ADD);
-	push_back(add_sub,SUB);
-	push_back(precedences,add_sub);
+	precedences = alloc(24); 
+	push_back(precedences,{{ADD,SUB},2});
 
 
 
@@ -71,10 +67,10 @@ dbg_op(op)
 		{
 			printf("Function call %s(",op[1]);
 			auto args = (op+16);
-			auto size = size(args);
+			auto size = args.1;
 			for(auto i=0;i<size;i++)
 			{
-				dbg_arg(op[2][i]);
+				dbg_arg(op.2[i]);
 				if(i != size-1)printf(",");
 			}
 			printf(")\n");
@@ -99,7 +95,7 @@ dbg_func(func)
 {
     auto name = func.0;
     printf("Function %s(%d,%d):\n",name,func.2,func.3);
-    auto size = size(func.1);
+    auto size = func.1.1;
     auto ops = func.1.0;
     for(auto i = 0;i<size;i++)dbg_op(ops[i]);
     printf("Function %s end\n",name);
@@ -107,10 +103,10 @@ dbg_func(func)
 
 dbg_compiler(compiler)
 {
-    auto size = size(compiler);
+    auto size = compiler.1;
     auto funcs = compiler.0;
     for(auto i=0;i<size;i++)dbg_func(funcs[i]);
-	size = size(extrns_arr);
+	size = extrns_arr.1;
 	auto base = extrns_arr.0;
 	for(auto i=0;i<size;i++)printf("extrn %s\n",base[i]);
 }
@@ -165,7 +161,7 @@ try_peek(tokentype,off=0)
 try_peek_vec(tokentypes,off=0)
 {
 	auto type = peek(off).0;
-	auto size = size(tokentypes);
+	auto size = tokentypes.1;
 	for(auto i=0;i<size;i++)
 	{
 		if(type == tokentypes.0[i])return true;
@@ -176,7 +172,7 @@ try_peek_vec(tokentypes,off=0)
 
 find_var(name)
 {
-	auto siz = size(vars);
+	auto siz = vars.1;
 	auto ptr = vars.0;
 	for(auto i = 0;i<siz;i++)
 	{
@@ -188,17 +184,25 @@ find_var(name)
 
 extrn atoll;
 
+decl compile_expression; 
+
+
 compile_primary_expression(ops)
 {
 	auto tok = consume();
 	switch(tok.0)
 	{
+		case IDENTIFIER:
+		{
+			auto idx = find_var(tok.1.0).1;
+			if(idx==-1)error("Undeclared variable %s",tok.1.0);
+			return {VAR,find_var(tok.1.0).1};
+		}
 		case INTLIT: return {LIT,atoll(tok.1.0)};
-		case IDENTIFIER:return {VAR,find_var(tok.1.0).1};
 		case STRING_LIT:
 		{
 			auto str = tok.1.0;
-			auto size = size(tok.1);
+			auto size = tok.1.1;
 			for(auto i=0;i<size;i++)
 			{
 				if(read_byte(str,i)!='\')format_str_2(data_string,"%d",read_byte(str,i));
@@ -216,13 +220,26 @@ compile_primary_expression(ops)
 			push_char(data_string,10);
 			return {DATA_OFFSET,data_count++};
 		}
+		case FUNCTION:
+		{
+			auto func = tok.1.0;
+			try_consume_error(OPEN_PAREN,"Expected (");
+			auto args = alloc(24);
+			while(try_consume(CLOSE_PAREN) == false)
+			{
+				auto arg = compile_expression(0,ops);
+				push_back(args,arg);
+				try_consume(COMMA);
+			}
+			push_back(ops,{FUNCALL,func,args.0,args.1,args.2});
+		}
 		default : error("UNREACHABLE\n");
 	}
 }
 
 compile_expression(prec,ops)
 {
-	if(prec==size(precedences))return compile_primary_expression(ops);
+	if(prec==precedences.1)return compile_primary_expression(ops);
 	auto lhs = compile_expression(prec+1,ops),rhs;
 	while(try_peek_vec(precedences.0[prec]))
 	{
@@ -285,37 +302,37 @@ auto_assign(ops)
 	return false;
 }
 
+compile_scope(ops)
+{
+	
+}
+
+
+compile_stmt(ops)
+{
+	compile_expression(0,ops);
+	try_consume_error(SEMICOLON,"Expected ;");
+}
+
+
+comp_func_body(ops)
+{
+	if(try_consume(SEMICOLON)) return 1;
+	else if(auto_vardec(ops)) return 1;
+	else if(auto_assign(ops)) return 1;
+	else if(extrn_decl(ops)) return 1;
+	else if(compile_scope(ops)) return 1;
+	else compile_stmt(ops);
+}
 
 comp_block(ops)
 {
-	if(auto_vardec(ops)) return 1;
-	else if(auto_assign(ops)) return 1;
-	else if(extrn_decl(ops)) return 1;
-	else if(try_peek(FUNCTION))
+	if(try_consume(OPEN_CURLY))
 	{
-		auto func = consume().1.0;
-		try_consume_error(OPEN_PAREN,"Expected (");
-		auto args = alloc(24);
-		while(try_consume(CLOSE_PAREN) == false)
-		{
-			auto arg = compile_expression(0,ops);
-			push_back(args,arg);
-			try_consume(COMMA);
-		}
-		try_consume_error(SEMICOLON,"Expected ;");
-		push_back(ops,{FUNCALL,func,args.0,args.1,args.2});
+		while(!try_consume(CLOSE_CURLY))comp_func_body(ops);
 	}
-	else error("Unexpected statements");
+	else comp_func_body(ops);
 }
-
-comp_func(ops)
-{
-	while(try_consume(CLOSE_CURLY) == false)
-	{
-		comp_block(ops);
-	}
-}
-
 
 compile_prog()
 {
@@ -331,8 +348,7 @@ compile_prog()
 		}
 		auto curr = vars_count;
 		try_consume_error(CLOSE_PAREN,"Expected )");
-		try_consume_error(OPEN_CURLY,"Expected {");
-		comp_func(ops);
+		comp_block(ops);
 		push_back(compiler,{name,ops,curr,vars_count});
 		vars_count = 0;
 	}
@@ -350,7 +366,7 @@ IrGenerate(tokens)
 	data_string = alloc(24);
     compiler = alloc(24);
 	extrns_arr = alloc(24);
-	auto len = size(tokens);
+	auto len = tokens.1;
 	while(IrGen.1 < len)
 	{
 		compile_prog();

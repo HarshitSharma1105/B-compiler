@@ -54,6 +54,7 @@ case_,
 default_,
 break_,
 colon,
+decl,
 invalid
 };
 

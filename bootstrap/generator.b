@@ -31,7 +31,7 @@ generate_op(op)
 		case FUNCALL:
 		{
 			auto args = (op+16);
-			auto size = size(args);
+			auto size = args.1;
 			for(auto i=0;i<size;i++)
 			{
 				generate_arg(op.2[i]);
@@ -60,7 +60,7 @@ generate_op(op)
 
 generate_func(func)
 {
-    auto size = size(func.1);
+    auto size = func.1.1;
     auto ops = func.1.0;
     for(auto i = 0;i<size;i++)generate_op(ops[i]);
 }
@@ -89,7 +89,7 @@ generate_func_epilogue()
 
 generate_extrns()
 {
-	auto size = size(extrns_arr);
+	auto size = extrns_arr.1;
 	auto base = extrns_arr.0;
 	for(auto i=0;i<size;i++)format_str(asm_str,"	extrn %s",base[i]);
 }
@@ -97,7 +97,7 @@ generate_extrns()
 generate_data_seg()
 {
 	format_str(asm_str,"section \"data\" writeable");
-	auto count = 0,idx = 0,size=size(data_string);
+	auto count = 0,idx = 0,size=data_string.1;
 	while(idx<size)
 	{
 		format_str_2(asm_str,"data_%d db ",count++);
@@ -116,7 +116,7 @@ generate()
 	asm_str = alloc(24);
 	format_str(asm_str,"format ELF64");
 	format_str(asm_str,"section \"text\" executable");
-	auto size = size(compiler);
+	auto size = compiler.1;
 	auto funcs = compiler.0;
 	for(auto i=0;i<size;i++)
 	{

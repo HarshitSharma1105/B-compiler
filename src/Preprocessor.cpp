@@ -6,11 +6,7 @@ void open_file(const std::string& path,std::string& finalb_sourcecode)
     {
         std::stringstream contents_stream;
         std::fstream input(path, std::ios::in);
-        if (!input.is_open()) 
-        {
-            std::cerr << "Failed to open file   " << path << "\n";
-            exit(EXIT_FAILURE);
-        }
+        if (!input.is_open())  errorf("Failed to open file  {}",path);
         contents_stream << input.rdbuf();
         finalb_sourcecode += contents_stream.str();
         finalb_sourcecode.push_back('\n');
@@ -35,11 +31,7 @@ std::string preprocessor(std::string path,const std::string& b_sourcecode)
             if(!std::isspace(b_sourcecode[index])) rel_path.push_back(b_sourcecode[index]);
             index++;
         }
-        if(rel_path!="include")
-        {
-            std::cerr << "wrong declaration\n" << rel_path.back();
-            exit(EXIT_FAILURE);
-        }
+        if(rel_path!="include") errorf("Wrong declaration {}",rel_path);
         rel_path.clear();
         rel_path="/";
         index++;//consume the starting double qoute

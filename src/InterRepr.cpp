@@ -151,10 +151,7 @@ Compiler   IREmittor::EmitIR()
     {
         compile_prog();
     }
-    if(is_main_func_present!=true){
-        std::cerr << "Main function not declared\n";
-        exit(EXIT_FAILURE);
-    }
+    if(is_main_func_present!=true) errorf("Main function not declared");
     compiler.data_section=datastring.str();
     return compiler;
 }
@@ -167,6 +164,7 @@ void IREmittor::compile_prog()
         Func func{};
         if(attrib.val=="asm")func.func_flags |= Flag::AsmFunc;
         func.function_name=consume().val;
+        functions.insert(func.function_name);
         size_t vars_size=vars.size();
         if(func.function_name=="main")is_main_func_present=true;
         try_consume(Tokentype::open_paren,"expcted '('");
@@ -182,15 +180,14 @@ void IREmittor::compile_prog()
             //"Expected comma between args";
         }
         func.num_args=vars_count;
-        compiler.functions.push_back(func);
-        Func& back = compiler.functions.back();
         try_consume(Tokentype::close_paren,"expected ')'");
-        compile_block(back.function_body);
+        compile_block(func.function_body);
         vars.resize(vars_size);
         max_vars_count=std::max(max_vars_count,vars_count);
         vars_count=0;
-        back.max_vars_count=max_vars_count;
+        func.max_vars_count=max_vars_count;
         max_vars_count=0;
+        compiler.functions.push_back(func);
     }
     else if (try_peek(Tokentype::extrn))
     {
@@ -214,6 +211,12 @@ void IREmittor::compile_prog()
             compiler.globals.emplace_back(name,val);
         }
         try_consume(Tokentype::semicolon,"Expected ; after global declaration");
+    }
+    else if(try_consume(Tokentype::decl))
+    {
+        Token func = try_consume(Tokentype::identifier,"Expected identifier after declaration");
+        functions.insert(func.val);
+        try_consume(Tokentype::semicolon,"Expected semicolon after identifier");
     }
     else 
     {
@@ -283,11 +286,7 @@ bool IREmittor::compile_switch(Ops& ops)
         }
         if(try_consume(Tokentype::default_))
         {
-            if(curr == 0)
-            {
-                std::cerr << "Default case without any previous cases isn't allowed\n";
-                exit(EXIT_FAILURE);
-            }
+            if(curr == 0)errorf("Default case witout any previous cases isn't allowed");
             try_consume(Tokentype::colon,"Expected :");
             ops.emplace_back(Label{labels_count});
             std::get<JmpIfZero>(ops[curr]).idx = labels_count++;
@@ -431,11 +430,7 @@ bool IREmittor::autovar_dec(Ops& ops)
         {
             try_consume(Tokentype::comma);
             std::string var_name=peek().value().val;
-            if(get_var(var_name).index!=-1)
-            {
-                std::cerr << "variable already declared " << var_name << "\n";
-                exit(EXIT_FAILURE);
-            }
+            if(get_var(var_name).index!=-1) errorf("Variable already declared {}",var_name);
             vars.emplace_back(vars_count++,Storage::Auto,var_name);
             compile_expression(0,ops);
         }
@@ -466,6 +461,7 @@ bool IREmittor::compile_extrn()
         {
             std::string extrn_name=consume().val;
             compiler.extrns.push_back(extrn_name);
+            functions.insert(extrn_name);
         }
         try_consume(Tokentype::semicolon,"Expected ;");//semicolon
         return true;
@@ -492,8 +488,8 @@ Arg IREmittor::compile_expression(int precedence,Ops& ops)
             rhs=compile_expression(0,ops);
             std::visit(overload{
                 [&](const Var& var)  { ops.emplace_back(BinOp{var,var,rhs,type});},
-                [&](const Ref& ref)  {  ops.emplace_back(Store{ref.index,rhs});},
-                [](const auto& ){std::cerr << "Assigning to non assignable value\n"; exit(EXIT_FAILURE); }
+                [&](const Ref& ref)  { ops.emplace_back(Store{ref.index,rhs});},
+                [](const auto& )     { errorf("Assigning to non assignable value");}
             }, lhs);
         }          
         else
@@ -576,11 +572,7 @@ Arg IREmittor::compile_primary_expression(Ops& ops)
         case Tokentype::identifier:
         {
             Var var=get_var(token.val);
-            if(var.index==-1)
-            {
-                std::cerr << "variable not declared " << token.val << "\n";
-                exit(EXIT_FAILURE);
-            }
+            if(var.index==-1) errorf("Variable not declared {}",token.val);
             return var;
         }
         case Tokentype::integer_lit:return Literal{(size_t)atoll(token.val.c_str())};
@@ -648,11 +640,7 @@ Arg IREmittor::compile_primary_expression(Ops& ops)
         {
             Token tok=try_consume(Tokentype::identifier,"expected identifier after pre decrement");
             Var var=get_var(tok.val);
-            if(var.index==-1)
-            {
-                std::cerr << "variable not declared " << token.val << "\n";
-                exit(EXIT_FAILURE);
-            }
+            if(var.index==-1)errorf("Variable not declared {}",tok.val);
             ops.emplace_back(BinOp{Var{var.index},var,Literal{1},Tokentype::add});
             return var;
         }
@@ -660,11 +648,7 @@ Arg IREmittor::compile_primary_expression(Ops& ops)
         {
             Token val=try_consume(Tokentype::identifier,"expected identifier after pre decrement");
             Var var=get_var(val.val);
-            if(var.index==-1)
-            {
-                std::cerr << "variable not declared " << val.val << "\n";
-                exit(EXIT_FAILURE);
-            }
+            if(var.index==-1)errorf("Variable not declared {}",val.val);
             ops.emplace_back(BinOp{Var{var.index},var,Literal{1},Tokentype::sub});
             return var;
         }
@@ -679,18 +663,7 @@ Arg IREmittor::compile_primary_expression(Ops& ops)
                 try_consume(Tokentype::comma);
             }
             try_consume(Tokentype::close_paren,"expected ')'");
-            if(
-                (
-                std::any_of(compiler.functions.begin(),compiler.functions.end(),[funcall_name](const Func& func){return func.function_name==funcall_name;}) 
-                || 
-                std::any_of(compiler.extrns.begin(),compiler.extrns.end(),[funcall_name](const std::string& extrn){return extrn==funcall_name;})
-                )
-                == false
-            )
-            {
-                std::cerr << "Undeclared function " << funcall_name << "\n";
-                exit(EXIT_FAILURE);
-            }
+            if(functions.find(funcall_name)==functions.end())errorf("Undeclared function {}",funcall_name);
             auto it = std::find_if(compiler.functions.begin(),compiler.functions.end(),[funcall_name](const Func& func){return func.function_name == funcall_name;});
             if(it != compiler.functions.end())
             {
@@ -700,13 +673,7 @@ Arg IREmittor::compile_primary_expression(Ops& ops)
                 {
                    for(size_t idx = args_size;idx<num_args;idx++)args.emplace_back(Literal{func.default_args[idx-args_size]});
                 }
-                else if(num_args!=args_size)
-                {
-                    for(int i=-10;i<10;i++)debug(std::vector<Token>{peek(i).value()});
-                    std::cout << "Function signature for " << funcall_name  << " not matched . Please give default args or provide all non-default arguments to function call\n";
-                    std::cout << num_args << ' ' << args_size << ' ' << default_size << '\n';
-                    exit(EXIT_FAILURE);
-                }
+                else if(num_args!=args_size) errorf("Function signature for {} not matched . Expected atleast {} arguments but got only {} arguments",funcall_name,num_args-default_size,args_size);
             }
             ops.emplace_back(Funcall{funcall_name,args});
             ops.emplace_back(BinOp{Var{vars_count},Arg{},FuncResult{funcall_name},Tokentype::assignment});
@@ -730,8 +697,7 @@ Token IREmittor::try_consume(const Tokentype& type, const std::string& err_msg)
     if (peek().value().type == type) {
         return consume();
     }
-    std::cerr << err_msg << std::endl;
-    exit(EXIT_FAILURE);
+    errorf("{}",err_msg);
 }
 Token IREmittor::try_consume(const Tokentype& type)
 {

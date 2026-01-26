@@ -15,11 +15,7 @@ Runner::Runner(std::string target_lang,const std::string& path) : path(path)
 	{
 		target=Target::MIPS;
 	}
-	else 
-	{
-		std::cerr << "Unsupported Target Language " << target_lang << " Please provide valid target for the compiler\n";
-		exit(EXIT_FAILURE);
-	}
+	else errorf("Unsupported Target Language {}. Please provide valid target for the compiler",target_lang);
 }
 void Runner::compile(const Compiler& compiler)
 {
