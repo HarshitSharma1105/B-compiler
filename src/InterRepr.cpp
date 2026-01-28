@@ -490,7 +490,7 @@ Arg IREmittor::compile_expression(int precedence,Ops& ops)
                 [&](const Var& var)  { ops.emplace_back(BinOp{var,var,rhs,type});},
                 [&](const Ref& ref)  { ops.emplace_back(Store{ref.index,rhs});},
                 [](const auto& )     { errorf("Assigning to non assignable value");}
-            }, lhs);
+            }, lhs); 
         }          
         else
         {

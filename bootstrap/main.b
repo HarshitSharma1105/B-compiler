@@ -24,7 +24,7 @@ main(argc,argv)
 
 	IrGenerate(tokens);
 
-	asm_str = generate();
+	generate();
 
 	auto file = open("output.asm",64 | 1,420);
 	write(file,asm_str.0,asm_str.1);

@@ -4,5 +4,7 @@ main(a,b)
 	x = 10;
 	y = 68;
 	extrn printf;
-	printf("hello world %c %d\n",y-1,x+20);
+	printf("hello world %c %d %d\n",y-1,x+20,foo(x+2));
 }
+
+foo(a) return a+2;

@@ -10,9 +10,10 @@ generate_arg(arg)
 {
 	switch(arg.0)
 	{
-		case LIT: format_str(asm_str,"    mov r15,%d",arg.1);
-		case VAR: format_str(asm_str,"    mov r15,[rbp-%d]",8*(arg.1+1));
-		case DATA_OFFSET : format_str(asm_str,"    mov r15,data_%d",arg.1);
+		case LIT:			format_str(asm_str,"    mov r15,%d",arg.1);
+		case VAR: 			format_str(asm_str,"    mov r15,[rbp-%d]",8*(arg.1+1));
+		case DATA_OFFSET : 	format_str(asm_str,"    mov r15,data_%d",arg.1);
+		case FUNC_RESULT :  format_str(asm_str,"	mov r15,rax");
 		default: error("UNREACHABLE\n");
 	}
 }
@@ -47,11 +48,30 @@ generate_op(op)
 			generate_arg(op.2);
 			switch(op.4)
 			{
-				case ADD : format_str(asm_str,"add r15,r14");
-				case SUB : format_str(asm_str,"sub r15,r14");
+				case ADD : format_str(asm_str,"    add r15,r14");
+				case SUB : format_str(asm_str,"    sub r15,r14");
 				default : error("UNKNOWN BINOP");
 			}
 			format_str(asm_str,"	mov QWORD [rbp-%d],r15",8*(op.1+1));
+		}
+		case UNOP:
+		{
+			generate_arg(op.2);
+			format_str(asm_str,"	mov r14,r15");
+			switch(op.3)
+			{
+				case SUB:format_str(asm_str,"    xor r15,r15\n    sub r15,r14");
+				default: error("UNREACHABLE");
+			}
+			format_str(asm_str,"	mov QWORD [rbp-%d],r15",8*(op.1+1));
+		}
+		case RETURNVALUE:
+		{
+			generate_arg(op.1);
+			format_str(asm_str,"	mov rax,r15");
+			format_str(asm_str,"	mov rsp,rbp");
+			format_str(asm_str,"	pop rbp");
+			format_str(asm_str,"	ret"); 
 		}
 		default : error("UNREACHABLE");
 	}
@@ -126,5 +146,4 @@ generate()
 	}
 	generate_extrns();
 	generate_data_seg();
-	return asm_str;
 }

@@ -14,12 +14,16 @@ ir_count;
 FUNCALL;
 AUTOASSIGN;
 BINOP;
+UNOP;
+RETURNVALUE;
+
+
 
 arg_count;
 VAR;
 LIT;
 DATA_OFFSET;
-
+FUNC_RESULT;
 
 precedences;
 
@@ -27,19 +31,20 @@ ir_init()
 {
 	precedences = alloc(24); 
 	push_back(precedences,{{ADD,SUB},2});
-
+	push_back(precedences,{{DIV,MULT,REMAINDER},3});
 
 
     FUNCALL     = ir_count++;
     AUTOASSIGN  = ir_count++;
 	BINOP		= ir_count++;
-
-
+	UNOP		= ir_count++;
+	RETURNVALUE = ir_count++;
 
 
 	VAR 		= arg_count++;
 	LIT 		= arg_count++;
 	DATA_OFFSET = arg_count++;
+	FUNC_RESULT = arg_count++;
 }
 
 dbg_arg(arg)
@@ -49,6 +54,7 @@ dbg_arg(arg)
 		case LIT: printf("Literal(%d)",arg.1);
 		case VAR: printf("AutoVar(%d)",arg.1);
 		case DATA_OFFSET: printf("DataOffset[%d]",arg.1);
+		case FUNC_RESULT: printf("Func Result %s",arg.1);
 		default : error("UNREACHABLE\n");
 	}
 }
@@ -84,7 +90,19 @@ dbg_op(op)
 			dbg_arg(op.3);
 			printf(",type=");
 			debug({op.4,NULL});
-
+		}
+		case UNOP:
+		{
+			printf("Unop Autovar(%d) Arg = ",op.1);
+			dbg_arg(op.2);
+			printf(",type =");
+			debug({op.3,NULL});
+		}
+		case RETURNVALUE:
+		{
+			printf("Return Value ");
+			dbg_arg(op.1);
+			printf("\n");
 		}
 		default : error("UNREACHABLE");
 	}
@@ -196,7 +214,7 @@ compile_primary_expression(ops)
 		{
 			auto idx = find_var(tok.1.0).1;
 			if(idx==-1)error("Undeclared variable %s",tok.1.0);
-			return {VAR,find_var(tok.1.0).1};
+			return {VAR,idx};
 		}
 		case INTLIT: return {LIT,atoll(tok.1.0)};
 		case STRING_LIT:
@@ -232,14 +250,29 @@ compile_primary_expression(ops)
 				try_consume(COMMA);
 			}
 			push_back(ops,{FUNCALL,func,args.0,args.1,args.2});
+			push_back(ops,{AUTOASSIGN,vars_count,{FUNC_RESULT,func}});
+			return {VAR,vars_count++};
+		}
+		case SUB:
+		{
+			auto arg = compile_primary_expression(ops);
+			push_back(ops,{UNOP,vars_count,arg,SUB});
+			return {VAR,vars_count++};
 		}
 		default : error("UNREACHABLE\n");
 	}
 }
 
+compile_prim_expression(ops)
+{
+	return compile_primary_expression(ops);
+}
+
+
+
 compile_expression(prec,ops)
 {
-	if(prec==precedences.1)return compile_primary_expression(ops);
+	if(prec==precedences.1)return compile_prim_expression(ops);
 	auto lhs = compile_expression(prec+1,ops),rhs;
 	while(try_peek_vec(precedences.0[prec]))
 	{
@@ -304,7 +337,7 @@ auto_assign(ops)
 
 compile_scope(ops)
 {
-	
+	return false;
 }
 
 
@@ -314,6 +347,18 @@ compile_stmt(ops)
 	try_consume_error(SEMICOLON,"Expected ;");
 }
 
+compile_return(ops)
+{
+	if(try_consume(RETURN))
+	{
+		auto arg = compile_expression(0,ops);
+		push_back(ops,{RETURNVALUE,arg});
+		try_consume_error(SEMICOLON,"Expected ;");
+		return true;
+	}
+	return false;
+}
+
 
 comp_func_body(ops)
 {
@@ -321,6 +366,7 @@ comp_func_body(ops)
 	else if(auto_vardec(ops)) return 1;
 	else if(auto_assign(ops)) return 1;
 	else if(extrn_decl(ops)) return 1;
+	else if(compile_return(ops)) return 1;
 	else if(compile_scope(ops)) return 1;
 	else compile_stmt(ops);
 }

@@ -22,6 +22,10 @@ COMMA;
 STRING_LIT;
 ADD;
 SUB;
+MULT;
+DIV;
+REMAINDER;
+RETURN;
 
 
 
@@ -42,6 +46,10 @@ tok_init()
 	STRING_LIT  = tok_count++;
 	ADD			= tok_count++;
 	SUB			= tok_count++;
+	MULT		= tok_count++;
+	DIV			= tok_count++;
+	REMAINDER	= tok_count++;
+	RETURN 		= tok_count++;
 }
 
 tokenize(src)
@@ -100,6 +108,21 @@ tokenize(src)
 			idx++;
 			push_back(tokens,{STRING_LIT,buff});
 		}
+		else if(ch=='*')
+		{
+			push_back(tokens,{MULT,NULL});
+			idx++;
+		}
+		else if(ch=='/')
+		{
+			push_back(tokens,{DIV,NULL});
+			idx++;
+		}
+		else if(ch=='%')
+		{
+			push_back(tokens,{REMAINDER,NULL});
+			idx++;
+		}
 		else if(isdigit(ch))
 		{
 			auto buff = alloc(24);
@@ -110,8 +133,9 @@ tokenize(src)
 		{
 			auto buff = alloc(24);
 			while(isalnum(read_byte(src,idx)))push_char(buff,read_byte(src,idx++));
-			if(!strcmp(*buff,"auto"))push_back(tokens,{AUTO,NULL});
-			else if(!strcmp(*buff,"extrn"))push_back(tokens,{EXTERN,NULL});
+			if(!strcmp(buff.0,"auto"))push_back(tokens,{AUTO,NULL});
+			else if(!strcmp(buff.0,"extrn"))push_back(tokens,{EXTERN,NULL});
+			else if(!strcmp(buff.0,"return"))push_back(tokens,{RETURN,NULL});
 			else push_back(tokens,{IDENTIFIER,buff});
 		}
 		else if(ch == '=')
