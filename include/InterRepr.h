@@ -145,7 +145,7 @@ public:
     Arg compile_expression(int precedence,Ops& ops);
     Arg compile_prim_expr(Ops& ops);
     Arg compile_primary_expression(Ops& ops);
-
+    Tokentype conv(const Tokentype& type);
     std::optional<Token> peek(int offset=0);
     Token consume();
     Token try_consume(const Tokentype& type, const std::string& err_msg);

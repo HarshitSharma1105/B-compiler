@@ -50,6 +50,7 @@ generate_op(op)
 			{
 				case ADD : format_str(asm_str,"    add r15,r14");
 				case SUB : format_str(asm_str,"    sub r15,r14");
+				case MULT: format_str(asm_str,"	   imul r15,r14");
 				default : error("UNKNOWN BINOP");
 			}
 			format_str(asm_str,"	mov QWORD [rbp-%d],r15",8*(op.1+1));
@@ -61,7 +62,7 @@ generate_op(op)
 			switch(op.3)
 			{
 				case SUB:format_str(asm_str,"    xor r15,r15\n    sub r15,r14");
-				default: error("UNREACHABLE");
+				default: error("UNREACHABLE UNOP");
 			}
 			format_str(asm_str,"	mov QWORD [rbp-%d],r15",8*(op.1+1));
 		}
@@ -121,10 +122,7 @@ generate_data_seg()
 	while(idx<size)
 	{
 		format_str_2(asm_str,"data_%d db ",count++);
-		while(read_byte(data_string.0,idx)!=10)
-		{
-			push_char(asm_str,read_byte(data_string.0,idx++));
-		}
+		while(read_byte(data_string.0,idx)!=10)push_char(asm_str,read_byte(data_string.0,idx++));
 		idx++;
 		push_char(asm_str,10);
 	}

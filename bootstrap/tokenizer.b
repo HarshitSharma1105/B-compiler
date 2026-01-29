@@ -26,7 +26,8 @@ MULT;
 DIV;
 REMAINDER;
 RETURN;
-
+INCR;
+DECR;
 
 
 tok_init()
@@ -50,6 +51,8 @@ tok_init()
 	DIV			= tok_count++;
 	REMAINDER	= tok_count++;
 	RETURN 		= tok_count++;
+	INCR		= tok_count++;
+	DECR		= tok_count++;
 }
 
 tokenize(src)
@@ -87,12 +90,22 @@ tokenize(src)
 		}
 		else if(ch=='+')
 		{
-			push_back(tokens,{ADD,NULL});
+			if(read_byte(src,idx+1)=='+')
+			{
+				push_back(tokens,{INCR,NULL});
+				idx++;
+			}
+			else push_back(tokens,{ADD,NULL});
 			idx++;
 		}
 		else if(ch=='-')
 		{
-			push_back(tokens,{SUB,NULL});
+			if(read_byte(src,idx+1)=='+')
+			{
+				push_back(tokens,{DECR,NULL});
+				idx++;
+			}
+			else push_back(tokens,{SUB,NULL});
 			idx++;
 		}
 		else if (ch == ',')
@@ -158,8 +171,8 @@ debug(token)
 	auto type = token.0;
 	switch(token.0)
 	{
-		case OPEN_PAREN:printf("open-curly (\n");
-		case CLOSE_PAREN: printf("close-curly )\n");
+		case OPEN_PAREN:printf("open-paren (\n");
+		case CLOSE_PAREN: printf("close-paren )\n");
 		case OPEN_CURLY: printf("open-brace {\n");
 		case CLOSE_CURLY: printf("close-brace }\n");
 		case INTLIT: printf("Int-lit %s\n",token.1.0);

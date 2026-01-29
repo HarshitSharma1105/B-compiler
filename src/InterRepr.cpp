@@ -273,6 +273,8 @@ bool IREmittor::compile_switch(Ops& ops)
         size_t curr{};
         while(try_consume(Tokentype::case_))
         {
+            size_t curr_vars=vars_count;
+            size_t vars_size=vars.size();
             ops.emplace_back(Label{labels_count++});
             Arg match = compile_primary_expression(ops);
             try_consume(Tokentype::colon,"Expected :");
@@ -283,6 +285,9 @@ bool IREmittor::compile_switch(Ops& ops)
             std::get<JmpIfZero>(ops[curr]).idx = labels_count;
             backpath_indexes.push_back(ops.size());
             ops.emplace_back(Jmp{0});
+            vars.resize(vars_size);
+            max_vars_count=std::max(max_vars_count,vars_count);
+            vars_count=curr_vars;
         }
         if(try_consume(Tokentype::default_))
         {
@@ -502,6 +507,16 @@ Arg IREmittor::compile_expression(int precedence,Ops& ops)
     return lhs;
 }
 
+Tokentype IREmittor::conv(const Tokentype& type)
+{
+    switch(type)
+    {
+        case Tokentype::incr: return Tokentype::add;
+        case Tokentype::decr: return Tokentype::sub;
+        default:assert(false && "UNREACHABLE");
+    }
+}
+
 Arg IREmittor::compile_prim_expr(Ops& ops)
 {
     Arg ret = compile_primary_expression(ops);
@@ -533,12 +548,7 @@ Arg IREmittor::compile_prim_expr(Ops& ops)
             Tokentype type=consume().type;
             temp = Var{vars_count++,Storage::Auto};
             ops.emplace_back(BinOp{temp,Arg{},ret,Tokentype::assignment});
-            switch(type)
-            {
-                case Tokentype::incr:ops.emplace_back(BinOp{*var,temp,Literal{1},Tokentype::add});break;
-                case Tokentype::decr:ops.emplace_back(BinOp{*var,temp,Literal{1},Tokentype::sub});break;
-                default: assert(false && "UNREACHABLE");
-            }
+            ops.emplace_back(BinOp{*var,temp,Literal{1},conv(type)});
             ret = temp;
         }
         else if(Ref* ref = std::get_if<Ref>(&ret))
@@ -549,12 +559,7 @@ Arg IREmittor::compile_prim_expr(Ops& ops)
             Tokentype type=consume().type;
             temp = Var{vars_count++,Storage::Auto};
             ops.emplace_back(BinOp{temp,Arg{},ret,Tokentype::assignment});
-            switch(type)
-            {
-                case Tokentype::incr:ops.emplace_back(BinOp{temp,temp,Literal{1},Tokentype::add});break;
-                case Tokentype::decr:ops.emplace_back(BinOp{temp,temp,Literal{1},Tokentype::sub});break;
-                default: assert(false && "UNREACHABLE");
-            }
+            ops.emplace_back(BinOp{temp,temp,Literal{1},conv(type)});
             ops.emplace_back(Store{curr,temp});
             ret = Var{new_curr};
         }
@@ -637,19 +642,12 @@ Arg IREmittor::compile_primary_expression(Ops& ops)
             return ptr;
         }
         case Tokentype::incr:
-        {
-            Token tok=try_consume(Tokentype::identifier,"expected identifier after pre decrement");
-            Var var=get_var(tok.val);
-            if(var.index==-1)errorf("Variable not declared {}",tok.val);
-            ops.emplace_back(BinOp{Var{var.index},var,Literal{1},Tokentype::add});
-            return var;
-        }
         case Tokentype::decr:
         {
             Token val=try_consume(Tokentype::identifier,"expected identifier after pre decrement");
             Var var=get_var(val.val);
             if(var.index==-1)errorf("Variable not declared {}",val.val);
-            ops.emplace_back(BinOp{Var{var.index},var,Literal{1},Tokentype::sub});
+            ops.emplace_back(BinOp{Var{var.index},var,Literal{1},conv(token.type)});
             return var;
         }
         case Tokentype::function:

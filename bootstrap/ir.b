@@ -259,13 +259,51 @@ compile_primary_expression(ops)
 			push_back(ops,{UNOP,vars_count,arg,SUB});
 			return {VAR,vars_count++};
 		}
+		case OPEN_PAREN:
+		{
+			auto arg = compile_expression(0,ops);
+			try_consume_error(CLOSE_PAREN,"Expected )");
+			return arg;
+		}
+		case INCR:
+		{
+			auto ident = try_consume_error(IDENTIFIER,"Only identifier allowed after pre incr");
+			auto idx = find_var(ident.1.0).1;
+			if(idx==-1)error("Undeclared variable %s",ident.1.0);
+			push_back(ops,{BINOP,idx,{VAR,idx},{LIT,1},ADD});
+			return {VAR,idx};
+		}
 		default : error("UNREACHABLE\n");
+	}
+}
+
+conv(type)
+{
+	switch(type)
+	{
+		case INCR:return ADD;
+		case DECR:return SUB;
+		default: error("UNREACHABLE");
 	}
 }
 
 compile_prim_expression(ops)
 {
-	return compile_primary_expression(ops);
+	auto ret = compile_primary_expression(ops);
+	auto temp;
+	if(try_peek_vec({{INCR,DECR},2}))
+	{
+		if(ret.0 == VAR)
+		{
+			auto type = consume().0;
+			temp = {VAR,vars_count++};
+			push_back(ops,{AUTOASSIGN,temp.1,ret});
+			push_back(ops,{BINOP,ret.1,temp,{LIT,1},conv(type)});
+			ret = temp;
+		}
+		else error("TODO REFERENCES FOR FUTURE");
+	}
+	return ret;
 }
 
 
@@ -292,9 +330,10 @@ auto_vardec(ops)
 		while(try_peek(IDENTIFIER))
 		{
 			auto name = consume().1.0;
-			if(find_var(name).1 != -1 ) error("variable already declared %s\n",name);
+			if(find_var(name).1 != -1 ) error("variable already declared %s",name);
 
 			push_back(vars,{name,vars_count++});
+			if(try_consume(ASSIGN))push_back(ops,{AUTOASSIGN,find_var(name).1,compile_expression(0,ops)});
 			try_consume(COMMA);
 		}
 		try_consume_error(SEMICOLON,"Expected ;");
@@ -327,16 +366,23 @@ auto_assign(ops)
 		auto name = consume().1.0;
 		auto idx = find_var(name).1;
 		if(idx == -1) error("Undeclared variable %s\n",name);
-		try_consume_error(ASSIGN,"Expected =");
-		push_back(ops,{AUTOASSIGN,idx,compile_expression(0,ops)});
+		if(try_consume(ASSIGN)) push_back(ops,{AUTOASSIGN,idx,compile_expression(0,ops)});
 		try_consume_error(SEMICOLON,"Expected ;");
 		return true;
 	}
 	return false;
 }
 
+decl comp_func_body;
 compile_scope(ops)
 {
+	if(try_consume(OPEN_CURLY))
+	{
+		auto size = vars.1;
+		while(!try_consume(CLOSE_CURLY))comp_func_body(ops);
+		resize(vars,size);
+		return true;
+	}
 	return false;
 }
 
@@ -397,6 +443,7 @@ compile_prog()
 		comp_block(ops);
 		push_back(compiler,{name,ops,curr,vars_count});
 		vars_count = 0;
+		resize(vars,0);
 	}
 	else error("Global statements not done");
 }

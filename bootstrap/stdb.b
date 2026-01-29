@@ -25,11 +25,11 @@ error(msg,x1=0,x2=0,x3=0,x4=0,x5=0)
 
 
 alloc_size;
-arena[20480];
+arena[40960];
 
 alloc(size)
 {
-	if(size+alloc_size > 20480) error("Ran out of arena memory . Please change capacity of arena\n");
+	if(size+alloc_size > 40960) error("Ran out of arena memory . Please change capacity of arena\n");
 	auto ptr = arena + alloc_size;
 
 	size = (size + 7) & (~7);
@@ -67,11 +67,14 @@ resize(ptr,siz)
 {
 	ptr.1 = siz;
 	auto cap = ptr.2;
-	while(cap<siz) cap = 2*cap+1;
-	auto new = alloc(8*cap);
-	for(auto i = 0; i < siz;i++) new[i] = ptr.0[i];
-	ptr.0 = new;
-	ptr.2 = cap;
+	if(siz>cap)
+	{
+		while(cap<siz) cap = 2*cap+1;
+		auto new = alloc(8*cap);
+		for(auto i = 0; i < siz;i++) new[i] = ptr.0[i];
+		ptr.0 = new;
+		ptr.2 = cap;
+	}
 }
 
 
@@ -103,15 +106,15 @@ push_str(ptr,str)
 }
 
 
-temp[100];
+temp_str[100];
 format_str(src,fmt,x1=0,x2=0,x3=0,x4=0)
 {
-	sprintf(temp,fmt,x1,x2,x3,x4);
-	push_str(src,temp);
+	sprintf(temp_str,fmt,x1,x2,x3,x4);
+	push_str(src,temp_str);
 	push_char(src,10);
 }
 format_str_2(src,fmt,x1=0,x2=0,x3=0,x4=0)
 {
-	sprintf(temp,fmt,x1,x2,x3,x4);
-	push_str(src,temp);
+	sprintf(temp_str,fmt,x1,x2,x3,x4);
+	push_str(src,temp_str);
 }
