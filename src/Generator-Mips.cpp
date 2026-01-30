@@ -27,6 +27,7 @@ void Mips::ArgVisitor::operator()(const Ref& ref)
     stream << "    lw $s0,-" << (ref.index+1)*4 << "($s1)\n";
     stream << "    lw $s0,0($s0)\n";
 }
+void Mips::ArgVisitor::operator()(const NoArg& noarg){}
 void Mips::Visitor::operator()(const UnOp& unop)
 {
     std::visit(argvisitor,unop.arg);

@@ -1,5 +1,5 @@
 CXX = g++
-CXXFLAGS = -std=c++20 -I include
+CXXFLAGS = -std=c++20 -I include -O2	
 
 SRC_DIR = src
 OBJ_DIR = objs

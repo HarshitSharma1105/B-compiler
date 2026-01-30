@@ -37,8 +37,9 @@ struct FuncResult{
     std::string func_name;
 };
 
+struct NoArg{};
 
-typedef std::variant<Var,Ref,Literal,DataOffset,FuncResult> Arg;
+typedef std::variant<Var,Ref,Literal,DataOffset,FuncResult,NoArg> Arg;
 
 struct UnOp{
     size_t index;

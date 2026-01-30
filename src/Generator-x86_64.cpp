@@ -28,6 +28,7 @@ void x86_64::ArgVisitor::operator()(const Ref& ref)
     stream << "    mov r15,[rbp-" << (ref.index+1)*8 << "]\n";
     stream << "    mov r15,[r15]\n";
 }
+void x86_64::ArgVisitor::operator()(const NoArg& noarg){}
 
 void x86_64::Visitor::operator()(const UnOp& unop)
 {

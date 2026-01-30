@@ -28,6 +28,10 @@ struct DebugArgVisitor{
     {
         std::cout << "FuncResult("  << funcresult.func_name << ")";
     }
+    void operator()(const NoArg& noarg)
+    {
+        std::cout << "NoArg";
+    }
 };
 
 struct DebugVisitor {
@@ -124,7 +128,7 @@ void debug(const Compiler& compiler)
     }
     for(const auto& [name,val] : compiler.globals) 
     {
-        std::cout << "global " << name << "value " << val << '\n';
+        std::cout << "global " << name << " value " << val << '\n';
     }
     for(const auto& [name,size] : compiler.arrays)
     {
@@ -291,11 +295,16 @@ bool IREmittor::compile_switch(Ops& ops)
         }
         if(try_consume(Tokentype::default_))
         {
+            size_t curr_vars=vars_count;
+            size_t vars_size=vars.size();
             if(curr == 0)errorf("Default case witout any previous cases isn't allowed");
             try_consume(Tokentype::colon,"Expected :");
             ops.emplace_back(Label{labels_count});
             std::get<JmpIfZero>(ops[curr]).idx = labels_count++;
             compile_block(ops);
+            vars.resize(vars_size);
+            max_vars_count=std::max(max_vars_count,vars_count);
+            vars_count=curr_vars;
         }
         for(size_t idx : backpath_indexes) std::get<Jmp>(ops[idx]).idx = labels_count;
         ops.emplace_back(Label{labels_count++});
@@ -547,7 +556,7 @@ Arg IREmittor::compile_prim_expr(Ops& ops)
         {
             Tokentype type=consume().type;
             temp = Var{vars_count++,Storage::Auto};
-            ops.emplace_back(BinOp{temp,Arg{},ret,Tokentype::assignment});
+            ops.emplace_back(BinOp{temp,NoArg{},ret,Tokentype::assignment});
             ops.emplace_back(BinOp{*var,temp,Literal{1},conv(type)});
             ret = temp;
         }
@@ -555,10 +564,10 @@ Arg IREmittor::compile_prim_expr(Ops& ops)
         {
             size_t curr = ref->index;
             size_t new_curr = vars_count++;
-            ops.emplace_back(BinOp{Var{new_curr},Arg{},ret,Tokentype::assignment});
+            ops.emplace_back(BinOp{Var{new_curr},NoArg{},ret,Tokentype::assignment});
             Tokentype type=consume().type;
             temp = Var{vars_count++,Storage::Auto};
-            ops.emplace_back(BinOp{temp,Arg{},ret,Tokentype::assignment});
+            ops.emplace_back(BinOp{temp,NoArg{},ret,Tokentype::assignment});
             ops.emplace_back(BinOp{temp,temp,Literal{1},conv(type)});
             ops.emplace_back(Store{curr,temp});
             ret = Var{new_curr};
@@ -612,7 +621,7 @@ Arg IREmittor::compile_primary_expression(Ops& ops)
         case Tokentype::mult:
         {
             Arg arg=compile_primary_expression(ops);
-            ops.emplace_back(BinOp{Var{vars_count},Arg{},arg,Tokentype::assignment});
+            ops.emplace_back(BinOp{Var{vars_count},NoArg{},arg,Tokentype::assignment});
             return Ref{vars_count++};
         }
         case Tokentype::open_paren:
@@ -633,7 +642,7 @@ Arg IREmittor::compile_primary_expression(Ops& ops)
             ops.emplace_back(Funcall{"alloc",{Literal{8*args.size()}}});
             Var ptr  = Var{vars_count++,Storage::Auto};
             Var temp = Var{vars_count++,Storage::Auto};
-            ops.emplace_back(BinOp{ptr,Arg{},FuncResult{"alloc"},Tokentype::assignment});
+            ops.emplace_back(BinOp{ptr,NoArg{},FuncResult{"alloc"},Tokentype::assignment});
             for(size_t i = 0; i < args.size();i++)
             {
                 ops.emplace_back(BinOp{temp,ptr,Literal{8*i},Tokentype::add});
@@ -674,7 +683,7 @@ Arg IREmittor::compile_primary_expression(Ops& ops)
                 else if(num_args!=args_size) errorf("Function signature for {} not matched . Expected atleast {} arguments but got only {} arguments",funcall_name,num_args-default_size,args_size);
             }
             ops.emplace_back(Funcall{funcall_name,args});
-            ops.emplace_back(BinOp{Var{vars_count},Arg{},FuncResult{funcall_name},Tokentype::assignment});
+            ops.emplace_back(BinOp{Var{vars_count},NoArg{},FuncResult{funcall_name},Tokentype::assignment});
             return Var{vars_count++};
         }
         default: assert(false && "UNREACHEABLE"); 

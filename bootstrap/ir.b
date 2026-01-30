@@ -12,7 +12,6 @@ data_string;
 
 ir_count;
 FUNCALL;
-AUTOASSIGN;
 BINOP;
 UNOP;
 RETURNVALUE;
@@ -24,18 +23,19 @@ VAR;
 LIT;
 DATA_OFFSET;
 FUNC_RESULT;
+NO_ARG;
 
 precedences;
 
 ir_init()
 {
 	precedences = alloc(24); 
+	push_back(precedences,{{ASSIGN},1});
 	push_back(precedences,{{ADD,SUB},2});
 	push_back(precedences,{{DIV,MULT,REMAINDER},3});
 
 
     FUNCALL     = ir_count++;
-    AUTOASSIGN  = ir_count++;
 	BINOP		= ir_count++;
 	UNOP		= ir_count++;
 	RETURNVALUE = ir_count++;
@@ -45,6 +45,7 @@ ir_init()
 	LIT 		= arg_count++;
 	DATA_OFFSET = arg_count++;
 	FUNC_RESULT = arg_count++;
+	NO_ARG		= arg_count++;
 }
 
 dbg_arg(arg)
@@ -55,7 +56,8 @@ dbg_arg(arg)
 		case VAR: printf("AutoVar(%d)",arg.1);
 		case DATA_OFFSET: printf("DataOffset[%d]",arg.1);
 		case FUNC_RESULT: printf("Func Result %s",arg.1);
-		default : error("UNREACHABLE\n");
+		case NO_ARG		: printf("No Arg");
+		default : error("UNREACHABLE");
 	}
 }
 
@@ -63,12 +65,6 @@ dbg_op(op)
 {
 	switch(op.0)
 	{
-		case AUTOASSIGN:
-		{
-			printf("Auto Assign(%d,",op.1);
-			dbg_arg(op.2);
-			printf(")\n");
-		}
 		case FUNCALL:
 		{
 			printf("Function call %s(",op[1]);
@@ -250,7 +246,7 @@ compile_primary_expression(ops)
 				try_consume(COMMA);
 			}
 			push_back(ops,{FUNCALL,func,args.0,args.1,args.2});
-			push_back(ops,{AUTOASSIGN,vars_count,{FUNC_RESULT,func}});
+			push_back(ops,{BINOP,vars_count,{NO_ARG},{FUNC_RESULT,func},ASSIGN});
 			return {VAR,vars_count++};
 		}
 		case SUB:
@@ -273,7 +269,7 @@ compile_primary_expression(ops)
 			push_back(ops,{BINOP,idx,{VAR,idx},{LIT,1},ADD});
 			return {VAR,idx};
 		}
-		default : error("UNREACHABLE\n");
+		default : error("UNREACHABLE");
 	}
 }
 
@@ -297,7 +293,7 @@ compile_prim_expression(ops)
 		{
 			auto type = consume().0;
 			temp = {VAR,vars_count++};
-			push_back(ops,{AUTOASSIGN,temp.1,ret});
+			push_back(ops,{BINOP,temp.1,{NO_ARG},ret,ASSIGN});
 			push_back(ops,{BINOP,ret.1,temp,{LIT,1},conv(type)});
 			ret = temp;
 		}
@@ -315,9 +311,17 @@ compile_expression(prec,ops)
 	while(try_peek_vec(precedences.0[prec]))
 	{
 		auto type = consume().0;
-		rhs = compile_expression(prec+1,ops);
-		push_back(ops,{BINOP,vars_count,lhs,rhs,type});
-		lhs = {VAR,vars_count++};
+		if(prec==0)
+		{
+			rhs = compile_expression(0,ops);
+			push_back(ops,{BINOP,lhs.1,{NO_ARG},rhs,type});
+		}
+		else
+		{
+			rhs = compile_expression(prec+1,ops);
+			push_back(ops,{BINOP,vars_count,lhs,rhs,type});
+			lhs = {VAR,vars_count++};
+		}
 	}
 	return lhs;
 }
@@ -329,11 +333,10 @@ auto_vardec(ops)
 	{
 		while(try_peek(IDENTIFIER))
 		{
-			auto name = consume().1.0;
+			auto name = peek().1.0;
 			if(find_var(name).1 != -1 ) error("variable already declared %s",name);
-
 			push_back(vars,{name,vars_count++});
-			if(try_consume(ASSIGN))push_back(ops,{AUTOASSIGN,find_var(name).1,compile_expression(0,ops)});
+			compile_expression(0,ops);
 			try_consume(COMMA);
 		}
 		try_consume_error(SEMICOLON,"Expected ;");
@@ -359,19 +362,7 @@ extrn_decl(ops)
 }
 
 
-auto_assign(ops)
-{
-	if(try_peek(IDENTIFIER))
-	{
-		auto name = consume().1.0;
-		auto idx = find_var(name).1;
-		if(idx == -1) error("Undeclared variable %s\n",name);
-		if(try_consume(ASSIGN)) push_back(ops,{AUTOASSIGN,idx,compile_expression(0,ops)});
-		try_consume_error(SEMICOLON,"Expected ;");
-		return true;
-	}
-	return false;
-}
+
 
 decl comp_func_body;
 compile_scope(ops)
@@ -410,7 +401,6 @@ comp_func_body(ops)
 {
 	if(try_consume(SEMICOLON)) return 1;
 	else if(auto_vardec(ops)) return 1;
-	else if(auto_assign(ops)) return 1;
 	else if(extrn_decl(ops)) return 1;
 	else if(compile_return(ops)) return 1;
 	else if(compile_scope(ops)) return 1;

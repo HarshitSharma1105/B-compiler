@@ -13,6 +13,7 @@ namespace x86_64
         void operator()(const DataOffset& data);
         void operator()(const FuncResult& funcresult);
         void operator()(const Ref& ref);
+        void operator()(const NoArg& noarg);
     };
     struct Visitor
     {
