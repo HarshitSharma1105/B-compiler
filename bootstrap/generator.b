@@ -45,6 +45,7 @@ generate_op(op)
 			switch(op.4)
 			{
 				case ASSIGN: format_str(asm_str,"	 mov r15,r14");
+				case LESS  : format_str(asm_str,"    cmp r15,r14\n    setl al\n    movzx r15,al");
 				case ADD :   format_str(asm_str,"    add r15,r14");
 				case SUB :   format_str(asm_str,"    sub r15,r14");
 				case MULT:   format_str(asm_str,"	 imul r15,r14");
@@ -71,6 +72,20 @@ generate_op(op)
 			format_str(asm_str,"	pop rbp");
 			format_str(asm_str,"	ret"); 
 		}
+		case LABEL:
+		{
+			format_str(asm_str,"label_%d:",op.1);
+		}
+		case JMP:
+		{
+			format_str(asm_str,"	jmp label_%d",op.1);
+		}
+		case JMPIFZERO:
+		{
+			generate_arg(op.1);
+			format_str(asm_str,"	test r15,r15");
+			format_str(asm_str,"	jz label_%d",op.2);
+		}	
 		default : error("UNREACHABLE");
 	}
 }

@@ -28,6 +28,8 @@ REMAINDER;
 RETURN;
 INCR;
 DECR;
+WHILE;
+LESS;
 
 
 tok_init()
@@ -53,6 +55,7 @@ tok_init()
 	RETURN 		= tok_count++;
 	INCR		= tok_count++;
 	DECR		= tok_count++;
+	WHILE 		= tok_count++;
 }
 
 tokenize(src)
@@ -96,6 +99,11 @@ tokenize(src)
 				idx++;
 			}
 			else push_back(tokens,{ADD,NULL});
+			idx++;
+		}
+		else if(ch=='<')
+		{
+			push_back(tokens,{LESS,NULL});
 			idx++;
 		}
 		else if(ch=='-')
@@ -149,6 +157,7 @@ tokenize(src)
 			if(!strcmp(buff.0,"auto"))push_back(tokens,{AUTO,NULL});
 			else if(!strcmp(buff.0,"extrn"))push_back(tokens,{EXTERN,NULL});
 			else if(!strcmp(buff.0,"return"))push_back(tokens,{RETURN,NULL});
+			else if(!strcmp(buff.0,"while"))push_back(tokens,{WHILE,NULL});
 			else push_back(tokens,{IDENTIFIER,buff});
 		}
 		else if(ch == '=')
@@ -186,6 +195,9 @@ debug(token)
 		case STRING_LIT:  printf("string lit %s\n",token.1.0);
 		case ADD : 		  printf("add\n");
 		case SUB : 		  printf("sub\n");
+		case INCR : 	  printf("Incr\n");
+		case DECR : 	  printf("Decr\n");
+		case WHILE:		  printf("While");
 		default : printf("Unknown token\n");
 	}
 }

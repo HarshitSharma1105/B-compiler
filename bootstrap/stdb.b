@@ -118,3 +118,8 @@ format_str_2(src,fmt,x1=0,x2=0,x3=0,x4=0)
 	sprintf(temp_str,fmt,x1,x2,x3,x4);
 	push_str(src,temp_str);
 }
+max(a,b)
+{
+	if(a>b)return a;
+	return b;
+}

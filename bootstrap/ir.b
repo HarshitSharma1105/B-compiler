@@ -5,17 +5,20 @@ IrGen;
 compiler;
 vars;
 vars_count;
+max_vars_count;
 extrns_arr;
 data_count;
 data_string;
-
+labels_count;
 
 ir_count;
 FUNCALL;
 BINOP;
 UNOP;
 RETURNVALUE;
-
+LABEL;
+JMP;
+JMPIFZERO;
 
 
 arg_count;
@@ -31,6 +34,7 @@ ir_init()
 {
 	precedences = alloc(24); 
 	push_back(precedences,{{ASSIGN},1});
+	push_back(precedences,{{LESS},1});
 	push_back(precedences,{{ADD,SUB},2});
 	push_back(precedences,{{DIV,MULT,REMAINDER},3});
 
@@ -39,6 +43,9 @@ ir_init()
 	BINOP		= ir_count++;
 	UNOP		= ir_count++;
 	RETURNVALUE = ir_count++;
+	JMP			= ir_count++;
+	JMPIFZERO	= ir_count++;
+	LABEL		= ir_count++;
 
 
 	VAR 		= arg_count++;
@@ -99,6 +106,20 @@ dbg_op(op)
 			printf("Return Value ");
 			dbg_arg(op.1);
 			printf("\n");
+		}
+		case LABEL:
+		{
+			printf("Label (%d)\n",op.1);
+		}
+		case JMP:
+		{
+			printf("Branch Label (%d)\n",op.1);
+		}
+		case JMPIFZERO:
+		{
+			printf("Branch Label (%d)(",op.1);
+			dbg_arg(op.2);
+			printf(")\n");
 		}
 		default : error("UNREACHABLE");
 	}
@@ -361,17 +382,41 @@ extrn_decl(ops)
 	return false;
 }
 
-
-
+decl comp_block;
+compile_while(ops)
+{
+	if(try_consume(WHILE))
+	{
+		push_back(ops,{LABEL,labels_count});
+		auto start = labels_count++;
+		auto curr_vars  = vars_count;
+		auto vars_size = vars.1;
+		auto arg = compile_expression(0,ops);
+		auto curr = ops.1;
+		push_back(ops,{JMPIFZERO,arg,0});
+		comp_block(ops);
+		push_back(ops,{JMP,start});
+		push_back(ops,{LABEL,labels_count});
+		ops.0[curr].2 = labels_count++;
+		resize(vars,vars_size);
+		max_vars_count = max(max_vars_count,vars_count);
+		vars_count = curr_vars;
+		return true;
+	}
+	return false;
+}
 
 decl comp_func_body;
 compile_scope(ops)
 {
 	if(try_consume(OPEN_CURLY))
 	{
+		auto curr = vars_count;
 		auto size = vars.1;
 		while(!try_consume(CLOSE_CURLY))comp_func_body(ops);
 		resize(vars,size);
+		max_vars_count = max(max_vars_count,vars_count);
+		vars_count = curr;
 		return true;
 	}
 	return false;
@@ -404,6 +449,7 @@ comp_func_body(ops)
 	else if(extrn_decl(ops)) return 1;
 	else if(compile_return(ops)) return 1;
 	else if(compile_scope(ops)) return 1;
+	else if(compile_while(ops))return 1;
 	else compile_stmt(ops);
 }
 
@@ -431,8 +477,9 @@ compile_prog()
 		auto curr = vars_count;
 		try_consume_error(CLOSE_PAREN,"Expected )");
 		comp_block(ops);
-		push_back(compiler,{name,ops,curr,vars_count});
+		push_back(compiler,{name,ops,curr,max_vars_count});
 		vars_count = 0;
+		max_vars_count = 0;
 		resize(vars,0);
 	}
 	else error("Global statements not done");
