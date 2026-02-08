@@ -64,7 +64,7 @@ dbg_arg(arg)
 		case LIT: printf("Literal(%d)",arg.1);
 		case VAR: printf("AutoVar(%d)",arg.1);
 		case DATA_OFFSET: printf("DataOffset[%d]",arg.1);
-		case FUNC_RESULT: printf("Func Result %s",arg.1);
+		case FUNC_RESULT: printf("FuncResult(%s)",arg.1);
 		case REF:		  printf("Ref(%d)",arg.1);
 		case NO_ARG		: printf("No Arg");
 		default : error("UNREACHABLE");
@@ -120,9 +120,15 @@ dbg_op(op)
 		}
 		case JMPIFZERO:
 		{
-			printf("Branch Label (%d)(",op.1);
-			dbg_arg(op.2);
+			printf("Branch Label (%d)(",op.2);
+			dbg_arg(op.1);
 			printf(")\n");
+		}
+		case STORE:
+		{
+			printf("Store ");
+			dbg_arg(op.2);
+			printf(" at AutoVar(%d)\n",op.1);
 		}
 		default : error("UNREACHABLE");
 	}
@@ -339,15 +345,27 @@ compile_prim_expression(ops)
 	}
 	if(try_peek_vec({{INCR,DECR},2}))
 	{
-		if(ret.0 == VAR)
+		auto type = consume().0;
+		switch(ret.0)
 		{
-			auto type = consume().0;
-			temp = {VAR,vars_count++};
-			push_back(ops,{BINOP,temp.1,{NO_ARG},ret,ASSIGN});
-			push_back(ops,{BINOP,ret.1,temp,{LIT,1},conv(type)});
-			ret = temp;
+			case VAR:
+			{
+				temp = {VAR,vars_count++};
+				push_back(ops,{BINOP,temp.1,{NO_ARG},ret,ASSIGN});
+				push_back(ops,{BINOP,ret.1,temp,{LIT,1},conv(type)});
+				ret = temp;
+			}
+			case REF:
+			{
+				auto curr = ret.1;
+				auto new_curr = vars_count++;
+				push_back(ops,{BINOP,new_curr,{NO_ARG},ret,ASSIGN});
+				temp = {VAR,vars_count++};
+				push_back(ops,{BINOP,temp.1,ret,{LIT,1},conv(type)});
+				push_back(ops,{STORE,curr,temp});
+				ret = {VAR,new_curr};
+			}
 		}
-		else error("TODO REFERENCES FOR FUTURE");
 	}
 	return ret;
 }

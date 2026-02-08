@@ -62,6 +62,8 @@ tok_init()
 	OPEN_SQUARE	= tok_count++;
 	CLOSE_SQUARE= tok_count++;
 	DOT			= tok_count++;
+	GREATER		= tok_count++;
+	LESS		= tok_count++;
 }
 
 tokenize(src)
@@ -215,7 +217,7 @@ debug(token)
 		case IDENTIFIER: printf("Identifier %s\n",token.1.0);
 		case FUNCTION: printf("Function %s\n",token.1.0);
 		case EXTERN: printf("Extrn\n");
-		case ASSIGN: printf("assignment =\n");
+		case ASSIGN: printf("assignment \n");
 		case SEMICOLON: printf("semicolon ;\n");
 		case COMMA: printf("comma ,\n");
 		case STRING_LIT:  printf("string lit %s\n",token.1.0);
@@ -224,6 +226,11 @@ debug(token)
 		case INCR : 	  printf("Incr\n");
 		case DECR : 	  printf("Decr\n");
 		case WHILE:		  printf("While");
+		case GREATER:	  printf("Greater\n");
+		case LESS:		  printf("Less\n");
+		case DOT:		  printf("Dot\n");
+		case OPEN_SQUARE: printf("Open Square\n");
+		case CLOSE_SQUARE:printf("Close Sqaure\n");
 		default : printf("Unknown token\n");
 	}
 }
@@ -231,7 +238,7 @@ debug(token)
 
 debug_tokens(tokens)
 {
-	auto base = *tokens,len = *(tokens+8);
+	auto base = tokens.0,len = tokens.1;
 	for(auto i=0;i<len;i++)
 	{
 		debug(base[i]);
