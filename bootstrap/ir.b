@@ -19,13 +19,14 @@ RETURNVALUE;
 LABEL;
 JMP;
 JMPIFZERO;
-
+STORE;
 
 arg_count;
 VAR;
 LIT;
 DATA_OFFSET;
 FUNC_RESULT;
+REF;
 NO_ARG;
 
 precedences;
@@ -34,7 +35,7 @@ ir_init()
 {
 	precedences = alloc(24); 
 	push_back(precedences,{{ASSIGN},1});
-	push_back(precedences,{{LESS},1});
+	push_back(precedences,{{LESS,GREATER},2});
 	push_back(precedences,{{ADD,SUB},2});
 	push_back(precedences,{{DIV,MULT,REMAINDER},3});
 
@@ -46,12 +47,13 @@ ir_init()
 	JMP			= ir_count++;
 	JMPIFZERO	= ir_count++;
 	LABEL		= ir_count++;
-
+	STORE		= ir_count++;
 
 	VAR 		= arg_count++;
 	LIT 		= arg_count++;
 	DATA_OFFSET = arg_count++;
 	FUNC_RESULT = arg_count++;
+	REF			= arg_count++;
 	NO_ARG		= arg_count++;
 }
 
@@ -63,6 +65,7 @@ dbg_arg(arg)
 		case VAR: printf("AutoVar(%d)",arg.1);
 		case DATA_OFFSET: printf("DataOffset[%d]",arg.1);
 		case FUNC_RESULT: printf("Func Result %s",arg.1);
+		case REF:		  printf("Ref(%d)",arg.1);
 		case NO_ARG		: printf("No Arg");
 		default : error("UNREACHABLE");
 	}
@@ -270,6 +273,12 @@ compile_primary_expression(ops)
 			push_back(ops,{BINOP,vars_count,{NO_ARG},{FUNC_RESULT,func},ASSIGN});
 			return {VAR,vars_count++};
 		}
+		case MULT:
+		{
+			auto arg = compile_primary_expression(ops);
+			push_back(ops,{BINOP,vars_count,{NO_ARG},arg,ASSIGN});
+			return {REF,vars_count++};
+		}
 		case SUB:
 		{
 			auto arg = compile_primary_expression(ops);
@@ -308,6 +317,26 @@ compile_prim_expression(ops)
 {
 	auto ret = compile_primary_expression(ops);
 	auto temp;
+	while(try_peek_vec({{DOT,OPEN_SQUARE},2}))
+	{
+		if(try_consume(DOT))
+		{
+			auto idx = compile_primary_expression(ops);
+			temp = {VAR,vars_count++};
+			push_back(ops,{BINOP,temp.1,{LIT,8},idx,MULT});
+    		push_back(ops,{BINOP,temp.1,ret,temp,ADD});
+            ret = {REF,temp.1};
+		}
+		else if(try_consume(OPEN_SQUARE))
+        {
+            auto idx = compile_expression(0,ops);
+            try_consume_error(CLOSE_SQUARE,"Expected closing ']'");
+            temp = {VAR,vars_count++};
+        	push_back(ops,{BINOP,temp.1,{LIT,8},idx,MULT});
+        	push_back(ops,{BINOP,temp.1,ret,temp,ADD});
+            ret = {REF,temp.1};
+        }
+	}
 	if(try_peek_vec({{INCR,DECR},2}))
 	{
 		if(ret.0 == VAR)
@@ -335,7 +364,12 @@ compile_expression(prec,ops)
 		if(prec==0)
 		{
 			rhs = compile_expression(0,ops);
-			push_back(ops,{BINOP,lhs.1,{NO_ARG},rhs,type});
+			switch(lhs.0)
+			{
+				case VAR:push_back(ops,{BINOP,lhs.1,{NO_ARG},rhs,type});
+				case REF:push_back(ops,{STORE,lhs.1,rhs});
+				default: error("Assigning to non assignable values");
+			}
 		}
 		else
 		{
@@ -477,6 +511,7 @@ compile_prog()
 		auto curr = vars_count;
 		try_consume_error(CLOSE_PAREN,"Expected )");
 		comp_block(ops);
+		max_vars_count = max(vars_count,max_vars_count);
 		push_back(compiler,{name,ops,curr,max_vars_count});
 		vars_count = 0;
 		max_vars_count = 0;

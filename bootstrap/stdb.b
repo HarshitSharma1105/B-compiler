@@ -51,7 +51,7 @@ push_back(ptr,val)
 	}
 	ptr.0[siz++] = val;
 	ptr.2 = cap;
-	ptr.1= siz;
+	ptr.1 = siz;
 }
 
 

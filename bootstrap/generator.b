@@ -14,6 +14,7 @@ generate_arg(arg)
 		case VAR: 			format_str(asm_str,"    mov r15,[rbp-%d]",8*(arg.1+1));
 		case DATA_OFFSET : 	format_str(asm_str,"    mov r15,data_%d",arg.1);
 		case FUNC_RESULT :  format_str(asm_str,"	mov r15,rax");
+		case REF		 : 	format_str(asm_str,"	mov r15,[rbp-%d]\n    mov r15,[r15]",8*(arg.1+1));
 		case NO_ARG	     :  {}
 		default: error("UNREACHABLE");
 	}
@@ -44,11 +45,13 @@ generate_op(op)
 			generate_arg(op.2);
 			switch(op.4)
 			{
-				case ASSIGN: format_str(asm_str,"	 mov r15,r14");
+				case ASSIGN: format_str(asm_str,"    mov r15,r14");
 				case LESS  : format_str(asm_str,"    cmp r15,r14\n    setl al\n    movzx r15,al");
+				case GREATER:format_str(asm_str,"    cmp r15,r14\n    setg al\n    movzx r15,al");
 				case ADD :   format_str(asm_str,"    add r15,r14");
 				case SUB :   format_str(asm_str,"    sub r15,r14");
 				case MULT:   format_str(asm_str,"	 imul r15,r14");
+				case DIV:	 format_str(asm_str,"    xor rdx,rdx\n    mov rax,r15\n    idiv r14\n    mov r15,rax");
 				default :    error("UNKNOWN BINOP");
 			}
 			format_str(asm_str,"	mov QWORD [rbp-%d],r15",8*(op.1+1));
@@ -86,6 +89,12 @@ generate_op(op)
 			format_str(asm_str,"	test r15,r15");
 			format_str(asm_str,"	jz label_%d",op.2);
 		}	
+		case STORE:
+		{
+			generate_arg(op.2);
+			format_str(asm_str,"	mov r14,[rbp-%d]",8*(op.1+1));
+			format_str(asm_str,"	mov [r14],r15");
+		}
 		default : error("UNREACHABLE");
 	}
 }
@@ -130,11 +139,11 @@ generate_extrns()
 generate_data_seg()
 {
 	format_str(asm_str,"section \"data\" writeable");
-	auto count = 0,idx = 0,size=data_string.1;
+	auto count = 0,idx = 0,size=data_string.1,str=data_string.0;
 	while(idx<size)
 	{
 		format_str_2(asm_str,"data_%d db ",count++);
-		while(read_byte(data_string.0,idx)!=10)push_char(asm_str,read_byte(data_string.0,idx++));
+		while(read_byte(str,idx)!=10)push_char(asm_str,read_byte(str,idx++));
 		idx++;
 		push_char(asm_str,10);
 	}

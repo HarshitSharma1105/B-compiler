@@ -61,7 +61,7 @@ invalid
 struct Token{
     Tokentype type;
     std::string val;
-    operator bool();
+    explicit operator bool();
 };
 void debug(const Tokentype& tokentype);
 void debug(const std::vector<Token>& tokens);

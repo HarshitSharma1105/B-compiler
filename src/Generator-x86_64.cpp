@@ -106,7 +106,7 @@ void x86_64::Visitor::operator()(const Funcall& funcall)
 }
 void x86_64::Visitor::operator()(const DataSection& data)
 {
-    stream << "section \"data\" writeable\n";
+    stream << "section \"data\"\n";
     int count=0,idx=0;
     while(idx<data.concatedstrings.size())
     {
@@ -170,6 +170,7 @@ std::string Generator_x86_64::generate()
         generate_function_epilogue(func);
     }
     std::visit(visitor,Op{DataSection{compiler.data_section}});
+    textstream << "section \".data\"  writeable\n";
     for(const auto& [name,val] : compiler.globals) 
     {
         textstream << "    public _" << name << "\n_";

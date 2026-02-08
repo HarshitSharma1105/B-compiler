@@ -29,8 +29,11 @@ RETURN;
 INCR;
 DECR;
 WHILE;
+GREATER;
 LESS;
-
+OPEN_SQUARE;
+CLOSE_SQUARE;
+DOT;
 
 tok_init()
 {
@@ -56,6 +59,9 @@ tok_init()
 	INCR		= tok_count++;
 	DECR		= tok_count++;
 	WHILE 		= tok_count++;
+	OPEN_SQUARE	= tok_count++;
+	CLOSE_SQUARE= tok_count++;
+	DOT			= tok_count++;
 }
 
 tokenize(src)
@@ -106,9 +112,14 @@ tokenize(src)
 			push_back(tokens,{LESS,NULL});
 			idx++;
 		}
+		else if(ch=='>')
+		{
+			push_back(tokens,{GREATER,NULL});
+			idx++;
+		}
 		else if(ch=='-')
 		{
-			if(read_byte(src,idx+1)=='+')
+			if(read_byte(src,idx+1)=='-')
 			{
 				push_back(tokens,{DECR,NULL});
 				idx++;
@@ -132,6 +143,21 @@ tokenize(src)
 		else if(ch=='*')
 		{
 			push_back(tokens,{MULT,NULL});
+			idx++;
+		}
+		else if(ch=='[')
+		{
+			push_back(tokens,{OPEN_SQUARE,NULL});
+			idx++;
+		}
+		else if(ch==']')
+		{
+			push_back(tokens,{CLOSE_SQUARE,NULL});
+			idx++;
+		}
+		else if(ch=='.')
+		{
+			push_back(tokens,{DOT,NULL});
 			idx++;
 		}
 		else if(ch=='/')

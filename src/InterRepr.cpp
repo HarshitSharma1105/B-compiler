@@ -532,23 +532,20 @@ Arg IREmittor::compile_prim_expr(Ops& ops)
     Var temp;
     while(try_peek({Tokentype::dot,Tokentype::open_square}))
     {
+        Arg idx;
         if(try_consume(Tokentype::dot))
         {
-            Arg idx = compile_primary_expression(ops);
-            temp = Var{vars_count++,Storage::Auto};
-            ops.emplace_back(BinOp{temp,Literal{8},idx,Tokentype::mult});
-            ops.emplace_back(BinOp{temp,ret,temp,Tokentype::add});
-            ret = Ref{temp.index};
+            idx = compile_primary_expression(ops);
         }
         else if(try_consume(Tokentype::open_square))
         {
-            Arg idx = compile_expression(0,ops);
+            idx = compile_expression(0,ops);
             try_consume(Tokentype::close_square,"Expected closing ']'");
-            temp = Var{vars_count++,Storage::Auto};
-            ops.emplace_back(BinOp{temp,Literal{8},idx,Tokentype::mult});
-            ops.emplace_back(BinOp{temp,ret,temp,Tokentype::add});
-            ret = Ref{temp.index};
         }
+        temp = Var{vars_count++,Storage::Auto};
+        ops.emplace_back(BinOp{temp,Literal{8},idx,Tokentype::mult});
+        ops.emplace_back(BinOp{temp,ret,temp,Tokentype::add});
+        ret = Ref{temp.index};
     }
     if(try_peek({Tokentype::incr,Tokentype::decr}))
     {

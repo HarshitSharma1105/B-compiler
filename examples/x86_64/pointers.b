@@ -10,10 +10,6 @@ main()
         printf("writing %d\n",*(p+8*(10-i))=i);
         i--;
     }
-    while(i<10)
-    {
-        printf("reading %d\n",p[i]);
-        i++;
-    }
+    while(i<10)printf("reading %d\n",p[i++]);
     return *p;
 }
