@@ -34,6 +34,9 @@ LESS;
 OPEN_SQUARE;
 CLOSE_SQUARE;
 DOT;
+EQUALS;
+NOT_EQUALS;
+NOT;
 
 tok_init()
 {
@@ -64,6 +67,9 @@ tok_init()
 	DOT			= tok_count++;
 	GREATER		= tok_count++;
 	LESS		= tok_count++;
+	EQUALS		= tok_count++;
+	NOT_EQUALS	= tok_count++;
+	NOT			= tok_count++;
 }
 
 tokenize(src)
@@ -190,7 +196,22 @@ tokenize(src)
 		}
 		else if(ch == '=')
 		{
-			push_back(tokens,{ASSIGN,NULL});
+			if(read_byte(src,idx+1)=='=')
+			{
+				push_back(tokens,{EQUALS,NULL});
+				idx++;
+			}
+			else push_back(tokens,{ASSIGN,NULL});
+			idx++;
+		}
+		else if(ch=='!')
+		{
+			if(read_byte(src,idx+1)=='=')
+			{
+				push_back(tokens,{NOT_EQUALS,NULL});
+				idx++;
+			}
+			else push_back(tokens,{NOT,NULL});
 			idx++;
 		}
 		else if(ch == ';')

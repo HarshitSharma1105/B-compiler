@@ -8,7 +8,7 @@ void x86_64::ArgVisitor::operator()(const Var& var)
         case Storage::Auto:   stream << "    mov r15,[rbp-" << (var.index+1)*8 << "]\n";break;
         case Storage::Global: stream << "    mov r15,[_" << var.var_name << "]\n";break;
         case Storage::Array : stream << "    mov r15,_" <<  var.var_name << "\n";break;
-        default: assert(false && "UNREACHABLE\n");
+        default: errorf("UNREACHABLE\n");
     }
 }
 void x86_64::ArgVisitor::operator()(const Literal& literal)
@@ -42,10 +42,10 @@ void x86_64::Visitor::operator()(const UnOp& unop)
                         case Storage::Global:
                         case Storage::Array: 
                         stream << "    mov r15, " << var.var_name << "\n";break;
-                        default:assert(false && "UNREACHABLE\n");
+                        default:errorf("UNREACHABLE\n");
                     }
                 },
-                [](const auto&){assert(false && "TODO:Address of other variables");}
+                [](const auto&){errorf("TODO:Address of other variables");}
         },unop.arg);
     }
     else
@@ -57,7 +57,7 @@ void x86_64::Visitor::operator()(const UnOp& unop)
             case Tokentype::sub:    stream << "    xor r15,r15\n    sub r15,r14\n";break;
             case Tokentype::not_:   stream << "    cmp r14,0\n    sete al\n    movzx r15,al\n";break;
             case Tokentype::bit_not:stream << "    mov r15,r14\n    not r15\n";break;
-            default: assert(false && "Unknown Unary Operation\n");
+            default: errorf("Unknown Unary Operation\n");
         }
     }
     stream << "    mov QWORD [rbp-" << (unop.index+1)*8 << "],r15\n";
@@ -83,14 +83,14 @@ void x86_64::Visitor::operator()(const BinOp& binop)
         case Tokentype::mult:       stream    << "    imul r15,r14\n";break;
         case Tokentype::divi:       stream    << "    xor rdx,rdx\n    mov rax,r15\n    idiv r14\n    mov r15,rax\n";break;
         case Tokentype::remainder:  stream    << "    xor rdx,rdx\n    mov rax,r15\n    idiv r14\n    mov r15,rdx\n";break;
-        default: assert(false && "Unknown Binary Operand type\n");
+        default: errorf("Unknown Binary Operand type\n");
     }
     switch(binop.var.type)
     {
         case Storage::Auto:   stream << "    mov QWORD [rbp-" << (binop.var.index+1)*8 << "],r15\n";break;
         case Storage::Global: stream << "    mov [_" << binop.var.var_name << "],r15\n";break;
         case Storage::Array:  stream << "    mov _" << binop.var.var_name << ",r15\n";break;
-        default: assert(false && "UNREACHABLE\n");
+        default: errorf("UNREACHABLE\n");
     }
 }
 void x86_64::Visitor::operator()(const Funcall& funcall) 

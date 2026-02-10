@@ -10,6 +10,9 @@ extrns_arr;
 data_count;
 data_string;
 labels_count;
+globals;
+
+
 
 ir_count;
 FUNCALL;
@@ -29,13 +32,18 @@ FUNC_RESULT;
 REF;
 NO_ARG;
 
+
+STORAGE_AUTO;
+STORAGE_GLOBAL;
+storage_count;
+
 precedences;
 
 ir_init()
 {
 	precedences = alloc(24); 
 	push_back(precedences,{{ASSIGN},1});
-	push_back(precedences,{{LESS,GREATER},2});
+	push_back(precedences,{{LESS,GREATER,EQUALS,NOT_EQUALS},4});
 	push_back(precedences,{{ADD,SUB},2});
 	push_back(precedences,{{DIV,MULT,REMAINDER},3});
 
@@ -55,6 +63,11 @@ ir_init()
 	FUNC_RESULT = arg_count++;
 	REF			= arg_count++;
 	NO_ARG		= arg_count++;
+
+	STORAGE_AUTO=storage_count++;
+	STORAGE_GLOBAL=storage_count++;
+
+	globals = alloc(24);
 }
 
 dbg_arg(arg)
@@ -62,7 +75,14 @@ dbg_arg(arg)
 	switch(arg.0)
 	{
 		case LIT: printf("Literal(%d)",arg.1);
-		case VAR: printf("AutoVar(%d)",arg.1);
+		case VAR: 
+		{
+			switch(arg.3)
+			{
+				case STORAGE_AUTO:printf("AutoVar(%d)",arg.1);
+				case STORAGE_GLOBAL:printf("Global %s",arg.2);
+			}
+		}
 		case DATA_OFFSET: printf("DataOffset[%d]",arg.1);
 		case FUNC_RESULT: printf("FuncResult(%s)",arg.1);
 		case REF:		  printf("Ref(%d)",arg.1);
@@ -89,7 +109,7 @@ dbg_op(op)
 		}
 		case BINOP :
 		{
-			printf("BinOp AutoVar(%d)",op.1);
+			dbg_arg(op.1);
 			printf(",lhs=");
 			dbg_arg(op.2);
 			printf(",rhs=");
@@ -220,9 +240,9 @@ find_var(name)
 	auto ptr = vars.0;
 	for(auto i = 0;i<siz;i++)
 	{
-		if(!strcmp(ptr[i].0,name)) return ptr[i];
+		if(!strcmp(ptr[i].2,name)) return ptr[i];
 	}
-	return {NULL,-1};
+	return {VAR,-1,NULL,STORAGE_AUTO};
 }
 
 
@@ -238,9 +258,9 @@ compile_primary_expression(ops)
 	{
 		case IDENTIFIER:
 		{
-			auto idx = find_var(tok.1.0).1;
-			if(idx==-1)error("Undeclared variable %s",tok.1.0);
-			return {VAR,idx};
+			auto var = find_var(tok.1.0);
+			if(var.1==-1)error("Undeclared variable %s",tok.1.0);
+			return var;
 		}
 		case INTLIT: return {LIT,atoll(tok.1.0)};
 		case STRING_LIT:
@@ -276,20 +296,26 @@ compile_primary_expression(ops)
 				try_consume(COMMA);
 			}
 			push_back(ops,{FUNCALL,func,args.0,args.1,args.2});
-			push_back(ops,{BINOP,vars_count,{NO_ARG},{FUNC_RESULT,func},ASSIGN});
-			return {VAR,vars_count++};
+			push_back(ops,{BINOP,{VAR,vars_count,NULL,STORAGE_AUTO},{NO_ARG},{FUNC_RESULT,func},ASSIGN});
+			return {VAR,vars_count++,NULL,STORAGE_AUTO};
 		}
 		case MULT:
 		{
 			auto arg = compile_primary_expression(ops);
-			push_back(ops,{BINOP,vars_count,{NO_ARG},arg,ASSIGN});
+			push_back(ops,{BINOP,{VAR,vars_count,NULL,STORAGE_AUTO},{NO_ARG},arg,ASSIGN});
 			return {REF,vars_count++};
 		}
 		case SUB:
 		{
 			auto arg = compile_primary_expression(ops);
 			push_back(ops,{UNOP,vars_count,arg,SUB});
-			return {VAR,vars_count++};
+			return {VAR,vars_count++,NULL,STORAGE_AUTO};
+		}
+		case NOT:
+		{
+			auto arg = compile_primary_expression(ops);
+			push_back(ops,{UNOP,vars_count,arg,NOT});
+			return {VAR,vars_count++,NULL,STORAGE_AUTO};		
 		}
 		case OPEN_PAREN:
 		{
@@ -300,10 +326,10 @@ compile_primary_expression(ops)
 		case INCR:
 		{
 			auto ident = try_consume_error(IDENTIFIER,"Only identifier allowed after pre incr");
-			auto idx = find_var(ident.1.0).1;
-			if(idx==-1)error("Undeclared variable %s",ident.1.0);
-			push_back(ops,{BINOP,idx,{VAR,idx},{LIT,1},ADD});
-			return {VAR,idx};
+			auto var = find_var(ident.1.0);
+			if(var.1==-1)error("Undeclared variable %s",ident.1.0);
+			push_back(ops,{BINOP,var,var,{LIT,1},ADD});
+			return var;
 		}
 		default : error("UNREACHABLE");
 	}
@@ -328,18 +354,18 @@ compile_prim_expression(ops)
 		if(try_consume(DOT))
 		{
 			auto idx = compile_primary_expression(ops);
-			temp = {VAR,vars_count++};
-			push_back(ops,{BINOP,temp.1,{LIT,8},idx,MULT});
-    		push_back(ops,{BINOP,temp.1,ret,temp,ADD});
+			temp = {VAR,vars_count++,NULL,STORAGE_AUTO};
+			push_back(ops,{BINOP,temp,{LIT,8},idx,MULT});
+    		push_back(ops,{BINOP,temp,ret,temp,ADD});
             ret = {REF,temp.1};
 		}
 		else if(try_consume(OPEN_SQUARE))
         {
             auto idx = compile_expression(0,ops);
             try_consume_error(CLOSE_SQUARE,"Expected closing ']'");
-            temp = {VAR,vars_count++};
-        	push_back(ops,{BINOP,temp.1,{LIT,8},idx,MULT});
-        	push_back(ops,{BINOP,temp.1,ret,temp,ADD});
+            temp = {VAR,vars_count++,NULL,STORAGE_AUTO};
+        	push_back(ops,{BINOP,temp,{LIT,8},idx,MULT});
+        	push_back(ops,{BINOP,temp,ret,temp,ADD});
             ret = {REF,temp.1};
         }
 	}
@@ -350,20 +376,20 @@ compile_prim_expression(ops)
 		{
 			case VAR:
 			{
-				temp = {VAR,vars_count++};
-				push_back(ops,{BINOP,temp.1,{NO_ARG},ret,ASSIGN});
-				push_back(ops,{BINOP,ret.1,temp,{LIT,1},conv(type)});
+				temp = {VAR,vars_count++,NULL,STORAGE_AUTO};
+				push_back(ops,{BINOP,temp,{NO_ARG},ret,ASSIGN});
+				push_back(ops,{BINOP,ret,temp,{LIT,1},conv(type)});
 				ret = temp;
 			}
 			case REF:
 			{
 				auto curr = ret.1;
 				auto new_curr = vars_count++;
-				push_back(ops,{BINOP,new_curr,{NO_ARG},ret,ASSIGN});
-				temp = {VAR,vars_count++};
-				push_back(ops,{BINOP,temp.1,ret,{LIT,1},conv(type)});
+				push_back(ops,{BINOP,{VAR,new_curr,NULL,STORAGE_AUTO},{NO_ARG},ret,ASSIGN});
+				temp = {VAR,vars_count++,NULL,STORAGE_AUTO};
+				push_back(ops,{BINOP,temp,ret,{LIT,1},conv(type)});
 				push_back(ops,{STORE,curr,temp});
-				ret = {VAR,new_curr};
+				ret = {VAR,new_curr,NULL,STORAGE_AUTO};
 			}
 		}
 	}
@@ -384,7 +410,7 @@ compile_expression(prec,ops)
 			rhs = compile_expression(0,ops);
 			switch(lhs.0)
 			{
-				case VAR:push_back(ops,{BINOP,lhs.1,{NO_ARG},rhs,type});
+				case VAR:push_back(ops,{BINOP,lhs,{NO_ARG},rhs,type});
 				case REF:push_back(ops,{STORE,lhs.1,rhs});
 				default: error("Assigning to non assignable values");
 			}
@@ -392,8 +418,9 @@ compile_expression(prec,ops)
 		else
 		{
 			rhs = compile_expression(prec+1,ops);
-			push_back(ops,{BINOP,vars_count,lhs,rhs,type});
-			lhs = {VAR,vars_count++};
+			auto new_lhs = {VAR,vars_count++,NULL,STORAGE_AUTO};
+			push_back(ops,{BINOP,new_lhs,lhs,rhs,type});
+			lhs = new_lhs;
 		}
 	}
 	return lhs;
@@ -408,7 +435,7 @@ auto_vardec(ops)
 		{
 			auto name = peek().1.0;
 			if(find_var(name).1 != -1 ) error("variable already declared %s",name);
-			push_back(vars,{name,vars_count++});
+			push_back(vars,{VAR,vars_count++,name,STORAGE_AUTO});
 			compile_expression(0,ops);
 			try_consume(COMMA);
 		}
@@ -418,7 +445,7 @@ auto_vardec(ops)
 	return false;
 }
 
-extrn_decl(ops)
+extrn_decl()
 {
 	if(try_consume(EXTERN))
 	{
@@ -498,7 +525,7 @@ comp_func_body(ops)
 {
 	if(try_consume(SEMICOLON)) return 1;
 	else if(auto_vardec(ops)) return 1;
-	else if(extrn_decl(ops)) return 1;
+	else if(extrn_decl()) return 1;
 	else if(compile_return(ops)) return 1;
 	else if(compile_scope(ops)) return 1;
 	else if(compile_while(ops))return 1;
@@ -523,7 +550,7 @@ compile_prog()
 		try_consume_error(OPEN_PAREN,"Expected (");
 		while(try_peek(IDENTIFIER))
 		{
-			push_back(vars,{consume().1.0,vars_count++});
+			push_back(vars,{ VAR,vars_count++,consume().1.0,STORAGE_AUTO});
 			try_consume(COMMA);
 		}
 		auto curr = vars_count;
@@ -534,6 +561,26 @@ compile_prog()
 		vars_count = 0;
 		max_vars_count = 0;
 		resize(vars,0);
+	}
+	else if(try_peek(EXTERN))
+	{
+		extrn_decl();
+	}
+	else if(try_peek(IDENTIFIER))
+	{
+		auto name = consume().1.0;
+		if(try_peek(OPEN_SQUARE))
+		{
+			error("TDODO");
+		}
+		else
+		{
+			auto val = 0;
+			if(try_peek(INTLIT))val = atoll(consume().1.0);
+			push_back(vars,{ VAR,globals.1,name,STORAGE_GLOBAL});
+			push_back(globals,{name,val});
+			try_consume_error(SEMICOLON,"Expected ;");
+		}
 	}
 	else error("Global statements not done");
 }

@@ -11,7 +11,14 @@ generate_arg(arg)
 	switch(arg.0)
 	{
 		case LIT:			format_str(asm_str,"    mov r15,%d",arg.1);
-		case VAR: 			format_str(asm_str,"    mov r15,[rbp-%d]",8*(arg.1+1));
+		case VAR: 			
+		{
+			switch(arg.3)
+			{
+				case STORAGE_AUTO:format_str(asm_str,"    mov r15,[rbp-%d]",8*(arg.1+1));
+				case STORAGE_GLOBAL:format_str(asm_str,"	mov r15,[%s]",arg.2);
+			}
+		}
 		case DATA_OFFSET : 	format_str(asm_str,"    mov r15,data_%d",arg.1);
 		case FUNC_RESULT :  format_str(asm_str,"	mov r15,rax");
 		case REF		 : 	format_str(asm_str,"	mov r15,[rbp-%d]\n    mov r15,[r15]",8*(arg.1+1));
@@ -45,16 +52,23 @@ generate_op(op)
 			generate_arg(op.2);
 			switch(op.4)
 			{
-				case ASSIGN: format_str(asm_str,"    mov r15,r14");
-				case LESS  : format_str(asm_str,"    cmp r15,r14\n    setl al\n    movzx r15,al");
-				case GREATER:format_str(asm_str,"    cmp r15,r14\n    setg al\n    movzx r15,al");
-				case ADD :   format_str(asm_str,"    add r15,r14");
-				case SUB :   format_str(asm_str,"    sub r15,r14");
-				case MULT:   format_str(asm_str,"	 imul r15,r14");
-				case DIV:	 format_str(asm_str,"    xor rdx,rdx\n    mov rax,r15\n    idiv r14\n    mov r15,rax");
+				case ASSIGN: 	 format_str(asm_str,"    mov r15,r14");
+				case LESS  : 	 format_str(asm_str,"    cmp r15,r14\n    setl al\n    movzx r15,al");
+				case GREATER:	 format_str(asm_str,"    cmp r15,r14\n    setg al\n    movzx r15,al");
+				case EQUALS:     format_str(asm_str,"    cmp r15,r14\n    sete al\n    movzx r15,al");
+        		case NOT_EQUALS: format_str(asm_str,"    cmp r15,r14\n    setne al\n   movzx r15,al");
+				case ADD :   	 format_str(asm_str,"    add r15,r14");
+				case SUB :   	 format_str(asm_str,"    sub r15,r14");
+				case MULT:   	 format_str(asm_str,"	 imul r15,r14");
+				case DIV:	 	 format_str(asm_str,"    xor rdx,rdx\n    mov rax,r15\n    idiv r14\n    mov r15,rax");
 				default :    error("UNKNOWN BINOP");
 			}
-			format_str(asm_str,"	mov QWORD [rbp-%d],r15",8*(op.1+1));
+			switch(op.1.3)
+			{
+				case STORAGE_AUTO:format_str(asm_str,"	mov QWORD [rbp-%d],r15",8*(op.1.1+1));
+				case STORAGE_GLOBAL:format_str(asm_str,"	mov [%s],r15",op.1.2);
+			}
+			
 		}
 		case UNOP:
 		{
@@ -63,6 +77,7 @@ generate_op(op)
 			switch(op.3)
 			{
 				case SUB:format_str(asm_str,"    xor r15,r15\n    sub r15,r14");
+				case NOT:format_str(asm_str,"    cmp r14,0\n    sete al\n    movzx r15,al");
 				default: error("UNREACHABLE UNOP");
 			}
 			format_str(asm_str,"	mov QWORD [rbp-%d],r15",8*(op.1+1));
@@ -138,7 +153,7 @@ generate_extrns()
 
 generate_data_seg()
 {
-	format_str(asm_str,"section \"data\" writeable");
+	format_str(asm_str,"section \"data\"");
 	auto count = 0,idx = 0,size=data_string.1,str=data_string.0;
 	while(idx<size)
 	{
@@ -146,6 +161,16 @@ generate_data_seg()
 		while(read_byte(str,idx)!=10)push_char(asm_str,read_byte(str,idx++));
 		idx++;
 		push_char(asm_str,10);
+	}
+}
+
+generate_globals()
+{
+	auto size = globals.1;
+	format_str(asm_str,"section \"data\" writeable");
+	for(auto i=0;i<size;i++)
+	{
+		format_str(asm_str,"%s dq %d",globals.0[i].0,globals.0[i].1);
 	}
 }
 
@@ -165,4 +190,5 @@ generate()
 	}
 	generate_extrns();
 	generate_data_seg();
+	generate_globals();
 }
