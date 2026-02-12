@@ -1,3 +1,5 @@
+#include"lib.b"
+
 b 200;
 
 extrn malloc,printf;
@@ -12,6 +14,7 @@ main(a,b)
 	printf("hello world %d %d %d %d %d\n",y++,x+y,foo(x+2),*p,200);
 	b=10;
 	while(x++<15)printf("%d\n",foo(x+b));
+	printf("bar results = %d\n",bar(20));
 }
 
 foo(a) return a+2;

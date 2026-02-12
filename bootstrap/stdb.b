@@ -106,6 +106,14 @@ push_str(ptr,str)
 }
 
 
+string_from_cstr(c_str)
+{
+	auto str = alloc(24);
+	push_str(str,c_str);
+	return str;
+}
+
+
 temp_str[100];
 format_str(src,fmt,x1=0,x2=0,x3=0,x4=0)
 {

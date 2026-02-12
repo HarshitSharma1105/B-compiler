@@ -636,6 +636,7 @@ Arg IREmittor::compile_primary_expression(Ops& ops)
                 try_consume(Tokentype::comma);
             }
             try_consume(Tokentype::close_curly,"Expected }");
+            if(functions.find("alloc")==functions.end())errorf("Please provide declaration of alloc function");
             ops.emplace_back(Funcall{"alloc",{Literal{8*args.size()}}});
             Var ptr  = Var{vars_count++,Storage::Auto};
             Var temp = Var{vars_count++,Storage::Auto};

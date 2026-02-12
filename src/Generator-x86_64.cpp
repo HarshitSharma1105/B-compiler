@@ -173,13 +173,13 @@ std::string Generator_x86_64::generate()
     textstream << "section \".data\"  writeable\n";
     for(const auto& [name,val] : compiler.globals) 
     {
-        textstream << "    public _" << name << "\n_";
+        textstream << "public _" << name << "\n_";
         textstream << name << "  dq " << val << "\n";
     }
     textstream << "section \".bss\"  writeable\n";
     for(const auto& [name,size] : compiler.arrays)
     {
-        textstream << "    public _" << name << "\n_";
+        textstream << "public _" << name << "\n_";
         textstream << name << "  rb " << size << '\n';
     }
     return textstream.str();
