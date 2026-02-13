@@ -54,10 +54,14 @@ generate_op(op)
 			switch(op.4)
 			{
 				case ASSIGN: 	 	format_str(asm_str,"	mov r15,r14");
+				case BIT_AND:       format_str(asm_str,"    and r15,r14\n");
+        		case BIT_OR:        format_str(asm_str,"    or  r15,r14\n");
 				case LESS  : 	 	format_str(asm_str,"	cmp r15,r14\n	setl al\n	movzx r15,al");
 				case GREATER:	 	format_str(asm_str,"	cmp r15,r14\n	setg al\n	movzx r15,al");
 				case EQUALS:     	format_str(asm_str,"	cmp r15,r14\n	sete al\n	movzx r15,al");
         		case NOT_EQUALS: 	format_str(asm_str,"	cmp r15,r14\n	setne al\n	movzx r15,al");
+				case SHIFT_LEFT:    format_str(asm_str,"    mov r11,rcx\n    mov rcx,r14\n    shl r15,cl\n    mov rcx,r11\n");
+        		case SHIFT_RIGHT:   format_str(asm_str,"    mov r11,rcx\n    mov rcx,r14\n    shr r15,cl\n    mov rcx,r11\n");
 				case ADD :   	 	format_str(asm_str,"	add r15,r14");
 				case SUB :   	 	format_str(asm_str,"	sub r15,r14");
 				case MULT:   	 	format_str(asm_str,"	imul r15,r14");

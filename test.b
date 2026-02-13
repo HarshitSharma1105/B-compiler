@@ -23,8 +23,7 @@ main(a,b)
 	arrays[20] = 40; 
 	while(x++<20)printf("%d\n",foo(x));
 	auto arr = {1,2,3,4};
-	auto i = 0;
-	while(i<4)printf("%d\n",arr[i++]);
+	for(auto i = 0;i<4;i++)printf("%d\n",arr[i]);
 	printf("bar results = %d\n",bar(20)+arrays[20]);
 }
 

@@ -29,6 +29,7 @@ RETURN;
 INCR;
 DECR;
 WHILE;
+FOR;
 GREATER;
 LESS;
 OPEN_SQUARE;
@@ -42,6 +43,10 @@ ELSE;
 ATTRIB;
 DECL;
 ASM;
+BIT_AND;
+BIT_OR;
+SHIFT_LEFT;
+SHIFT_RIGHT;
 
 tok_init()
 {
@@ -67,6 +72,7 @@ tok_init()
 	INCR		= tok_count++;
 	DECR		= tok_count++;
 	WHILE 		= tok_count++;
+	FOR			= tok_count++;
 	OPEN_SQUARE	= tok_count++;
 	CLOSE_SQUARE= tok_count++;
 	DOT			= tok_count++;
@@ -78,6 +84,10 @@ tok_init()
 	IF			= tok_count++;
 	ELSE		= tok_count++;
 	ATTRIB		= tok_count++;
+	BIT_AND		= tok_count++;
+	BIT_OR		= tok_count++;
+	SHIFT_LEFT	= tok_count++;
+	SHIFT_RIGHT	= tok_count++;
 	DECL		= tok_count++;
 }
 
@@ -126,12 +136,32 @@ tokenize(src)
 		}
 		else if(ch=='<')
 		{
-			push_back(tokens,{LESS,NULL});
+			if(read_byte(src,idx+1)=='<')
+			{
+				push_back(tokens,{SHIFT_LEFT,NULL});
+				idx++;
+			}
+			else push_back(tokens,{LESS,NULL});
 			idx++;
 		}
 		else if(ch=='>')
 		{
-			push_back(tokens,{GREATER,NULL});
+			if(read_byte(src,idx+1)=='>')
+			{
+				push_back(tokens,{SHIFT_RIGHT,NULL});
+				idx++;
+			}
+			else push_back(tokens,{GREATER,NULL});
+			idx++;
+		}
+		else if(ch=='|')
+		{
+			push_back(tokens,{BIT_OR,NULL});
+			idx++;
+		}
+		else if(ch=='&')
+		{
+			push_back(tokens,{BIT_AND,NULL});
 			idx++;
 		}
 		else if(ch=='-')
@@ -216,6 +246,9 @@ tokenize(src)
 			else if(!strcmp(buff.0,"else"))push_back(tokens,{ELSE,NULL});
 			else if(!strcmp(buff.0,"decl"))push_back(tokens,{DECL,NULL});
 			else if(!strcmp(buff.0,"asm"))push_back(tokens,{ASM,NULL});
+			else if(!strcmp(buff.0,"for"))push_back(tokens,{FOR,NULL});
+			else if(!strcmp(buff.0,"NULL") | !strcmp(buff.0,"false"))push_back(tokens,{INTLIT,0});
+			else if(!strcmp(buff.0,"true"))push_back(tokens,{INTLIT,1});
 			else push_back(tokens,{IDENTIFIER,buff});
 		}
 		else if(ch == '=')

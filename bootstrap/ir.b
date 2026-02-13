@@ -45,7 +45,9 @@ ir_init()
 {
 	precedences = alloc(24); 
 	push_back(precedences,{{ASSIGN},1});
+	push_back(precedences,{{BIT_AND,BIT_OR},2});
 	push_back(precedences,{{LESS,GREATER,EQUALS,NOT_EQUALS},4});
+	push_back(precedences,{{SHIFT_LEFT,SHIFT_RIGHT},2});
 	push_back(precedences,{{ADD,SUB},2});
 	push_back(precedences,{{DIV,MULT,REMAINDER},3});
 
@@ -455,6 +457,11 @@ compile_expression(prec,ops)
 	return lhs;
 }
 
+compile_stmt(ops)
+{
+	compile_expression(0,ops);
+	try_consume_error(SEMICOLON,"Expected ;");
+}
 
 auto_vardec(ops)
 {
@@ -514,6 +521,36 @@ compile_while(ops)
 	return false;
 }
 
+compile_for(ops)
+{
+	if(try_consume(FOR))
+	{
+		auto temp = alloc(24);
+		auto curr_vars  = vars_count;
+		auto vars_size = vars.1;
+		try_consume_error(OPEN_PAREN,"Expected (");
+		if(!auto_vardec(ops))compile_stmt(ops);
+		push_back(ops,{LABEL,labels_count});
+		auto start = labels_count++;
+		auto arg = compile_expression(0,ops);
+		try_consume_error(SEMICOLON,"Expected ;");
+		auto curr = ops.1;
+		push_back(ops,{JMPIFZERO,arg,0});
+		compile_expression(0,temp);
+		try_consume_error(CLOSE_PAREN,"Expected )");
+		comp_block(ops);
+		for(auto i=0;i<temp.1;i++)push_back(ops,temp.0[i]);
+		push_back(ops,{JMP,start});
+		push_back(ops,{LABEL,labels_count});
+		ops.0[curr].2 = labels_count++;
+		resize(vars,vars_size);
+		max_vars_count = max(max_vars_count,vars_count);
+		vars_count = curr_vars;
+		return true;
+	}
+	return false;
+}
+
 decl comp_func_body;
 compile_scope(ops)
 {
@@ -531,11 +568,6 @@ compile_scope(ops)
 }
 
 
-compile_stmt(ops)
-{
-	compile_expression(0,ops);
-	try_consume_error(SEMICOLON,"Expected ;");
-}
 
 compile_return(ops)
 {
@@ -604,6 +636,7 @@ comp_func_body(ops)
 	else if(compile_return(ops)) return 1;
 	else if(compile_scope(ops)) return 1;
 	else if(compile_while(ops))return 1;
+	else if(compile_for(ops))return 1;
 	else if(compile_branch(ops))return 1;
 	else if(compile_asm(ops))return 1;
 	else compile_stmt(ops);
