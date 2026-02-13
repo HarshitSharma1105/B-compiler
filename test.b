@@ -24,6 +24,6 @@ main(a,b)
 	while(x++<20)printf("%d\n",foo(x));
 	auto arr = {1,2,3,4};
 	for(auto i = 0;i<4;i++)printf("%d\n",arr[i]);
-	printf("bar results = %d\n",bar(20)+arrays[20]);
+	printf("bar results = %d %c\n",bar(20)+arrays[20],''');
 }
 

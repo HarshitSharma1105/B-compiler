@@ -45,6 +45,7 @@ DECL;
 ASM;
 BIT_AND;
 BIT_OR;
+BIT_NOT;
 SHIFT_LEFT;
 SHIFT_RIGHT;
 
@@ -118,6 +119,20 @@ tokenize(src)
 		{
 			push_back(tokens,{OPEN_CURLY,NULL});
 			idx++;
+		}
+		else if(ch=='~')
+		{
+			push_back(tokens,{BIT_NOT,NULL});
+			idx++;
+		}
+		else if(ch==''')
+		{
+			idx++;
+			ch = read_byte(src,idx++);
+			idx++;
+			auto buff = alloc(24);
+			format_str(buff,"%d",ch);
+			push_back(tokens,{INTLIT,buff});
 		}
 		else if(ch == '}')
 		{
