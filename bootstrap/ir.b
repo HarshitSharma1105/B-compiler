@@ -326,6 +326,26 @@ compile_primary_expression(ops)
 			push_back(ops,{UNOP,vars_count,arg,NOT});
 			return {VAR,vars_count++,NULL,STORAGE_AUTO};		
 		}
+		case OPEN_CURLY:
+		{
+			auto args = alloc(24);
+			while(try_peek(CLOSE_CURLY)==false)
+			{
+				push_back(args,compile_expression(0,ops));
+				try_consume(COMMA);
+			}
+			try_consume(CLOSE_CURLY);
+			push_back(ops,{FUNCALL,"alloc",{{LIT,8*args.1}},1,1});
+			auto ptr  = {VAR,vars_count++,NULL,STORAGE_AUTO};
+			auto temp = {VAR,vars_count++,NULL,STORAGE_AUTO};
+			push_back(ops,{BINOP,ptr,{NO_ARG},{FUNC_RESULT,"alloc"},ASSIGN});
+			for(auto i = 0;i<args.1;i++)
+			{
+				push_back(ops,{BINOP,temp,ptr,{LIT,8*i},ADD});
+				push_back(ops,{STORE,temp.1,args.0[i]});
+			}
+			return ptr;
+		}
 		case OPEN_PAREN:
 		{
 			auto arg = compile_expression(0,ops);
@@ -615,7 +635,7 @@ compile_prog()
 		auto vars_size = vars.1;
 		while(try_peek(IDENTIFIER))
 		{
-			push_back(vars,{ VAR,vars_count++,consume().1.0,STORAGE_AUTO});
+			push_back(vars,{VAR,vars_count++,consume().1.0,STORAGE_AUTO});
 			try_consume(COMMA);
 		}
 		auto curr = vars_count;
