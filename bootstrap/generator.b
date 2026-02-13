@@ -15,8 +15,9 @@ generate_arg(arg)
 		{
 			switch(arg.3)
 			{
-				case STORAGE_AUTO:format_str(asm_str,"    mov r15,[rbp-%d]",8*(arg.1+1));
+				case STORAGE_AUTO:  format_str(asm_str,"	mov r15,[rbp-%d]",8*(arg.1+1));
 				case STORAGE_GLOBAL:format_str(asm_str,"	mov r15,[%s]",arg.2);
+				case STORAGE_ARRAY: format_str(asm_str,"	mov r15,%s",arg.2);
 			}
 		}
 		case DATA_OFFSET : 	format_str(asm_str,"    mov r15,data_%d",arg.1);
@@ -52,21 +53,22 @@ generate_op(op)
 			generate_arg(op.2);
 			switch(op.4)
 			{
-				case ASSIGN: 	 format_str(asm_str,"    mov r15,r14");
-				case LESS  : 	 format_str(asm_str,"    cmp r15,r14\n    setl al\n    movzx r15,al");
-				case GREATER:	 format_str(asm_str,"    cmp r15,r14\n    setg al\n    movzx r15,al");
-				case EQUALS:     format_str(asm_str,"    cmp r15,r14\n    sete al\n    movzx r15,al");
-        		case NOT_EQUALS: format_str(asm_str,"    cmp r15,r14\n    setne al\n   movzx r15,al");
-				case ADD :   	 format_str(asm_str,"    add r15,r14");
-				case SUB :   	 format_str(asm_str,"    sub r15,r14");
-				case MULT:   	 format_str(asm_str,"	 imul r15,r14");
-				case DIV:	 	 format_str(asm_str,"    xor rdx,rdx\n    mov rax,r15\n    idiv r14\n    mov r15,rax");
+				case ASSIGN: 	 	format_str(asm_str,"	mov r15,r14");
+				case LESS  : 	 	format_str(asm_str,"	cmp r15,r14\n	setl al\n	movzx r15,al");
+				case GREATER:	 	format_str(asm_str,"	cmp r15,r14\n	setg al\n	movzx r15,al");
+				case EQUALS:     	format_str(asm_str,"	cmp r15,r14\n	sete al\n	movzx r15,al");
+        		case NOT_EQUALS: 	format_str(asm_str,"	cmp r15,r14\n	setne al\n	movzx r15,al");
+				case ADD :   	 	format_str(asm_str,"	add r15,r14");
+				case SUB :   	 	format_str(asm_str,"	sub r15,r14");
+				case MULT:   	 	format_str(asm_str,"	imul r15,r14");
+				case DIV:	 	 	format_str(asm_str,"	xor rdx,rdx\n	mov rax,r15\n	idiv r14\n	mov r15,rax");
 				default :    error("UNKNOWN BINOP");
 			}
 			switch(op.1.3)
 			{
-				case STORAGE_AUTO:format_str(asm_str,"	mov QWORD [rbp-%d],r15",8*(op.1.1+1));
+				case STORAGE_AUTO:  format_str(asm_str,"	mov QWORD [rbp-%d],r15",8*(op.1.1+1));
 				case STORAGE_GLOBAL:format_str(asm_str,"	mov [%s],r15",op.1.2);
+				case STORAGE_ARRAY: format_str(asm_str,"	mov %s,r15",op.1.2);
 			}
 			
 		}
@@ -174,6 +176,17 @@ generate_globals()
 	}
 }
 
+generate_arrays()
+{
+	auto size = arrays.1;
+	format_str(asm_str,"section \"data\" writeable");
+	for(auto i=0;i<size;i++)
+	{
+		format_str(asm_str,"%s rb %d",arrays.0[i].0,arrays.0[i].1);
+	}
+}
+
+
 generate()
 {
 	regs = {"rdi","rsi","rdx","rcx","r8","r9"};
@@ -191,4 +204,5 @@ generate()
 	generate_extrns();
 	generate_data_seg();
 	generate_globals();
+	generate_arrays();
 }

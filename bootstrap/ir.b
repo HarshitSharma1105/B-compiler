@@ -11,7 +11,7 @@ data_count;
 data_string;
 labels_count;
 globals;
-
+arrays;
 
 
 ir_count;
@@ -35,6 +35,7 @@ NO_ARG;
 
 STORAGE_AUTO;
 STORAGE_GLOBAL;
+STORAGE_ARRAY;
 storage_count;
 
 precedences;
@@ -66,8 +67,10 @@ ir_init()
 
 	STORAGE_AUTO=storage_count++;
 	STORAGE_GLOBAL=storage_count++;
+	STORAGE_ARRAY = storage_count++;
 
 	globals = alloc(24);
+	arrays	= alloc(24);
 }
 
 dbg_arg(arg)
@@ -519,7 +522,39 @@ compile_return(ops)
 	}
 	return false;
 }
-
+compile_branch(ops)
+{
+	if(try_consume(IF))
+	{
+		push_back(ops,{LABEL,labels_count++});
+		auto curr_vars = vars_count;
+		auto vars_size = vars.1;
+		auto arg = compile_expression(0,ops);
+		auto jmp_idx = ops.1;
+		push_back(ops,{JMPIFZERO,arg,0});
+		comp_block(ops);
+		auto if_jmp = ops.1;
+		push_back(ops,{JMP,labels_count});
+		push_back(ops,{LABEL,labels_count});
+		ops.0[jmp_idx].2 = labels_count++;
+		max_vars_count = max(vars_count,max_vars_count);
+		resize(vars,vars_size);
+		vars_count = curr_vars;
+		if(try_consume(ELSE))
+		{
+			curr_vars = vars_count;
+			vars_size = vars.1;
+			comp_block(ops);
+			push_back(ops,{LABEL,labels_count});
+			ops.0[if_jmp].1 = labels_count++;
+			max_vars_count = max(vars_count,max_vars_count);
+			resize(vars,vars_size);
+			vars_count = curr_vars;
+		}
+		return true;
+	}
+	return false;
+}
 
 comp_func_body(ops)
 {
@@ -529,6 +564,7 @@ comp_func_body(ops)
 	else if(compile_return(ops)) return 1;
 	else if(compile_scope(ops)) return 1;
 	else if(compile_while(ops))return 1;
+	else if(compile_branch(ops))return 1;
 	else compile_stmt(ops);
 }
 
@@ -557,10 +593,10 @@ compile_prog()
 		try_consume_error(CLOSE_PAREN,"Expected )");
 		comp_block(ops);
 		max_vars_count = max(vars_count,max_vars_count);
-		push_back(compiler,{name,ops,curr,max_vars_count});
 		vars_count = 0;
-		max_vars_count = 0;
 		resize(vars,0);
+		push_back(compiler,{name,ops,curr,max_vars_count});
+		max_vars_count = 0;
 	}
 	else if(try_peek(EXTERN))
 	{
@@ -569,18 +605,21 @@ compile_prog()
 	else if(try_peek(IDENTIFIER))
 	{
 		auto name = consume().1.0;
-		if(try_peek(OPEN_SQUARE))
+		if(try_consume(OPEN_SQUARE))
 		{
-			error("TDODO");
+			push_back(vars,{VAR,arrays.1,name,STORAGE_ARRAY});
+			auto size = atoll(try_consume_error(INTLIT,"Only constant integer sizes supported for now").1.0);
+			try_consume_error(CLOSE_SQUARE,"Expected ]");
+			push_back(arrays,{name,size});
 		}
 		else
 		{
 			auto val = 0;
 			if(try_peek(INTLIT))val = atoll(consume().1.0);
-			push_back(vars,{ VAR,globals.1,name,STORAGE_GLOBAL});
+			push_back(vars,{VAR,globals.1,name,STORAGE_GLOBAL});
 			push_back(globals,{name,val});
-			try_consume_error(SEMICOLON,"Expected ;");
 		}
+		try_consume_error(SEMICOLON,"Expected ;");
 	}
 	else error("Global statements not done");
 }

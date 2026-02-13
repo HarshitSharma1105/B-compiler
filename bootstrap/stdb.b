@@ -102,6 +102,7 @@ push_char(ptr,ch)
 
 push_str(ptr,str)
 {
+	if(str==NULL) return 0;
 	for(auto i = 0;read_byte(str,i);i++)push_char(ptr,read_byte(str,i));
 }
 

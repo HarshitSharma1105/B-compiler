@@ -17,11 +17,11 @@ read_file(path)
 	read(fd,buff,siz);
 	return buff;
 }
-extrn realpath,dirname;
 
 
 preprocess(path,buff)
 {
+	extrn realpath,dirname;
 	auto final_code = alloc(24);
 	auto parent_path = string_from_cstr(dirname(realpath(path,NULL)));
 	auto rel_path = alloc(24);
@@ -45,10 +45,7 @@ preprocess(path,buff)
 		push_str(final_code,preprocess(temp_path.0,read_file(temp_path.0)));
 		while(isspace(read_byte(buff,idx)))idx++;
 	} 
-	while(read_byte(buff,idx))
-	{
-		push_char(final_code,read_byte(buff,idx++));
-	}
+	while(read_byte(buff,idx))push_char(final_code,read_byte(buff,idx++));
 	return final_code.0;
 }
 
@@ -57,7 +54,7 @@ main(argc,argv)
 {
 	if(argc < 2) error("Incorrect Usage");
 	auto path = argv[1];
-	auto parent_path = dirname(realpath(path,NULL));
+
 	auto buff = read_file(path);
 	auto code = preprocess(path,buff);
 	

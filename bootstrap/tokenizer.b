@@ -37,6 +37,8 @@ DOT;
 EQUALS;
 NOT_EQUALS;
 NOT;
+IF;
+ELSE;
 
 tok_init()
 {
@@ -70,6 +72,8 @@ tok_init()
 	EQUALS		= tok_count++;
 	NOT_EQUALS	= tok_count++;
 	NOT			= tok_count++;
+	IF			= tok_count++;
+	ELSE		= tok_count++;
 }
 
 tokenize(src)
@@ -192,6 +196,8 @@ tokenize(src)
 			else if(!strcmp(buff.0,"extrn"))push_back(tokens,{EXTERN,NULL});
 			else if(!strcmp(buff.0,"return"))push_back(tokens,{RETURN,NULL});
 			else if(!strcmp(buff.0,"while"))push_back(tokens,{WHILE,NULL});
+			else if(!strcmp(buff.0,"if"))push_back(tokens,{IF,NULL});
+			else if(!strcmp(buff.0,"else"))push_back(tokens,{ELSE,NULL});
 			else push_back(tokens,{IDENTIFIER,buff});
 		}
 		else if(ch == '=')

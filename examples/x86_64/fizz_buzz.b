@@ -8,10 +8,9 @@ main(argc,argv)
         printf("%s ",*(argv+8*i));
         i++;
     }
-    puts("\n");
-    auto p=malloc(8),n;
-    scanf("%ld",p);
-    n=*p;
+    printf("\n");
+    auto n;
+    scanf("%ld",&n);
     if(n>7)
     {
         if(n>10) printf("first\n");
