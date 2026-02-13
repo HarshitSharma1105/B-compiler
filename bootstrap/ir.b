@@ -23,6 +23,7 @@ LABEL;
 JMP;
 JMPIFZERO;
 STORE;
+ASSEMBLY;
 
 arg_count;
 VAR;
@@ -57,6 +58,7 @@ ir_init()
 	JMPIFZERO	= ir_count++;
 	LABEL		= ir_count++;
 	STORE		= ir_count++;
+	ASSEMBLY	= ir_count++;
 
 	VAR 		= arg_count++;
 	LIT 		= arg_count++;
@@ -153,6 +155,10 @@ dbg_op(op)
 			dbg_arg(op.2);
 			printf(" at AutoVar(%d)\n",op.1);
 		}
+		case ASSEMBLY:
+		{
+			printf("Assembly %s\n",op.1);
+		}
 		default : error("UNREACHABLE");
 	}
 }
@@ -179,7 +185,12 @@ dbg_compiler(compiler)
 }
 
 
-
+peek(off=0)
+{
+	auto ptr = IrGen.0.0;
+	auto idx = IrGen.1;
+	return ptr[idx+off];
+}	
 
 consume()
 {
@@ -211,12 +222,7 @@ try_consume(tokentype)
 }
 
 
-peek(off=0)
-{
-	auto ptr = IrGen.0.0;
-	auto idx = IrGen.1;
-	return ptr[idx+off];
-}	
+
 
 try_peek(tokentype,off=0)
 {
@@ -556,6 +562,20 @@ compile_branch(ops)
 	return false;
 }
 
+compile_asm(ops)
+{
+	if(try_consume(ASM))
+	{
+		try_consume_error(OPEN_PAREN,"Expected )");
+		auto code = try_consume_error(STRING_LIT,"Expected string lit").1.0;
+		push_back(ops,{ASSEMBLY,code});
+		try_consume_error(CLOSE_PAREN,"Expected (");
+		try_consume_error(SEMICOLON,"Expected ;");
+		return true;
+	}
+	return false;
+}
+
 comp_func_body(ops)
 {
 	if(try_consume(SEMICOLON)) return 1;
@@ -565,6 +585,7 @@ comp_func_body(ops)
 	else if(compile_scope(ops)) return 1;
 	else if(compile_while(ops))return 1;
 	else if(compile_branch(ops))return 1;
+	else if(compile_asm(ops))return 1;
 	else compile_stmt(ops);
 }
 
@@ -579,23 +600,31 @@ comp_block(ops)
 
 compile_prog()
 {
+	auto asm_only = false;
+	if(try_peek(ATTRIB))
+	{
+		auto attr = consume().1.0;
+		if(strcmp(attr,"asm"))error("Unknown Attribute");
+		asm_only = true;
+	}
 	if(try_peek(FUNCTION))
 	{
 		auto name = consume().1.0;
 		auto ops = alloc(24);
 		try_consume_error(OPEN_PAREN,"Expected (");
+		auto vars_size = vars.1;
 		while(try_peek(IDENTIFIER))
 		{
 			push_back(vars,{ VAR,vars_count++,consume().1.0,STORAGE_AUTO});
 			try_consume(COMMA);
 		}
 		auto curr = vars_count;
-		try_consume_error(CLOSE_PAREN,"Expected )");
+		try_consume_error(CLOSE_PAREN,"Expected )23");
 		comp_block(ops);
 		max_vars_count = max(vars_count,max_vars_count);
 		vars_count = 0;
-		resize(vars,0);
-		push_back(compiler,{name,ops,curr,max_vars_count});
+		resize(vars,vars_size);
+		push_back(compiler,{name,ops,curr,max_vars_count,asm_only});
 		max_vars_count = 0;
 	}
 	else if(try_peek(EXTERN))
@@ -619,6 +648,11 @@ compile_prog()
 			push_back(vars,{VAR,globals.1,name,STORAGE_GLOBAL});
 			push_back(globals,{name,val});
 		}
+		try_consume_error(SEMICOLON,"Expected ;");
+	}
+	else if(try_consume(DECL))
+	{
+		try_consume(IDENTIFIER);
 		try_consume_error(SEMICOLON,"Expected ;");
 	}
 	else error("Global statements not done");

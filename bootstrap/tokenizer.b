@@ -39,6 +39,9 @@ NOT_EQUALS;
 NOT;
 IF;
 ELSE;
+ATTRIB;
+DECL;
+ASM;
 
 tok_init()
 {
@@ -74,6 +77,8 @@ tok_init()
 	NOT			= tok_count++;
 	IF			= tok_count++;
 	ELSE		= tok_count++;
+	ATTRIB		= tok_count++;
+	DECL		= tok_count++;
 }
 
 tokenize(src)
@@ -159,8 +164,19 @@ tokenize(src)
 		}
 		else if(ch=='[')
 		{
-			push_back(tokens,{OPEN_SQUARE,NULL});
-			idx++;
+			if(read_byte(src,idx+1)=='[')
+			{
+				idx = idx + 2;
+				auto buff = alloc(24);
+				while(isalnum(read_byte(src,idx)))push_char(buff,read_byte(src,idx++));
+				idx = idx + 2;
+				push_back(tokens,{ATTRIB,buff});
+			}
+			else
+			{
+				push_back(tokens,{OPEN_SQUARE,NULL});
+				idx++;
+			}
 		}
 		else if(ch==']')
 		{
@@ -188,16 +204,18 @@ tokenize(src)
 			while(isdigit(read_byte(src,idx)))push_char(buff,read_byte(src,idx++));
 			push_back(tokens,{INTLIT,buff});
 		}
-		else if(isalnum(ch))
+		else if(isalnum(ch) | ch == '_')
 		{
 			auto buff = alloc(24);
-			while(isalnum(read_byte(src,idx)))push_char(buff,read_byte(src,idx++));
+			while(isalnum(read_byte(src,idx)) | read_byte(src,idx) == '_')push_char(buff,read_byte(src,idx++));
 			if(!strcmp(buff.0,"auto"))push_back(tokens,{AUTO,NULL});
 			else if(!strcmp(buff.0,"extrn"))push_back(tokens,{EXTERN,NULL});
 			else if(!strcmp(buff.0,"return"))push_back(tokens,{RETURN,NULL});
 			else if(!strcmp(buff.0,"while"))push_back(tokens,{WHILE,NULL});
 			else if(!strcmp(buff.0,"if"))push_back(tokens,{IF,NULL});
 			else if(!strcmp(buff.0,"else"))push_back(tokens,{ELSE,NULL});
+			else if(!strcmp(buff.0,"decl"))push_back(tokens,{DECL,NULL});
+			else if(!strcmp(buff.0,"asm"))push_back(tokens,{ASM,NULL});
 			else push_back(tokens,{IDENTIFIER,buff});
 		}
 		else if(ch == '=')

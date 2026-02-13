@@ -25,11 +25,11 @@ error(msg,x1=0,x2=0,x3=0,x4=0,x5=0)
 
 
 alloc_size;
-arena[40960];
+arena[81920];
 
 alloc(size)
 {
-	if(size+alloc_size > 40960) error("Ran out of arena memory . Please change capacity of arena\n");
+	if(size+alloc_size > 81920) error("Ran out of arena memory . Please change capacity of arena\n");
 	auto ptr = arena + alloc_size;
 
 	size = (size + 7) & (~7);

@@ -57,7 +57,7 @@ main(argc,argv)
 
 	auto buff = read_file(path);
 	auto code = preprocess(path,buff);
-	
+
 	auto tokens = tokenize(code);
 
 	IrGenerate(tokens);

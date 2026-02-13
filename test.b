@@ -3,7 +3,12 @@
 b 200;
 arrays[200];
 
-
+foo(a) 
+{
+	if(a>100) return 10;
+	else if(a>17) return a+2;
+	else return 2;
+}
 extrn malloc,printf;
 main(a,b)
 {
@@ -20,9 +25,3 @@ main(a,b)
 	printf("bar results = %d\n",bar(20)+arrays[20]);
 }
 
-foo(a) 
-{
-	if(a>100) return 10;
-	else if(a>17) return a+2;
-	else return 2;
-}

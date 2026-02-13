@@ -16,8 +16,8 @@ generate_arg(arg)
 			switch(arg.3)
 			{
 				case STORAGE_AUTO:  format_str(asm_str,"	mov r15,[rbp-%d]",8*(arg.1+1));
-				case STORAGE_GLOBAL:format_str(asm_str,"	mov r15,[%s]",arg.2);
-				case STORAGE_ARRAY: format_str(asm_str,"	mov r15,%s",arg.2);
+				case STORAGE_GLOBAL:format_str(asm_str,"	mov r15,[_%s]",arg.2);
+				case STORAGE_ARRAY: format_str(asm_str,"	mov r15,_%s",arg.2);
 			}
 		}
 		case DATA_OFFSET : 	format_str(asm_str,"    mov r15,data_%d",arg.1);
@@ -44,7 +44,7 @@ generate_op(op)
 				format_str(asm_str,"	mov %s,r15",regs[i]);
 			}
 			format_str(asm_str,"	xor rax,rax");
-			format_str(asm_str,"	call %s",op.1);
+			format_str(asm_str,"	call _%s",op.1);
 		}
 		case BINOP :
 		{
@@ -67,8 +67,8 @@ generate_op(op)
 			switch(op.1.3)
 			{
 				case STORAGE_AUTO:  format_str(asm_str,"	mov QWORD [rbp-%d],r15",8*(op.1.1+1));
-				case STORAGE_GLOBAL:format_str(asm_str,"	mov [%s],r15",op.1.2);
-				case STORAGE_ARRAY: format_str(asm_str,"	mov %s,r15",op.1.2);
+				case STORAGE_GLOBAL:format_str(asm_str,"	mov [_%s],r15",op.1.2);
+				case STORAGE_ARRAY: format_str(asm_str,"	mov _%s,r15",op.1.2);
 			}
 			
 		}
@@ -112,6 +112,10 @@ generate_op(op)
 			format_str(asm_str,"	mov r14,[rbp-%d]",8*(op.1+1));
 			format_str(asm_str,"	mov [r14],r15");
 		}
+		case ASSEMBLY:
+		{
+			format_str(asm_str,"%s",op.1);
+		}
 		default : error("UNREACHABLE");
 	}
 }
@@ -129,20 +133,26 @@ generate_func_prologue(func)
 	auto num_args = func.2,alloc_vars = func.3;
 	if(num_args>6)error("Too many args");
 	if(alloc_vars%2)alloc_vars++;
-	format_str(asm_str,"public %s",func.0);
-	format_str(asm_str,"%s:",func.0);
-	format_str(asm_str,"	push rbp");
-	format_str(asm_str,"	mov rbp,rsp");
-	format_str(asm_str,"	sub rsp,%d",8*alloc_vars);
-	for(auto i=0;i<num_args;i++) format_str(asm_str,"    mov [rbp-%d],%s",8*(i+1),regs[i]);
+	format_str(asm_str,"public _%s as '%s'",func.0,func.0);
+	format_str(asm_str,"_%s:",func.0);
+	if(func.4==false)
+	{
+		format_str(asm_str,"	push rbp");
+		format_str(asm_str,"	mov rbp,rsp");
+		format_str(asm_str,"	sub rsp,%d",8*alloc_vars);
+		for(auto i=0;i<num_args;i++) format_str(asm_str,"    mov [rbp-%d],%s",8*(i+1),regs[i]);
+	}
 }
 
-generate_func_epilogue()
+generate_func_epilogue(func)
 {
-	format_str(asm_str,"	mov rsp,rbp");
-	format_str(asm_str,"	pop rbp");
-	format_str(asm_str,"	xor rax,rax");
-	format_str(asm_str,"	ret"); 
+	if(func.4==false)
+	{
+		format_str(asm_str,"	mov rsp,rbp");
+		format_str(asm_str,"	pop rbp");
+		format_str(asm_str,"	xor rax,rax");
+		format_str(asm_str,"	ret"); 
+	}
 }
 
 
@@ -150,7 +160,7 @@ generate_extrns()
 {
 	auto size = extrns_arr.1;
 	auto base = extrns_arr.0;
-	for(auto i=0;i<size;i++)format_str(asm_str,"	extrn %s",base[i]);
+	for(auto i=0;i<size;i++)format_str(asm_str,"extrn '%s' as _%s",base[i],base[i]);
 }
 
 generate_data_seg()
@@ -172,17 +182,23 @@ generate_globals()
 	format_str(asm_str,"section \"data\" writeable");
 	for(auto i=0;i<size;i++)
 	{
-		format_str(asm_str,"%s dq %d",globals.0[i].0,globals.0[i].1);
+		auto name = globals.0[i].0;
+		auto val = globals.0[i].1;
+		format_str(asm_str,"public _%s",name);
+		format_str(asm_str,"_%s dq %d",name,val);
 	}
 }
 
 generate_arrays()
 {
 	auto size = arrays.1;
-	format_str(asm_str,"section \"data\" writeable");
+	format_str(asm_str,"section \"bss\" writeable");
 	for(auto i=0;i<size;i++)
 	{
-		format_str(asm_str,"%s rb %d",arrays.0[i].0,arrays.0[i].1);
+		auto name = arrays.0[i].0;
+		auto size_ = arrays.0[i].1;
+		format_str(asm_str,"public _%s",name);
+		format_str(asm_str,"_%s rb %d",name,size_);
 	}
 }
 
@@ -192,6 +208,7 @@ generate()
 	regs = {"rdi","rsi","rdx","rcx","r8","r9"};
 	asm_str = alloc(24);
 	format_str(asm_str,"format ELF64");
+	generate_extrns();
 	format_str(asm_str,"section \"text\" executable");
 	auto size = compiler.1;
 	auto funcs = compiler.0;
@@ -199,9 +216,8 @@ generate()
 	{
 		generate_func_prologue(funcs[i]);
 		generate_func(funcs[i]);
-		generate_func_epilogue();
+		generate_func_epilogue(funcs[i]);
 	}
-	generate_extrns();
 	generate_data_seg();
 	generate_globals();
 	generate_arrays();
