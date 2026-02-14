@@ -43,6 +43,7 @@ generate_op(op)
 				generate_arg(op.2[i]);
 				format_str(asm_str,"	mov %s,r15",regs[i]);
 			}
+			for(auto i = size;i<6;i++)  format_str(asm_str,"	xor %s,%s",regs[i],regs[i]);
 			format_str(asm_str,"	xor rax,rax");
 			format_str(asm_str,"	call _%s",op.1);
 		}

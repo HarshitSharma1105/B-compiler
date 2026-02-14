@@ -669,6 +669,7 @@ compile_prog()
 		while(try_peek(IDENTIFIER))
 		{
 			push_back(vars,{VAR,vars_count++,consume().1.0,STORAGE_AUTO});
+			if(try_consume(ASSIGN)) try_consume_error(INTLIT,"Only int lit supported");
 			try_consume(COMMA);
 		}
 		auto curr = vars_count;

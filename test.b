@@ -9,6 +9,10 @@ foo(a)
 	else if(a>17) return a+2;
 	else return 2;
 }
+baz(z)
+{
+	printf("%d\n",z);
+}
 extrn malloc,printf;
 main(a,b)
 {
@@ -25,5 +29,7 @@ main(a,b)
 	auto arr = {1,2,3,4};
 	for(auto i = 0;i<4;i++)printf("%d\n",arr[i]);
 	printf("bar results = %d %c\n",bar(20)+arrays[20],''');
+	baz();
+	baz(20);
 }
 
