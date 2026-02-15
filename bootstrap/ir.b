@@ -328,6 +328,12 @@ compile_primary_expression(ops)
 			push_back(ops,{UNOP,vars_count,arg,NOT});
 			return {VAR,vars_count++,NULL,STORAGE_AUTO};		
 		}
+		case BIT_NOT:
+		{
+			auto arg = compile_primary_expression(ops);
+			push_back(ops,{UNOP,vars_count,arg,BIT_NOT});
+			return {VAR,vars_count++,NULL,STORAGE_AUTO};				
+		}
 		case OPEN_CURLY:
 		{
 			auto args = alloc(24);
@@ -362,7 +368,7 @@ compile_primary_expression(ops)
 			push_back(ops,{BINOP,var,var,{LIT,1},ADD});
 			return var;
 		}
-		default : error("UNREACHABLE");
+		default : error("UNREACHABLESSS");
 	}
 }
 
@@ -628,6 +634,54 @@ compile_asm(ops)
 	return false;
 }
 
+compile_switch(ops)
+{
+	if(try_consume(SWITCH))
+	{
+		auto temp_var = {VAR,vars_count++,NULL,STORAGE_AUTO};
+		auto arg = compile_expression(0,ops);
+		try_consume_error(OPEN_CURLY,"Expected {");
+		auto vec = alloc(24);
+		auto curr = 0;
+		while(try_consume(CASE))
+		{
+			auto curr_vars = vars_count;
+			auto vars_size	= vars.1;
+			push_back(ops,{LABEL,labels_count++});
+			auto match = compile_expression(0,ops);
+			try_consume_error(COLON,"Expected :");
+			push_back(ops,{BINOP,temp_var,arg,match,EQUALS});
+			curr = ops.1;
+			push_back(ops,{JMPIFZERO,temp_var,0});
+			comp_block(ops);
+			ops.0[curr].2 = labels_count;
+			push_back(vec,ops.1);
+			push_back(ops,{JMP,0});
+			resize(vars,vars_size);
+			max_vars_count=max(vars_count,max_vars_count);
+			vars_count = curr_vars;
+		}
+		if(try_consume(DEFAULT))
+		{
+			auto curr_vars = vars_count;
+			auto vars_size	= vars.1;
+			if(curr == 0)error("Default case without any previous cases");
+			try_consume_error(COLON,"Expected :");
+			push_back(ops,{LABEL,labels_count});
+			ops.0[curr].2 = labels_count++;
+			comp_block(ops);
+			resize(vars,vars_size);
+			max_vars_count=max(vars_count,max_vars_count);
+			vars_count = curr_vars;		
+		}
+		for(auto i =0;i<vec.1;i++) ops.0[vec.0[i]].1 = labels_count;
+		push_back(ops,{LABEL,labels_count++});
+		try_consume_error(CLOSE_CURLY,"Expected }");
+		return true;
+	}
+	return false;
+}
+
 comp_func_body(ops)
 {
 	if(try_consume(SEMICOLON)) return 1;
@@ -639,6 +693,7 @@ comp_func_body(ops)
 	else if(compile_for(ops))return 1;
 	else if(compile_branch(ops))return 1;
 	else if(compile_asm(ops))return 1;
+	else if(compile_switch(ops))return 1;
 	else compile_stmt(ops);
 }
 

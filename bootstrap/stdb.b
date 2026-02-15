@@ -25,11 +25,11 @@ error(msg,x1=0,x2=0,x3=0,x4=0,x5=0)
 
 
 alloc_size;
-arena[81920];
+arena[8192000];
 
 alloc(size)
 {
-	if(size+alloc_size > 81920) error("Ran out of arena memory . Please change capacity of arena\n");
+	if(size+alloc_size > 8192000) error("Ran out of arena memory . Please change capacity of arena\n");
 	auto ptr = arena + alloc_size;
 
 	size = (size + 7) & (~7);
@@ -131,4 +131,11 @@ max(a,b)
 {
 	if(a>b)return a;
 	return b;
+}
+
+int_to_str(val)
+{
+	auto str = alloc(24);
+	format_str_2(str,"%d",val);
+	return str;
 }

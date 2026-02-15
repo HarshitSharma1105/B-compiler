@@ -48,6 +48,10 @@ BIT_OR;
 BIT_NOT;
 SHIFT_LEFT;
 SHIFT_RIGHT;
+SWITCH;
+COLON;
+CASE;
+DEFAULT;
 
 tok_init()
 {
@@ -87,9 +91,14 @@ tok_init()
 	ATTRIB		= tok_count++;
 	BIT_AND		= tok_count++;
 	BIT_OR		= tok_count++;
+	BIT_NOT		= tok_count++;
 	SHIFT_LEFT	= tok_count++;
 	SHIFT_RIGHT	= tok_count++;
 	DECL		= tok_count++;
+	SWITCH		= tok_count++;
+	COLON		= tok_count++;
+	CASE		= tok_count++;
+	DEFAULT		= tok_count++;
 }
 
 tokenize(src)
@@ -198,13 +207,26 @@ tokenize(src)
 		{
 			idx++;
 			auto buff = alloc(24);
-			while(read_byte(src,idx)!='"')push_char(buff,read_byte(src,idx++));
+			while(read_byte(src,idx)!='"')
+			{
+				if(read_byte(src,idx)=='\' & read_byte(src,idx+1)=='"')
+				{
+					push_char(buff,'"');
+					idx = idx + 2;
+				}
+				else push_char(buff,read_byte(src,idx++));
+			}
 			idx++;
 			push_back(tokens,{STRING_LIT,buff});
 		}
 		else if(ch=='*')
 		{
 			push_back(tokens,{MULT,NULL});
+			idx++;
+		}
+		else if(ch==':')
+		{
+			push_back(tokens,{COLON,NULL});
 			idx++;
 		}
 		else if(ch=='[')
@@ -262,8 +284,11 @@ tokenize(src)
 			else if(!strcmp(buff.0,"decl"))push_back(tokens,{DECL,NULL});
 			else if(!strcmp(buff.0,"asm"))push_back(tokens,{ASM,NULL});
 			else if(!strcmp(buff.0,"for"))push_back(tokens,{FOR,NULL});
-			else if(!strcmp(buff.0,"NULL") | !strcmp(buff.0,"false"))push_back(tokens,{INTLIT,0});
-			else if(!strcmp(buff.0,"true"))push_back(tokens,{INTLIT,1});
+			else if(!strcmp(buff.0,"NULL") | !strcmp(buff.0,"false"))push_back(tokens,{INTLIT,int_to_str(0)});
+			else if(!strcmp(buff.0,"true"))push_back(tokens,{INTLIT,int_to_str(1)});
+			else if(!strcmp(buff.0,"switch"))push_back(tokens,{SWITCH,NULL});
+			else if(!strcmp(buff.0,"case"))push_back(tokens,{CASE,NULL});
+			else if(!strcmp(buff.0,"default"))push_back(tokens,{DEFAULT,NULL});
 			else push_back(tokens,{IDENTIFIER,buff});
 		}
 		else if(ch == '=')
@@ -316,14 +341,35 @@ debug(token)
 		case STRING_LIT:  printf("string lit %s\n",token.1.0);
 		case ADD : 		  printf("add\n");
 		case SUB : 		  printf("sub\n");
+		case MULT:        printf("mult \n");
+		case DIV: 		  printf("div\n");
+		case REMAINDER:	  printf("remaineder \n");
+		case RETURN :	  printf("return \n");
 		case INCR : 	  printf("Incr\n");
 		case DECR : 	  printf("Decr\n");
 		case WHILE:		  printf("While");
+		case FOR:		  printf("For \n");
 		case GREATER:	  printf("Greater\n");
 		case LESS:		  printf("Less\n");
 		case DOT:		  printf("Dot\n");
 		case OPEN_SQUARE: printf("Open Square\n");
 		case CLOSE_SQUARE:printf("Close Sqaure\n");
+		case EQUALS		 : printf("Equals \n");
+		case NOT_EQUALS  : printf("Not Equals\n");
+		case IF:           printf("if\n");
+		case ELSE:         printf("else\n");
+		case ATTRIB:       printf("attrib\n");
+		case DECL:         printf("decl\n");
+		case ASM:          printf("asm\n");
+		case BIT_AND:      printf("bit_and\n");
+		case BIT_OR:       printf("bit_or\n");
+		case BIT_NOT:      printf("bit_not\n");
+		case SHIFT_LEFT:   printf("shift_left\n");
+		case SHIFT_RIGHT:  printf("shift_right\n");
+		case SWITCH:       printf("switch\n");
+		case COLON:        printf("colon\n");
+		case CASE:         printf("case\n");
+		case DEFAULT:      printf("default\n");
 		default : printf("Unknown token\n");
 	}
 }

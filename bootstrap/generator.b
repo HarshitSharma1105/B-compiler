@@ -67,6 +67,7 @@ generate_op(op)
 				case SUB :   	 	format_str(asm_str,"	sub r15,r14");
 				case MULT:   	 	format_str(asm_str,"	imul r15,r14");
 				case DIV:	 	 	format_str(asm_str,"	xor rdx,rdx\n	mov rax,r15\n	idiv r14\n	mov r15,rax");
+				case REMAINDER:		format_str(asm_str,"	xor rdx,rdx\n	mov rax,r15\n	idiv r14\n	mov r15,rdx");
 				default :    error("UNKNOWN BINOP");
 			}
 			switch(op.1.3)
@@ -85,6 +86,7 @@ generate_op(op)
 			{
 				case SUB:format_str(asm_str,"    xor r15,r15\n    sub r15,r14");
 				case NOT:format_str(asm_str,"    cmp r14,0\n    sete al\n    movzx r15,al");
+				case BIT_NOT:format_str(asm_str,"    mov r15,r14\n    not r15");
 				default: error("UNREACHABLE UNOP");
 			}
 			format_str(asm_str,"	mov QWORD [rbp-%d],r15",8*(op.1+1));
