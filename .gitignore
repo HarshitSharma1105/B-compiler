@@ -6,6 +6,7 @@ objs/
 # Editor files
 *.swp
 # Rough Notes
+grammar.md
 .txt 
 *.csv
 # Added tests
