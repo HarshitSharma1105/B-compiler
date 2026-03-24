@@ -125,7 +125,7 @@ class IREmittor
 public:
     IREmittor(const std::vector<Token> &tokens);
     Compiler   EmitIR();
-
+    void show_table();
 
 
 public:

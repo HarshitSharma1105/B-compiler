@@ -555,6 +555,14 @@ Arg IREmittor::compile_prim_expr(Ops& ops)
             temp = Var{vars_count++,Storage::Auto};
             ops.emplace_back(BinOp{temp,NoArg{},ret,Tokentype::assignment});
             ops.emplace_back(BinOp{*var,temp,Literal{1},conv(type)});
+            auto old_val = get_const(*var);
+            if(old_val.has_value()){
+                set_const(*var, 
+                old_val.value() + 
+                ((type==Tokentype::incr)?1:-1)
+                // +1 if incr, else -1 
+            );
+            }
             ret = temp;
         }
         else if(Ref* ref = std::get_if<Ref>(&ret))
@@ -743,4 +751,14 @@ void IREmittor::remove(Var& var){
     auto it = const_vars.find(var.index);
     if(it != const_vars.end())
         const_vars.erase(var.index);
+}
+
+void IREmittor::show_table(){
+    std::cout << "Index\t\t"
+    << "Value\n";
+    for(auto it=const_vars.begin();
+    it != const_vars.end(); it++){
+        std::cout<<it->first<<"\t\t"
+        <<it->second<<"\n";
+    }
 }
