@@ -725,3 +725,22 @@ bool IREmittor::try_peek(const Tokentype& type,int offset)
     return try_peek(std::vector<Tokentype>{type},offset);
 }
 
+// helper function
+std::optional<int> IREmittor::get_const(Var& var){
+    auto it = const_vars.find(var.index);
+    if(it != const_vars.end())
+        return it->second;
+    return std::nullopt;
+}
+
+void IREmittor::set_const(Var& var, int x){
+    auto it = const_vars.find(var.index);
+    if(it != const_vars.end())
+        const_vars[var.index] = x;
+}
+
+void IREmittor::remove(Var& var){
+    auto it = const_vars.find(var.index);
+    if(it != const_vars.end())
+        const_vars.erase(var.index);
+}

@@ -7,7 +7,7 @@
 #include<algorithm>
 #include<array>
 #include<unordered_set>
-
+#include<unordered_map> 
 
 enum Storage{
     Auto,
@@ -164,4 +164,10 @@ public:
     std::stringstream datastring;
     std::unordered_set<std::string> functions;
     bool is_main_func_present=false;
+
+private:
+    std::unordered_map<size_t, int> const_vars;
+    std::optional<int> get_const(Var&);
+    void set_const(Var&, int);
+    void remove(Var&);
 };
