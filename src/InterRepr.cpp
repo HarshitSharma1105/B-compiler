@@ -654,6 +654,19 @@ Arg IREmittor::compile_primary_expression(Ops& ops)
         case Tokentype::sub: 
         case Tokentype::not_:
         case Tokentype::bit_not:
+        {
+            Arg arg=compile_primary_expression(ops);
+            auto opnd=get_const(arg);
+            if(opnd.has_value()){
+                auto result = eval_unop(opnd.value(),
+            token.type);
+                return Literal{result};
+            }
+            else{
+                ops.emplace_back(UnOp{vars_count,arg,token.type});
+                return Var{vars_count++,Storage::Auto};
+            }
+        }
         case Tokentype::bit_and:
         {
             Arg arg=compile_primary_expression(ops);
@@ -833,5 +846,21 @@ big_int eval_binop(big_int lhs, big_int rhs, Tokentype type) {
                 std::cerr<<"Division by zero detected at compile time\n";
                 exit(EXIT_FAILURE); 
         default: errorf("Unsupported op for constant folding");
+    }
+}
+
+big_int eval_unop(big_int val, Tokentype op) {
+    switch(op) {
+        case Tokentype::sub:      // unary minus
+            return -val;
+
+        case Tokentype::not_:     // logical NOT
+            return !val;
+
+        case Tokentype::bit_not:  // bitwise NOT
+            return ~val;
+
+        default:
+            throw std::runtime_error("Unknown unary operator");
     }
 }

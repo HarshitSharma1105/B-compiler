@@ -199,3 +199,4 @@ private:
 
 // helper function
 big_int eval_binop(big_int lhs, big_int rhs, Tokentype type);
+big_int eval_unop(big_int, Tokentype);
