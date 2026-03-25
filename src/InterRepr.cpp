@@ -631,7 +631,7 @@ Arg IREmittor::compile_primary_expression(Ops& ops)
             if(var.index==-1) errorf("Variable not declared {}",token.val);
             return var;
         }
-        case Tokentype::integer_lit:return Literal{(size_t)atoll(token.val.c_str())};
+        case Tokentype::integer_lit:return Literal{(big_int)atoll(token.val.c_str())};
         case Tokentype::string_lit:
         {
             std::string lit=token.val;
@@ -700,6 +700,14 @@ Arg IREmittor::compile_primary_expression(Ops& ops)
             Var var=get_var(val.val);
             if(var.index==-1)errorf("Variable not declared {}",val.val);
             ops.emplace_back(BinOp{Var{var.index},var,Literal{1},conv(token.type)});
+            auto old_val = get_const(var);
+            if(old_val.has_value()){
+                set_const(var, 
+                old_val.value() + 
+                ((token.type==Tokentype::incr)?1:-1)
+                // +1 if incr, else -1 
+            );
+            }
             return var;
         }
         case Tokentype::function:
