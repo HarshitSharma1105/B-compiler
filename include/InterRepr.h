@@ -9,6 +9,8 @@
 #include<unordered_set>
 #include<unordered_map> 
 
+using big_int = __int128_t;
+
 enum Storage{
     Auto,
     Global,
@@ -166,8 +168,11 @@ public:
     bool is_main_func_present=false;
 
 private:
-    std::unordered_map<size_t, int> const_vars;
-    std::optional<int> get_const(Var&);
-    void set_const(Var&, int);
-    void remove(Var&);
+    std::unordered_map<size_t, big_int> const_vars;
+    std::optional<big_int> get_const(const Arg&);
+    void set_const(const Var&, big_int);
+    void remove(const Var&);
 };
+
+// helper function
+big_int eval_binop(big_int lhs, big_int rhs, Tokentype type);

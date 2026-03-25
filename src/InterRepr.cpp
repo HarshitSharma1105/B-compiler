@@ -501,16 +501,42 @@ Arg IREmittor::compile_expression(int precedence,Ops& ops)
         {
             rhs=compile_expression(0,ops);
             std::visit(overload{
-                [&](const Var& var)  { ops.emplace_back(BinOp{var,var,rhs,type});},
-                [&](const Ref& ref)  { ops.emplace_back(Store{ref.index,rhs});},
-                [](const auto& )     { errorf("Assigning to non assignable value");}
-            }, lhs); 
+                [&](const Var& var) {
+                    ops.emplace_back(BinOp{var, var, rhs, type});
+                    auto rval = get_const(rhs);
+                    if (rval.has_value()) 
+                    const_vars[var.index] = rval.value();
+                    else remove(var);
+                },
+                [&](const Ref& ref) {
+                    ops.emplace_back(Store{ref.index, rhs});
+                },
+                [](const auto&) {
+                    errorf("Assigning to non assignable value");
+                }
+            }, lhs);
         }          
         else
         {
-            rhs=compile_expression(precedence+1,ops);       
-            ops.emplace_back(BinOp{Var{vars_count,Storage::Auto},lhs,rhs,type});
-            lhs=Var{vars_count++,Storage::Auto};
+            rhs=compile_expression(precedence+1,ops);  
+            auto lval = get_const(lhs);
+            auto rval = get_const(rhs);
+            if (lval.has_value() && rval.has_value()) 
+            {
+                int result = eval_binop(lval.value(), 
+                rval.value(), type);
+                lhs = Literal{result};
+            }else {
+                Var temp{vars_count++, Storage::Auto};
+                ops.emplace_back(BinOp{temp, lhs, rhs, type});
+                lhs = temp;
+
+                if (lval && rval) {
+                    const_vars[temp.index] = eval_binop(*lval, *rval, type);
+                } else {
+                    remove(temp);
+                }
+            }
         }    
     }
     return lhs;
@@ -734,24 +760,53 @@ bool IREmittor::try_peek(const Tokentype& type,int offset)
 }
 
 // helper function
-std::optional<int> IREmittor::get_const(Var& var){
-    auto it = const_vars.find(var.index);
-    if(it != const_vars.end())
-        return it->second;
-    return std::nullopt;
+std::optional<big_int> IREmittor::get_const(const Arg& arg) {
+    return std::visit(overload{
+        [&](const Literal& lit) -> std::optional<big_int> {
+            return lit.literal;
+        },
+        [&](const Var& var) -> std::optional<big_int> {
+            auto it = const_vars.find(var.index);
+            if (it != const_vars.end()) return it->second;
+            return std::nullopt;
+        },
+        [&](const auto&) -> std::optional<big_int> {
+            return std::nullopt;
+        }
+    }, arg);
 }
 
-void IREmittor::set_const(Var& var, int x){
+void IREmittor::set_const(const Var& var, big_int x){
     auto it = const_vars.find(var.index);
     if(it != const_vars.end())
         const_vars[var.index] = x;
 }
 
-void IREmittor::remove(Var& var){
+void IREmittor::remove(const Var& var){
     auto it = const_vars.find(var.index);
     if(it != const_vars.end())
         const_vars.erase(var.index);
 }
+
+
+std::ostream& operator<<(std::ostream& os, __int128 value) {
+    if (value == 0) return os << '0';
+
+    bool neg = value < 0;
+    if (neg) value = -value;
+
+    std::string s;
+    while (value > 0) {
+        s.push_back('0' + value % 10);
+        value /= 10;
+    }
+
+    if (neg) s.push_back('-');
+    std::reverse(s.begin(), s.end());
+
+    return os << s;
+}
+
 
 void IREmittor::show_table(){
     std::cout << "Index\t\t"
@@ -759,6 +814,21 @@ void IREmittor::show_table(){
     for(auto it=const_vars.begin();
     it != const_vars.end(); it++){
         std::cout<<it->first<<"\t\t"
-        <<it->second<<"\n";
+        <<(it->second)<<"\n";
+    }
+}
+
+big_int eval_binop(big_int lhs, big_int rhs, Tokentype type) {
+    switch(type) {
+        case Tokentype::add:  return lhs + rhs;
+        case Tokentype::sub: return lhs - rhs;
+        case Tokentype::mult:   return lhs * rhs;
+        case Tokentype::divi:   
+            if(rhs!=0)
+                return lhs / rhs;
+            else 
+                std::cerr<<"Division by zero detected at compile time\n";
+                exit(EXIT_FAILURE); 
+        default: errorf("Unsupported op for constant folding");
     }
 }
