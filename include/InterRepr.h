@@ -11,6 +11,29 @@
 
 using big_int = __int128_t;
 
+// help for debug
+
+
+inline std::ostream& operator<<(std::ostream& os, __int128 value) {
+    if (value == 0) return os << '0';
+
+    bool neg = value < 0;
+    if (neg) value = -value;
+
+    std::string s;
+    while (value > 0) {
+        s.push_back('0' + value % 10);
+        value /= 10;
+    }
+
+    if (neg) s.push_back('-');
+    std::reverse(s.begin(), s.end());
+
+    return os << s;
+}
+
+
+
 enum Storage{
     Auto,
     Global,
@@ -28,7 +51,7 @@ struct Ref{
 };
 
 struct Literal{
-   size_t literal;
+   big_int literal;
 };
 
 struct DataOffset{

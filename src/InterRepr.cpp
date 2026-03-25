@@ -1,4 +1,15 @@
 #include<InterRepr.h>
+// for debug
+
+struct ArgPrinter {
+    void operator()(const Var&) const        { std::cout << "Var\n"; }
+    void operator()(const Ref&) const        { std::cout << "Ref\n"; }
+    void operator()(const Literal&) const    { std::cout << "Literal\n"; }
+    void operator()(const DataOffset&) const { std::cout << "DataOffset\n"; }
+    void operator()(const FuncResult&) const { std::cout << "FuncResult\n"; }
+    void operator()(const NoArg&) const      { std::cout << "NoArg\n"; }
+};
+// ---------------------
 
 struct DebugArgVisitor{
     void operator()(const Var& var)
@@ -523,7 +534,7 @@ Arg IREmittor::compile_expression(int precedence,Ops& ops)
             auto rval = get_const(rhs);
             if (lval.has_value() && rval.has_value()) 
             {
-                int result = eval_binop(lval.value(), 
+                auto result = eval_binop(lval.value(), 
                 rval.value(), type);
                 lhs = Literal{result};
             }else {
@@ -789,23 +800,7 @@ void IREmittor::remove(const Var& var){
 }
 
 
-std::ostream& operator<<(std::ostream& os, __int128 value) {
-    if (value == 0) return os << '0';
 
-    bool neg = value < 0;
-    if (neg) value = -value;
-
-    std::string s;
-    while (value > 0) {
-        s.push_back('0' + value % 10);
-        value /= 10;
-    }
-
-    if (neg) s.push_back('-');
-    std::reverse(s.begin(), s.end());
-
-    return os << s;
-}
 
 
 void IREmittor::show_table(){
