@@ -541,12 +541,7 @@ Arg IREmittor::compile_expression(int precedence,Ops& ops)
                 Var temp{vars_count++, Storage::Auto};
                 ops.emplace_back(BinOp{temp, lhs, rhs, type});
                 lhs = temp;
-
-                if (lval && rval) {
-                    const_vars[temp.index] = eval_binop(*lval, *rval, type);
-                } else {
-                    remove(temp);
-                }
+                remove(temp);
             }
         }    
     }
