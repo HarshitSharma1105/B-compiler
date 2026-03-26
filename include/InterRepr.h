@@ -7,6 +7,31 @@
 #include<algorithm>
 #include<array>
 #include<unordered_set>
+#include<unordered_map> 
+
+using big_int = __int128_t;
+
+// help for debug
+
+
+inline std::ostream& operator<<(std::ostream& os, __int128 value) {
+    if (value == 0) return os << '0';
+
+    bool neg = value < 0;
+    if (neg) value = -value;
+
+    std::string s;
+    while (value > 0) {
+        s.push_back('0' + value % 10);
+        value /= 10;
+    }
+
+    if (neg) s.push_back('-');
+    std::reverse(s.begin(), s.end());
+
+    return os << s;
+}
+
 
 
 enum Storage{
@@ -26,7 +51,7 @@ struct Ref{
 };
 
 struct Literal{
-   size_t literal;
+   big_int literal;
 };
 
 struct DataOffset{
@@ -125,7 +150,7 @@ class IREmittor
 public:
     IREmittor(const std::vector<Token> &tokens);
     Compiler   EmitIR();
-
+    void show_table();
 
 
 public:
@@ -164,4 +189,14 @@ public:
     std::stringstream datastring;
     std::unordered_set<std::string> functions;
     bool is_main_func_present=false;
+
+private:
+    std::unordered_map<size_t, big_int> const_vars;
+    std::optional<big_int> get_const(const Arg&);
+    void set_const(const Var&, big_int);
+    void remove(const Var&);
 };
+
+// helper function
+big_int eval_binop(big_int lhs, big_int rhs, Tokentype type);
+big_int eval_unop(big_int, Tokentype);

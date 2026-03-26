@@ -1,4 +1,15 @@
 #include<InterRepr.h>
+// for debug
+
+struct ArgPrinter {
+    void operator()(const Var&) const        { std::cout << "Var\n"; }
+    void operator()(const Ref&) const        { std::cout << "Ref\n"; }
+    void operator()(const Literal&) const    { std::cout << "Literal\n"; }
+    void operator()(const DataOffset&) const { std::cout << "DataOffset\n"; }
+    void operator()(const FuncResult&) const { std::cout << "FuncResult\n"; }
+    void operator()(const NoArg&) const      { std::cout << "NoArg\n"; }
+};
+// ---------------------
 
 struct DebugArgVisitor{
     void operator()(const Var& var)
@@ -501,16 +512,42 @@ Arg IREmittor::compile_expression(int precedence,Ops& ops)
         {
             rhs=compile_expression(0,ops);
             std::visit(overload{
-                [&](const Var& var)  { ops.emplace_back(BinOp{var,var,rhs,type});},
-                [&](const Ref& ref)  { ops.emplace_back(Store{ref.index,rhs});},
-                [](const auto& )     { errorf("Assigning to non assignable value");}
-            }, lhs); 
+                [&](const Var& var) {
+                    ops.emplace_back(BinOp{var, var, rhs, type});
+                    auto rval = get_const(rhs);
+                    if (rval.has_value()) 
+                    const_vars[var.index] = rval.value();
+                    else remove(var);
+                },
+                [&](const Ref& ref) {
+                    ops.emplace_back(Store{ref.index, rhs});
+                },
+                [](const auto&) {
+                    errorf("Assigning to non assignable value");
+                }
+            }, lhs);
         }          
         else
         {
-            rhs=compile_expression(precedence+1,ops);       
-            ops.emplace_back(BinOp{Var{vars_count,Storage::Auto},lhs,rhs,type});
-            lhs=Var{vars_count++,Storage::Auto};
+            rhs=compile_expression(precedence+1,ops);  
+            auto lval = get_const(lhs);
+            auto rval = get_const(rhs);
+            if (lval.has_value() && rval.has_value()) 
+            {
+                auto result = eval_binop(lval.value(), 
+                rval.value(), type);
+                lhs = Literal{result};
+            }else {
+                Var temp{vars_count++, Storage::Auto};
+                ops.emplace_back(BinOp{temp, lhs, rhs, type});
+                lhs = temp;
+
+                if (lval && rval) {
+                    const_vars[temp.index] = eval_binop(*lval, *rval, type);
+                } else {
+                    remove(temp);
+                }
+            }
         }    
     }
     return lhs;
@@ -555,6 +592,14 @@ Arg IREmittor::compile_prim_expr(Ops& ops)
             temp = Var{vars_count++,Storage::Auto};
             ops.emplace_back(BinOp{temp,NoArg{},ret,Tokentype::assignment});
             ops.emplace_back(BinOp{*var,temp,Literal{1},conv(type)});
+            auto old_val = get_const(*var);
+            if(old_val.has_value()){
+                set_const(*var, 
+                old_val.value() + 
+                ((type==Tokentype::incr)?1:-1)
+                // +1 if incr, else -1 
+            );
+            }
             ret = temp;
         }
         else if(Ref* ref = std::get_if<Ref>(&ret))
@@ -586,7 +631,7 @@ Arg IREmittor::compile_primary_expression(Ops& ops)
             if(var.index==-1) errorf("Variable not declared {}",token.val);
             return var;
         }
-        case Tokentype::integer_lit:return Literal{(size_t)atoll(token.val.c_str())};
+        case Tokentype::integer_lit:return Literal{(big_int)atoll(token.val.c_str())};
         case Tokentype::string_lit:
         {
             std::string lit=token.val;
@@ -609,6 +654,19 @@ Arg IREmittor::compile_primary_expression(Ops& ops)
         case Tokentype::sub: 
         case Tokentype::not_:
         case Tokentype::bit_not:
+        {
+            Arg arg=compile_primary_expression(ops);
+            auto opnd=get_const(arg);
+            if(opnd.has_value()){
+                auto result = eval_unop(opnd.value(),
+            token.type);
+                return Literal{result};
+            }
+            else{
+                ops.emplace_back(UnOp{vars_count,arg,token.type});
+                return Var{vars_count++,Storage::Auto};
+            }
+        }
         case Tokentype::bit_and:
         {
             Arg arg=compile_primary_expression(ops);
@@ -655,6 +713,14 @@ Arg IREmittor::compile_primary_expression(Ops& ops)
             Var var=get_var(val.val);
             if(var.index==-1)errorf("Variable not declared {}",val.val);
             ops.emplace_back(BinOp{Var{var.index},var,Literal{1},conv(token.type)});
+            auto old_val = get_const(var);
+            if(old_val.has_value()){
+                set_const(var, 
+                old_val.value() + 
+                ((token.type==Tokentype::incr)?1:-1)
+                // +1 if incr, else -1 
+            );
+            }
             return var;
         }
         case Tokentype::function:
@@ -725,3 +791,76 @@ bool IREmittor::try_peek(const Tokentype& type,int offset)
     return try_peek(std::vector<Tokentype>{type},offset);
 }
 
+// helper function
+std::optional<big_int> IREmittor::get_const(const Arg& arg) {
+    return std::visit(overload{
+        [&](const Literal& lit) -> std::optional<big_int> {
+            return lit.literal;
+        },
+        [&](const Var& var) -> std::optional<big_int> {
+            auto it = const_vars.find(var.index);
+            if (it != const_vars.end()) return it->second;
+            return std::nullopt;
+        },
+        [&](const auto&) -> std::optional<big_int> {
+            return std::nullopt;
+        }
+    }, arg);
+}
+
+void IREmittor::set_const(const Var& var, big_int x){
+    auto it = const_vars.find(var.index);
+    if(it != const_vars.end())
+        const_vars[var.index] = x;
+}
+
+void IREmittor::remove(const Var& var){
+    auto it = const_vars.find(var.index);
+    if(it != const_vars.end())
+        const_vars.erase(var.index);
+}
+
+
+
+
+
+void IREmittor::show_table(){
+    std::cout << "Index\t\t"
+    << "Value\n";
+    for(auto it=const_vars.begin();
+    it != const_vars.end(); it++){
+        std::cout<<it->first<<"\t\t"
+        <<(it->second)<<"\n";
+    }
+}
+
+big_int eval_binop(big_int lhs, big_int rhs, Tokentype type) {
+    switch(type) {
+        case Tokentype::add:  return lhs + rhs;
+        case Tokentype::sub: return lhs - rhs;
+        case Tokentype::mult:   return lhs * rhs;
+        case Tokentype::divi:   
+            if(rhs!=0)
+                return lhs / rhs;
+            else 
+                std::cerr<<"Division by zero detected at compile time\n";
+                exit(EXIT_FAILURE); 
+        default: errorf("Unsupported op for constant folding");
+    }
+}
+
+big_int eval_unop(big_int val, Tokentype op) {
+    switch(op) {
+        case Tokentype::sub:      // unary minus
+            return -val;
+
+        case Tokentype::not_:     // logical NOT
+            return !val;
+
+        case Tokentype::bit_not:  // bitwise NOT
+            return ~val;
+
+        default:
+            throw std::runtime_error("Unknown unary operator");
+    }
+}
