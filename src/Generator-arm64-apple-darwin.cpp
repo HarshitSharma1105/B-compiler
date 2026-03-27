@@ -17,7 +17,7 @@ std::string to_64bithex(int64_t x) {
       << static_cast<uint64_t>(x);
   return buf.str();
 }
-void load_const(const std::stringstream &stream, big_int lit) {
+void load_const(std::stringstream &stream, big_int lit) {
   int64_t x = to_i64(lit);
   auto hexval = to_64bithex(x);
   std::string tmp;
@@ -30,19 +30,20 @@ void load_const(const std::stringstream &stream, big_int lit) {
 void arm64_apple_darwin::ArgVisitor::operator()(const Var &var) {
   switch (var.type) {
   case Storage::Auto:
-    stream << "    ldr x10, [x29, #" << (var.index + 1) * 8 << "]\n";
+    stream << "    ldr x10, [x29, #-" << (var.index + 1) * 8 << "]\n";
     break;
+
+  case Storage::Global:
+    stream << "    adrp x10, _" << var.var_name << "@PAGE\n"
+           << "    ldr x10, [x10, _" << var.var_name << "@PAGEOFF\n";
+    break;
+  case Storage::Array:
+    stream << "    adrp x10, _" << var.var_name << "@PAGE\n"
+           << "    add x10, x10, _" << var.var_name << "@PAGEOFF\n";
+    break;
+  default:
+    errorf("Undefined Argument passed in code generation\n");
   }
-case Storage::Global:
-  stream << "    adrp x10, _" << var.var_name << "@PAGE\n"
-         << "    ldr x10, [x10, _" << var.var_name << "@PAGEOFF\n";
-  break;
-case Storage::Array:
-  stream << "    adrp x10, _" << var.var_name << "@PAGE\n"
-         << "    add x10, x10, _" << var.var_name << "@PAGEOFF\n";
-  break;
-default:
-  errorf("Undefined Argument passed in code generation\n");
 }
 void arm64_apple_darwin::ArgVisitor::operator()(const Literal &literal) {
   load_const(stream, literal.literal);
@@ -153,18 +154,18 @@ void arm64_apple_darwin::Visitor::operator()(const BinOp &binop) {
   }
   switch (binop.var.type) {
   case Storage::Auto:
-    stream << "    str x10 [x29, #-" << (binop.var.index + 1) * 8 << "]\n";
+    stream << "    str x10, [x29, #-" << (binop.var.index + 1) * 8 << "]\n";
     break;
   case Storage::Global:
-    stream << "    adrp x11, _" << var.var_name << "@PAGE\n"
-           << "    add x11, x11, _" << var.var_name << "@PAGEOFF\n";
-    << "    str x10, [x11]\n";
+    stream << "    adrp x11, _" << binop.var.var_name << "@PAGE\n"
+           << "    add x11, x11, _" << binop.var.var_name << "@PAGEOFF\n"
+           << "    str x10, [x11]\n";
     break;
   case Storage::Array:
-    stream << "    adrp x11, _" << var.var_name << "@PAGE\n"
-           << "    add x11, x11, _" << var.var_name << "@PAGEOFF\n";
-    << "    ldr x12, [x11]\n" // loading the pointer to x12
-    << "    str x10, [x12]\n";
+    stream << "    adrp x11, _" << binop.var.var_name << "@PAGE\n"
+           << "    add x11, x11, _" << binop.var.var_name << "@PAGEOFF\n"
+           << "    ldr x12, [x11]\n" // loading the pointer to x12
+           << "    str x10, [x12]\n";
     break;
   default:
     errorf("UNREACHABLE\n");
@@ -181,7 +182,7 @@ void arm64_apple_darwin::Visitor::operator()(const Funcall &funcall) {
   stream << "    bl _" << funcall.name << "\n";
 }
 void arm64_apple_darwin::Visitor::operator()(const DataSection &data) {
-  stream << "section __DATA, __data\n";
+  stream << ".data\n";
   int count = 0, idx = 0;
   while (idx < data.concatedstrings.size()) {
     stream << "data_" << count++ << ":\n    .byte ";
@@ -210,7 +211,7 @@ void arm64_apple_darwin::Visitor::operator()(const Jmp &jmp) {
   stream << "    b label_" << jmp.idx << "\n";
 }
 void arm64_apple_darwin::Visitor::operator()(const Store &store) {
-  stream << "    ldr x9, [x29, -#" << (store.index + 1) * 8 << "]\n";
+  stream << "    ldr x9, [x29, #-" << (store.index + 1) * 8 << "]\n";
   std::visit(argvisitor, store.val);
   stream << "    str x10, [x9]\n";
 }
@@ -255,25 +256,26 @@ void Generator_arm64_apple_darwin::generate_function_prologue(
   size_t alloc_size = func.max_vars_count;
   if (alloc_size % 2)
     alloc_size++;
+  textstream << ".globl _" << func.function_name << "\n";
   textstream << "_" << func.function_name << ":\n";
   if ((func.func_flags & Flag::AsmFunc) == 0) {
     textstream << "    stp x29, x30, [sp, #-16]\n";
     textstream << "    mov x29, sp\n";
     textstream << "    sub sp, sp, #" << 8 * alloc_size << "\n";
     for (int i = 0; i < func.num_args; i++) {
-      textstream << "    str " << x86_64::regs[i] << ", [x29, #-" << (i + 1) * 8
-                 << "]," << "\n";
+      textstream << "    str " << arm64_apple_darwin::regs[i] << ", [x29, #-"
+                 << (i + 1) * 8 << "]," << "\n";
     }
   }
 }
 void Generator_arm64_apple_darwin::generate_function_epilogue(
     const Func &func) {
   if ((func.func_flags & Flag::AsmFunc) == 0) {
-    stream << "    ldp x29, x30, [sp], #16\n"; // load reg pair
-    stream << "    ret\n";
+    textstream << "    ldp x29, x30, [sp], #16\n"; // load reg pair
+    textstream << "    ret\n";
   }
 }
-void Generator_arm64_apple_darwin64::generate_func(const Func &func) {
+void Generator_arm64_apple_darwin::generate_func(const Func &func) {
   for (const auto &op : func.function_body)
     std::visit(visitor, op);
 }

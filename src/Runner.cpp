@@ -5,6 +5,7 @@
 
 
 
+
 Runner::Runner(std::string target_lang,const std::string& path) : path(path)
 {
 	if(target_lang=="x86_64")
@@ -15,8 +16,15 @@ Runner::Runner(std::string target_lang,const std::string& path) : path(path)
 	{
 		target=Target::MIPS;
 	}
-	else errorf("Unsupported Target Language {}. Please provide valid target for the compiler",target_lang);
+  else if (target_lang == "arm64-mac") {
+    target = Target::ARM64_APPLE_DARWIN;
+  } 
+  else
+  errorf("Unsupported Target Language {}. Please provide valid target for "
+            "the compiler",
+            target_lang);
 }
+
 void Runner::compile(const Compiler& compiler)
 {
 	std::string assembly_sourcecode;
@@ -30,11 +38,14 @@ void Runner::compile(const Compiler& compiler)
 		Generator_x86_64 generator(compiler);
 		assembly_sourcecode=generator.generate();
 	}
-	exec("mkdir " + path+"/trash");
-	{
-		std::ofstream outFile(path+ "/trash/output.asm");  
-		outFile << assembly_sourcecode;
-	}
+ else if (target == Target::ARM64_APPLE_DARWIN) {
+    Generator_arm64_apple_darwin generator(compiler);
+    assembly_sourcecode = generator.generate();
+  }
+  {
+    std::ofstream outFile(path + "/output.asm");
+    outFile << assembly_sourcecode;
+  }
 }
 
 
@@ -45,13 +56,11 @@ void Runner::run()
 	{
 		exec("java -jar assemblers/Mars4_5.jar sm " + path +"/trash/output.asm");
 	}
-	else 
-	{
-		exec("assemblers/fasm "+ path +"/trash/output.asm");
-		exec("cc -no-pie " + path +"/trash/output.o -l:raylib/libraylib.so -o builds/output");
-//		exec_c("LD_LIBRARY_PATH=\"/usr/lib/raylib\"  builds/output");
-	}
+  else if (target == Target::X86_64) {
+    exec("assemblers/fasm " + path + "/trash/output.asm");
+    exec("cc -no-pie " + path + "/trash/output.o -o builds/output");
+    exec_c("LD_LIBRARY_PATH=\"/usr/lib/raylib\"  builds/output");
+  } else if (target == Target::ARM64_APPLE_DARWIN) {
+    exec("./assemble.sh " + path + "/output.asm");
+  }
 }
-
-
-

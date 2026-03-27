@@ -13,3 +13,4 @@ grammar.md
 *.b
 # Mac specific files
 .DS_Store
+*.sh
