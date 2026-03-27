@@ -217,3 +217,63 @@ void arm64_apple_darwin::Visitor::operator()(const Store &store) {
 void arm64_apple_darwin::Visitor::operator()(const Asm &assembly) {
   stream << assembly.asm_code << '\n';
 }
+
+Generator_arm64_apple_darwin::Generator_arm64_apple_darwin(
+    const Compiler &compiler)
+    : compiler(compiler) {}
+
+std::string Generator_arm64_apple_darwin::generate() {
+  for (const auto &name : compiler.extrns) {
+    textstream << ".extrn " << name << "\n";
+    textstream << ".globl _" << name << "\n_" << name << " = " << name
+               << "\n"; // .globl _name _name = name
+  }
+  textstream << ".text\n.align 2\n";
+  for (const auto &func : compiler.functions) {
+    generate_function_prologue(func);
+    generate_func(func);
+    generate_function_epilogue(func);
+  }
+  std::visit(visitor, Op{DataSection{compiler.data_section}});
+  textstream << ".data\n.align 3\n";
+  for (const auto &[name, val] : compiler.globals) {
+    textstream << ".globl _" << name << "\n"
+               << "_" << name << ":\n    "
+               << ".quad " << val << "\n";
+  }
+  textstream << ".bss\n.align 3\n";
+  for (const auto &[name, size] : compiler.arrays) {
+    textstream << ".globl _" << name << "\n"
+               << "_" << name << ":\n    "
+               << ".skip" << size << "\n";
+  }
+  return textstream.str();
+}
+void Generator_arm64_apple_darwin::generate_function_prologue(
+    const Func &func) {
+  assert(func.num_args <= 8 && "too many args");
+  size_t alloc_size = func.max_vars_count;
+  if (alloc_size % 2)
+    alloc_size++;
+  textstream << "_" << func.function_name << ":\n";
+  if ((func.func_flags & Flag::AsmFunc) == 0) {
+    textstream << "    stp x29, x30, [sp, #-16]\n";
+    textstream << "    mov x29, sp\n";
+    textstream << "    sub sp, sp, #" << 8 * alloc_size << "\n";
+    for (int i = 0; i < func.num_args; i++) {
+      textstream << "    str " << x86_64::regs[i] << ", [x29, #-" << (i + 1) * 8
+                 << "]," << "\n";
+    }
+  }
+}
+void Generator_arm64_apple_darwin::generate_function_epilogue(
+    const Func &func) {
+  if ((func.func_flags & Flag::AsmFunc) == 0) {
+    stream << "    ldp x29, x30, [sp], #16\n"; // load reg pair
+    stream << "    ret\n";
+  }
+}
+void Generator_arm64_apple_darwin64::generate_func(const Func &func) {
+  for (const auto &op : func.function_body)
+    std::visit(visitor, op);
+}
