@@ -9,8 +9,6 @@ objs/
 grammar.md
 .txt 
 *.csv
-# Added tests
-*.b
 # Mac specific files
 .DS_Store
 *.sh
