@@ -3,8 +3,8 @@
 #include <InterRepr.h>
 
 namespace arm64_apple_darwin {
-inline std::array<std::string, 8> regs = {"x1", "x2", "x3", "x4",
-                                          "x5", "x6", "x7", "x8"};
+inline std::array<std::string, 8> regs = {"x0", "x1", "x2", "x3",
+                                          "x4", "x5", "x6", "x7"};
 struct ArgVisitor {
   std::stringstream &stream;
   void operator()(const Var &var);

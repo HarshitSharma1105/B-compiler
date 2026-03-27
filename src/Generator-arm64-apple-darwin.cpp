@@ -178,7 +178,6 @@ void arm64_apple_darwin::Visitor::operator()(const Funcall &funcall) {
     std::visit(argvisitor, funcall.args[i]);
     stream << "    mov " << arm64_apple_darwin::regs[i] << ", x10\n";
   }
-  stream << "    eor x0, x0, x0\n";
   stream << "    bl _" << funcall.name << "\n";
 }
 void arm64_apple_darwin::Visitor::operator()(const DataSection &data) {
@@ -225,9 +224,7 @@ Generator_arm64_apple_darwin::Generator_arm64_apple_darwin(
 
 std::string Generator_arm64_apple_darwin::generate() {
   for (const auto &name : compiler.extrns) {
-    textstream << ".extrn " << name << "\n";
-    textstream << ".globl _" << name << "\n_" << name << " = " << name
-               << "\n"; // .globl _name _name = name
+    textstream << ".extern _" << name << "\n";
   }
   textstream << ".text\n.align 2\n";
   for (const auto &func : compiler.functions) {
