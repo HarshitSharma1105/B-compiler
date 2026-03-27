@@ -1,4 +1,4 @@
 main(){
     extrn printf;
-    printf("Hello World\n");
-  }
+    printf("hello world\n");
+}

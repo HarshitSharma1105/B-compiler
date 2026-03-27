@@ -20,11 +20,11 @@ std::string to_64bithex(int64_t x) {
 void load_const(std::stringstream &stream, big_int lit) {
   int64_t x = to_i64(lit);
   auto hexval = to_64bithex(x);
-  std::string tmp;
-  stream << "    movz x10, #0x" << hexval.substr(12) << "\n";
-  stream << "    movk x10, #0x" << hexval.substr(8, 4) << "\n";
-  stream << "    movk x10, #0x" << hexval.substr(4, 4) << "\n";
-  stream << "    movk x10, #0x" << hexval.substr(0, 4) << "\n";
+  std::cout << x << " -> 0x" << hexval << "\n";
+  stream << "    movz x10, #0x" << hexval.substr(0, 4) << ", lsl #48\n";
+  stream << "    movk x10, #0x" << hexval.substr(4, 4) << ", lsl #32\n";
+  stream << "    movk x10, #0x" << hexval.substr(8, 4) << ", lsl #16\n";
+  stream << "    movk x10, #0x" << hexval.substr(12, 4) << ", lsl #0\n";
 }
 // stack pointer : sp, base pointer : x29
 void arm64_apple_darwin::ArgVisitor::operator()(const Var &var) {
@@ -35,7 +35,8 @@ void arm64_apple_darwin::ArgVisitor::operator()(const Var &var) {
 
   case Storage::Global:
     stream << "    adrp x10, _" << var.var_name << "@PAGE\n"
-           << "    ldr x10, [x10, _" << var.var_name << "@PAGEOFF\n";
+           << "    ldr x10, x10, _" << var.var_name << "@PAGEOFF\n"
+           << "    ldr x10, [x10]\n";
     break;
   case Storage::Array:
     stream << "    adrp x10, _" << var.var_name << "@PAGE\n"
@@ -164,8 +165,7 @@ void arm64_apple_darwin::Visitor::operator()(const BinOp &binop) {
   case Storage::Array:
     stream << "    adrp x11, _" << binop.var.var_name << "@PAGE\n"
            << "    add x11, x11, _" << binop.var.var_name << "@PAGEOFF\n"
-           << "    ldr x12, [x11]\n" // loading the pointer to x12
-           << "    str x10, [x12]\n";
+           << "    str x10, [x11]\n";
     break;
   default:
     errorf("UNREACHABLE\n");
@@ -174,9 +174,14 @@ void arm64_apple_darwin::Visitor::operator()(const BinOp &binop) {
 void arm64_apple_darwin::Visitor::operator()(const Funcall &funcall) {
   assert(funcall.args.size() <= arm64_apple_darwin::regs.size() &&
          "too many args");
-  for (size_t i = 0; i < funcall.args.size(); i++) {
+  size_t i;
+  for (i = 0; i < funcall.args.size(); i++) {
     std::visit(argvisitor, funcall.args[i]);
     stream << "    mov " << arm64_apple_darwin::regs[i] << ", x10\n";
+  }
+  while (i < arm64_apple_darwin::regs.size()) {
+    stream << "    mov " << arm64_apple_darwin::regs[i] << ", xzr\n";
+    i++;
   }
   stream << "    bl _" << funcall.name << "\n";
 }
@@ -195,6 +200,7 @@ void arm64_apple_darwin::Visitor::operator()(const DataSection &data) {
 void arm64_apple_darwin::Visitor::operator()(const ReturnValue &retval) {
   std::visit(argvisitor, retval.arg);
   stream << "    mov x0,x10\n";
+  stream << "    add sp, sp, #" << 8 * alloc_size << "\n";
   stream << "    ldp x29, x30, [sp], #16\n"; // load reg pair
   stream << "    ret\n";
 }
@@ -233,7 +239,6 @@ std::string Generator_arm64_apple_darwin::generate() {
     generate_function_epilogue(func);
   }
   std::visit(visitor, Op{DataSection{compiler.data_section}});
-  textstream << ".data\n.align 3\n";
   for (const auto &[name, val] : compiler.globals) {
     textstream << ".globl _" << name << "\n"
                << "_" << name << ":\n    "
@@ -243,7 +248,7 @@ std::string Generator_arm64_apple_darwin::generate() {
   for (const auto &[name, size] : compiler.arrays) {
     textstream << ".globl _" << name << "\n"
                << "_" << name << ":\n    "
-               << ".skip" << size << "\n";
+               << ".skip " << size << "\n";
   }
   return textstream.str();
 }
@@ -256,18 +261,23 @@ void Generator_arm64_apple_darwin::generate_function_prologue(
   textstream << ".globl _" << func.function_name << "\n";
   textstream << "_" << func.function_name << ":\n";
   if ((func.func_flags & Flag::AsmFunc) == 0) {
-    textstream << "    stp x29, x30, [sp, #-16]\n";
+    textstream << "    stp x29, x30, [sp, #-16]!\n";
     textstream << "    mov x29, sp\n";
     textstream << "    sub sp, sp, #" << 8 * alloc_size << "\n";
     for (int i = 0; i < func.num_args; i++) {
       textstream << "    str " << arm64_apple_darwin::regs[i] << ", [x29, #-"
-                 << (i + 1) * 8 << "]," << "\n";
+                 << (i + 1) * 8 << "]" << "\n";
     }
   }
 }
 void Generator_arm64_apple_darwin::generate_function_epilogue(
     const Func &func) {
+  size_t alloc_size = func.max_vars_count;
+  if (alloc_size % 2)
+    alloc_size++;
+
   if ((func.func_flags & Flag::AsmFunc) == 0) {
+    textstream << "    add sp, sp, #" << 8 * alloc_size << "\n";
     textstream << "    ldp x29, x30, [sp], #16\n"; // load reg pair
     textstream << "    ret\n";
   }
