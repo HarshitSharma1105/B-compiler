@@ -541,7 +541,6 @@ Arg IREmittor::compile_expression(int precedence,Ops& ops)
                 Var temp{vars_count++, Storage::Auto};
                 ops.emplace_back(BinOp{temp, lhs, rhs, type});
                 lhs = temp;
-                remove(temp);
             }
         }    
     }
