@@ -671,10 +671,11 @@ Arg IREmittor::compile_primary_expression(Ops &ops) {
                "arguments but got only {} arguments",
                funcall_name, num_args - default_size, args_size);
     }
-    if (funcall_name == "printf")
+    if (funcall_name == "printf" 
+     || funcall_name == "scanf") // variadic calls on stack
       ops.emplace_back(Funcall{funcall_name, args, args.size() - 1});
     else
-      ops.emplace_back(Funcall{funcall_name, args});
+      ops.emplace_back(Funcall{funcall_name, args, 0});
     ops.emplace_back(BinOp{Var{vars_count}, NoArg{}, FuncResult{funcall_name},
                            Tokentype::assignment});
     return Var{vars_count++};

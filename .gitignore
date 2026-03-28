@@ -8,7 +8,7 @@ objs/
 *.swp
 # Rough Notes
 grammar.md
-.txt 
+*.txt 
 *.csv
 # Mac specific files
 .DS_Store

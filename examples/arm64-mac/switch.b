@@ -1,7 +1,7 @@
 main()
 {
     extrn printf;
-    auto x=4;
+    auto x=3;
     switch(x)
     {
         case 2 : printf("hi 1\n");

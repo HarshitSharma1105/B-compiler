@@ -3,12 +3,11 @@ bitwise.b		DONE
 da.b			DONE
 expressions.b		
 fib.b			DONE
-fizz_buzz.b		
+fizz_buzz.b		DONE
 helloworld.b		DONE
 pointers.b		
 raylib.b		
-recursive_fib.b		
-rough.txt		
+recursive_fib.b		DONE
 rule110.b		
-stdb.b			
-switch.b		
+stdb.b			...
+switch.b		DONE
