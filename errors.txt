@@ -1,0 +1,2 @@
+Scopes can have there own ReturnValue without any funcName 
+resulting in weird epilogue labels without any function names

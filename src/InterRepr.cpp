@@ -322,7 +322,7 @@ bool IREmittor::compile_branch(Ops &ops) {
     Arg arg = compile_expression(0, ops);
     size_t jmp = ops.size();
     ops.emplace_back(JmpIfZero{arg, 0});
-    compile_block(ops);
+    compile_block(ops, 1, "branch");
     size_t if_jump = ops.size();
     ops.emplace_back(Jmp{labels_count});
     ops.emplace_back(Label{labels_count});
@@ -333,7 +333,7 @@ bool IREmittor::compile_branch(Ops &ops) {
     if (try_consume(Tokentype::else_)) {
       curr_vars = vars_count;
       vars_size = vars.size();
-      compile_block(ops);
+      compile_block(ops, 1, "branch");
       ops.emplace_back(Label{labels_count});
       std::get<Jmp>(ops[if_jump]).idx = labels_count++;
       vars.resize(vars_size);
@@ -354,7 +354,7 @@ bool IREmittor::compile_while_loops(Ops &ops) {
     Arg arg = compile_expression(0, ops);
     size_t curr = ops.size();
     ops.emplace_back(JmpIfZero{arg, 0});
-    compile_block(ops);
+    compile_block(ops, 1, "while");
     ops.emplace_back(Jmp{start});
     ops.emplace_back(Label{labels_count});
     std::get<JmpIfZero>(ops[curr]).idx = labels_count++;
