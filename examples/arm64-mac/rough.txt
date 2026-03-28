@@ -1,6 +1,6 @@
 TESTPROG		TEST
 bitwise.b		DONE
-da.b			
+da.b			DONE
 expressions.b		
 fib.b			DONE
 fizz_buzz.b		
