@@ -175,7 +175,9 @@ void IREmittor::compile_prog() {
     }
     func.num_args = vars_count;
     try_consume(Tokentype::close_paren, "expected ')'");
-    compile_block(func.function_body);
+    std::cout<<"Calling compile_bloc("<<func.function_name<<", "
+    << &func<<")\n";
+    compile_block(func.function_body, func.max_vars_count, func.function_name);
     vars.resize(vars_size);
     max_vars_count = std::max(max_vars_count, vars_count);
     vars_count = 0;
@@ -218,7 +220,8 @@ Var IREmittor::get_var(const std::string &name) {
   }
   return {(size_t)-1, Storage::Auto, "INVALID"};
 }
-void IREmittor::compile_func_body(Ops &ops) {
+void IREmittor::compile_func_body(Ops &ops, size_t max_vars_count=0, std::string fname="") {
+
   if (try_consume(Tokentype::semicolon))
     return;
   else if (compile_extrn())
@@ -227,7 +230,7 @@ void IREmittor::compile_func_body(Ops &ops) {
     return;
   else if (compile_scope(ops))
     return;
-  else if (compile_return(ops))
+  else if (compile_return(ops, max_vars_count, fname))
     return;
   else if (compile_while_loops(ops))
     return;
@@ -242,12 +245,12 @@ void IREmittor::compile_func_body(Ops &ops) {
   compile_stmt(ops);
 }
 
-void IREmittor::compile_block(Ops &ops) {
+void IREmittor::compile_block(Ops &ops, size_t max_vars_count=0, std::string fname="") {
   if (try_consume(Tokentype::open_curly)) {
     while (!try_consume(Tokentype::close_curly))
-      compile_func_body(ops);
+      compile_func_body(ops, max_vars_count, fname);
   } else
-    compile_func_body(ops);
+    compile_func_body(ops, max_vars_count, fname);
 }
 
 bool IREmittor::compile_switch(Ops &ops) {
@@ -300,6 +303,7 @@ bool IREmittor::compile_scope(Ops &ops) {
   if (try_consume(Tokentype::open_curly)) {
     size_t curr_vars = vars_count;
     size_t vars_size = vars.size();
+    std::cout << "inside compile scope\n";
     while (!try_consume(Tokentype::close_curly))
       compile_func_body(ops);
     vars.resize(vars_size);
@@ -391,11 +395,11 @@ bool IREmittor::compile_for_loops(Ops &ops) {
   return false;
 }
 
-bool IREmittor::compile_return(Ops &ops) {
+bool IREmittor::compile_return(Ops &ops, size_t max_vars_count=0, std::string fname="") {
   if (try_consume(Tokentype::return_)) {
     Arg arg = compile_expression(0, ops);
     try_consume(Tokentype::semicolon, "Expected ;");
-    ops.emplace_back(ReturnValue{arg});
+    ops.emplace_back(ReturnValue{arg, max_vars_count, fname});
     return true;
   }
   return false;

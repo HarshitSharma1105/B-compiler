@@ -213,10 +213,10 @@ void arm64_apple_darwin::Visitor::operator()(const DataSection &data) {
 }
 void arm64_apple_darwin::Visitor::operator()(const ReturnValue &retval) {
   std::visit(argvisitor, retval.arg);
+  size_t alloc_size = retval.max_vars_count;
+  if(alloc_size % 2) alloc_size++;
   stream << "    mov x0,x10\n";
-  // stream << "    add sp, sp, #" << 8 * alloc_size << "\n";
-  stream << "    ldp x29, x30, [sp], #16\n"; // load reg pair
-  stream << "    ret\n";
+  stream << "    b _epilogue_"<< retval.func_name <<"\n";
 }
 void arm64_apple_darwin::Visitor::operator()(const Label &label) {
   stream << "label_" << label.idx << ":\n";
@@ -289,10 +289,10 @@ void Generator_arm64_apple_darwin::generate_function_epilogue(
   size_t alloc_size = func.max_vars_count;
   if (alloc_size % 2)
     alloc_size++;
-
-  if ((func.func_flags & Flag::AsmFunc) == 0) {
+  textstream << "_epilogue_"<<func.function_name<<":\n";
+  if ((func.func_flags & Flag::AsmFunc) == 0) {    
     textstream << "    add sp, sp, #" << 8 * alloc_size << "\n";
-    textstream << "    ldp x29, x30, [sp], #16\n"; // load reg pair
+    textstream << "    ldp x29, x30, [sp], #16;;;;\n";
     textstream << "    ret\n";
   }
 }
