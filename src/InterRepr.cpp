@@ -772,7 +772,11 @@ big_int eval_binop(big_int lhs, big_int rhs, Tokentype type) {
   case Tokentype::shift_left:
     return lhs << rhs;
   case Tokentype::shift_right:
-    return lhs > rhs;
+    return lhs >> rhs;
+  case Tokentype::less:
+    return (lhs < rhs);
+  case Tokentype::greater:
+    return (lhs > rhs);
   default:
     errorf("Unsupported op for constant folding");
   }

@@ -181,8 +181,12 @@ void arm64_apple_darwin::Visitor::operator()(const Funcall &funcall) {
     std::visit(argvisitor, funcall.args[i]);
     stream << "    mov " << arm64_apple_darwin::regs[i] << ", x10\n";
   }
-  if (stack)
-    stream << "    sub sp, sp, #" << stack * 8 << "\n";
+  if (stack){
+    if(stack % 2 == 0)
+      stream << "    sub sp, sp, #" << stack * 8 << "\n";
+    else 
+      stream << "    sub sp, sp, #" << (stack+1) * 8 << "\n";
+  }
   for (i = 0; i < stack; i++) {
     std::visit(argvisitor, funcall.args[i + funcall.args.size() - stack]);
     stream << "    str x10, [sp, #" << i * 8 << "]\n";
