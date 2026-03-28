@@ -1,0 +1,74 @@
+.extern _printf
+.text
+.align 2
+.globl _main
+_main:
+    stp x29, x30, [sp, #-16]!
+    mov x29, sp
+    sub sp, sp, #48
+    movz x10, #0x0000, lsl #48
+    movk x10, #0x0000, lsl #32
+    movk x10, #0x0000, lsl #16
+    movk x10, #0x0008, lsl #0
+    mov x9, x10
+    ldr x10, [x29, #-8]
+    mov x10,x9
+    str x10, [x29, #-8]
+    movz x10, #0x0000, lsl #48
+    movk x10, #0x0000, lsl #32
+    movk x10, #0x0000, lsl #16
+    movk x10, #0x0001, lsl #0
+    mov x9, x10
+    ldr x10, [x29, #-16]
+    mov x10,x9
+    str x10, [x29, #-16]
+    movz x10, #0x0000, lsl #48
+    movk x10, #0x0000, lsl #32
+    movk x10, #0x0000, lsl #16
+    movk x10, #0x0009, lsl #0
+    mov x9, x10
+    ldr x10, [x29, #-24]
+    mov x10,x9
+    str x10, [x29, #-24]
+    movz x10, #0x0000, lsl #48
+    movk x10, #0x0000, lsl #32
+    movk x10, #0x0000, lsl #16
+    movk x10, #0x0008, lsl #0
+    mov x9, x10
+    ldr x10, [x29, #-32]
+    mov x10,x9
+    str x10, [x29, #-32]
+
+    ;; TEMPLATE OF HOW TO CALL PRINTF
+    adrp x10, data_0@PAGE
+    add x10, x10, data_0@PAGEOFF
+    mov x0, x10
+
+    sub sp, sp, #32
+
+    ldr x10, [x29, #-8]
+    str x10, [sp, #0]
+    
+    ldr x10, [x29, #-16]
+    str x10, [sp, #8]
+
+    ldr x10, [x29, #-24]
+    str x10, [sp, #16]
+
+    ldr x10, [x29, #-32]
+    str x10, [sp, #24]
+
+    bl _printf
+    ;;
+    mov x10, x0
+    mov x9, x10
+    mov x10,x9
+    str x10, [x29, #-40]
+    add sp, sp, #48
+    ldp x29, x30, [sp], #16
+    ret
+.data
+data_0:
+    .byte 37,100,32,37,100,32,37,100,32,37,100,10,0
+.bss
+.align 3

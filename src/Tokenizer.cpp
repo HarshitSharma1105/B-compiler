@@ -93,14 +93,16 @@ std::vector<Token> Tokenizer::tokenize()
                 while(std::isspace(peek().value()))consume();
                 while(peek().value()!=';')
                 {
-                    if(peek().value()==',')consume();
-                    while(peek().value()!=',' && peek().value()!=';')
+                    while(peek().value() == ',' || std::isspace(peek().value())) 
+                    consume();
+                    buffer.clear();
+                    while(peek().value()!=',' && peek().value()!=';'
+                    && !std::isspace(peek().value()))
                     {
                         buffer.push_back(consume());
                     }
                     
                     tokens.push_back({Tokentype::extrn,buffer});
-                    buffer.clear();
                 }
             }
             else if(buffer=="return")

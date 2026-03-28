@@ -2,12 +2,14 @@
 
 
 #include<Generator-Mips.h>
+#include<Generator-arm64-apple-darwin.h>
 #include<Generator-x86_64.h>
 
 
 enum Target{
 	X86_64,
-	MIPS
+	MIPS,
+  ARM64_APPLE_DARWIN
 };
 
 
