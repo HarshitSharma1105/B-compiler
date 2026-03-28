@@ -1,13 +1,13 @@
 TESTPROG		TEST
 bitwise.b		DONE
 da.b			DONE
-expressions.b		
+expressions.b		DONE
 fib.b			DONE
 fizz_buzz.b		DONE
 helloworld.b		DONE
-pointers.b		
-raylib.b		
+pointers.b		DONE
+raylib.b		DONE
 recursive_fib.b		DONE
-rule110.b		
+rule110.b		DONE
 stdb.b			...
 switch.b		DONE
