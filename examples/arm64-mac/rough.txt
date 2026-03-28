@@ -2,7 +2,7 @@ TESTPROG		TEST
 bitwise.b		DONE
 da.b			
 expressions.b		
-fib.b			
+fib.b			DONE
 fizz_buzz.b		
 helloworld.b		DONE
 pointers.b		
