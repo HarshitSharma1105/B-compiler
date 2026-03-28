@@ -716,7 +716,9 @@ bool IREmittor::try_peek(const Tokentype &type, int offset) {
 
 // helper function
 std::optional<big_int> IREmittor::get_const(const Arg &arg) {
-  return std::visit(overload{[&](const Literal &lit) -> std::optional<big_int> {
+  return std::visit(overload{
+    /*
+                            [&](const Literal &lit) -> std::optional<big_int> {
                                return lit.literal;
                              },
                              [&](const Var &var) -> std::optional<big_int> {
@@ -724,7 +726,7 @@ std::optional<big_int> IREmittor::get_const(const Arg &arg) {
                                if (it != const_vars.end())
                                  return it->second;
                                return std::nullopt;
-                             },
+                             },*/
                              [&](const auto &) -> std::optional<big_int> {
                                return std::nullopt;
                              }},
