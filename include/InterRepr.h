@@ -90,8 +90,6 @@ struct DataSection {
 
 struct ReturnValue {
   Arg arg;
-  size_t max_vars_count;
-  std::string func_name;
 };
 
 struct Label {
@@ -150,15 +148,15 @@ public:
 public:
   Var get_var(const std::string &name);
   void compile_prog();
-  void compile_func_body(Ops &ops, size_t, std::string);
+  void compile_func_body(Ops &ops);
   bool compile_while_loops(Ops &ops);
   bool compile_for_loops(Ops &ops);
-  bool compile_return(Ops &ops, size_t, std::string);
+  bool compile_return(Ops &ops);
   void compile_stmt(Ops &ops);
   bool autovar_dec(Ops &ops);
   bool compile_extrn();
   bool compile_branch(Ops &ops);
-  void compile_block(Ops &ops, size_t, std::string);
+  void compile_block(Ops &ops);
   bool compile_scope(Ops &ops);
   bool compile_asm(Ops &ops);
   bool compile_switch(Ops &ops);

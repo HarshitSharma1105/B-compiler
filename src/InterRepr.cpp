@@ -175,9 +175,7 @@ void IREmittor::compile_prog() {
     }
     func.num_args = vars_count;
     try_consume(Tokentype::close_paren, "expected ')'");
-    std::cout<<"Calling compile_bloc("<<func.function_name<<", "
-    << &func<<")\n";
-    compile_block(func.function_body, func.max_vars_count, func.function_name);
+    compile_block(func.function_body);
     vars.resize(vars_size);
     max_vars_count = std::max(max_vars_count, vars_count);
     vars_count = 0;
@@ -220,7 +218,7 @@ Var IREmittor::get_var(const std::string &name) {
   }
   return {(size_t)-1, Storage::Auto, "INVALID"};
 }
-void IREmittor::compile_func_body(Ops &ops, size_t max_vars_count=0, std::string fname="") {
+void IREmittor::compile_func_body(Ops &ops) {
 
   if (try_consume(Tokentype::semicolon))
     return;
@@ -230,7 +228,7 @@ void IREmittor::compile_func_body(Ops &ops, size_t max_vars_count=0, std::string
     return;
   else if (compile_scope(ops))
     return;
-  else if (compile_return(ops, max_vars_count, fname))
+  else if (compile_return(ops))
     return;
   else if (compile_while_loops(ops))
     return;
@@ -245,12 +243,12 @@ void IREmittor::compile_func_body(Ops &ops, size_t max_vars_count=0, std::string
   compile_stmt(ops);
 }
 
-void IREmittor::compile_block(Ops &ops, size_t max_vars_count=0, std::string fname="") {
+void IREmittor::compile_block(Ops &ops) {
   if (try_consume(Tokentype::open_curly)) {
     while (!try_consume(Tokentype::close_curly))
-      compile_func_body(ops, max_vars_count, fname);
+      compile_func_body(ops);
   } else
-    compile_func_body(ops, max_vars_count, fname);
+    compile_func_body(ops);
 }
 
 bool IREmittor::compile_switch(Ops &ops) {
@@ -322,7 +320,7 @@ bool IREmittor::compile_branch(Ops &ops) {
     Arg arg = compile_expression(0, ops);
     size_t jmp = ops.size();
     ops.emplace_back(JmpIfZero{arg, 0});
-    compile_block(ops, 1, "branch");
+    compile_block(ops);
     size_t if_jump = ops.size();
     ops.emplace_back(Jmp{labels_count});
     ops.emplace_back(Label{labels_count});
@@ -333,7 +331,7 @@ bool IREmittor::compile_branch(Ops &ops) {
     if (try_consume(Tokentype::else_)) {
       curr_vars = vars_count;
       vars_size = vars.size();
-      compile_block(ops, 1, "branch");
+      compile_block(ops);
       ops.emplace_back(Label{labels_count});
       std::get<Jmp>(ops[if_jump]).idx = labels_count++;
       vars.resize(vars_size);
@@ -354,7 +352,7 @@ bool IREmittor::compile_while_loops(Ops &ops) {
     Arg arg = compile_expression(0, ops);
     size_t curr = ops.size();
     ops.emplace_back(JmpIfZero{arg, 0});
-    compile_block(ops, 1, "while");
+    compile_block(ops);
     ops.emplace_back(Jmp{start});
     ops.emplace_back(Label{labels_count});
     std::get<JmpIfZero>(ops[curr]).idx = labels_count++;
@@ -395,11 +393,11 @@ bool IREmittor::compile_for_loops(Ops &ops) {
   return false;
 }
 
-bool IREmittor::compile_return(Ops &ops, size_t max_vars_count=0, std::string fname="") {
+bool IREmittor::compile_return(Ops &ops) {
   if (try_consume(Tokentype::return_)) {
     Arg arg = compile_expression(0, ops);
     try_consume(Tokentype::semicolon, "Expected ;");
-    ops.emplace_back(ReturnValue{arg, max_vars_count, fname});
+    ops.emplace_back(ReturnValue{arg});
     return true;
   }
   return false;
