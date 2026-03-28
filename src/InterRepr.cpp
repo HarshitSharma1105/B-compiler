@@ -839,6 +839,10 @@ big_int eval_binop(big_int lhs, big_int rhs, Tokentype type) {
             else 
                 std::cerr<<"Division by zero detected at compile time\n";
                 exit(EXIT_FAILURE); 
+	case Tokentype::bit_or: return lhs | rhs;
+	case Tokentype::bit_and:return lhs & rhs;
+	case Tokentype::shift_left: return lhs << rhs;
+	case Tokentype::shift_right: return lhs > rhs;
         default: errorf("Unsupported op for constant folding");
     }
 }
