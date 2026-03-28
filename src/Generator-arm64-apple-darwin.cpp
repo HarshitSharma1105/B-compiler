@@ -101,7 +101,6 @@ void arm64_apple_darwin::Visitor::operator()(const UnOp &unop) {
     }
   }
   stream << "    str x10, [x29, #-" << (unop.index + 1) * 8 << "]\n";
-  stream << "    sub sp, sp, #8\n";
 }
 void arm64_apple_darwin::Visitor::operator()(const BinOp &binop) {
   std::visit(argvisitor, binop.rhs);
@@ -157,7 +156,6 @@ void arm64_apple_darwin::Visitor::operator()(const BinOp &binop) {
   switch (binop.var.type) {
   case Storage::Auto:
     stream << "    str x10, [x29, #-" << (binop.var.index + 1) * 8 << "]\n";
-    stream << "    sub sp, sp, #8\n";
     break;
   case Storage::Global:
     stream << "    adrp x11, _" << binop.var.var_name << "@PAGE\n"
@@ -258,6 +256,7 @@ void Generator_arm64_apple_darwin::generate_function_prologue(
     const Func &func) {
   assert(func.num_args <= 8 && "too many args");
   size_t alloc_size = func.max_vars_count;
+  std::cout << "ALLOC SIZE : "<<alloc_size<<"\n";
   if (alloc_size % 2)
     alloc_size++;
   textstream << ".globl _" << func.function_name << "\n";
