@@ -1,5 +1,5 @@
 TESTPROG		TEST
-bitwise.b		
+bitwise.b		DONE
 da.b			
 expressions.b		
 fib.b			

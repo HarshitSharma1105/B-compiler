@@ -1,8 +1,10 @@
 #include <Generator-arm64-apple-darwin.h>
+#include <cstddef>
 #include <cstdint>
 #include <cstdlib>
 #include <iomanip>
 #include <string>
+#include <variant>
 // helper functions
 int64_t to_i64(big_int x) {
   if (x < (big_int)INT64_MIN || x > (big_int)INT64_MAX) {
@@ -20,7 +22,6 @@ std::string to_64bithex(int64_t x) {
 void load_const(std::stringstream &stream, big_int lit) {
   int64_t x = to_i64(lit);
   auto hexval = to_64bithex(x);
-  std::cout << x << " -> 0x" << hexval << "\n";
   stream << "    movz x10, #0x" << hexval.substr(0, 4) << ", lsl #48\n";
   stream << "    movk x10, #0x" << hexval.substr(4, 4) << ", lsl #32\n";
   stream << "    movk x10, #0x" << hexval.substr(8, 4) << ", lsl #16\n";
@@ -175,15 +176,20 @@ void arm64_apple_darwin::Visitor::operator()(const Funcall &funcall) {
   assert(funcall.args.size() <= arm64_apple_darwin::regs.size() &&
          "too many args");
   size_t i;
-  for (i = 0; i < funcall.args.size(); i++) {
+  size_t stack = funcall.stk;
+  for (i = 0; i < funcall.args.size() - stack; i++) {
     std::visit(argvisitor, funcall.args[i]);
     stream << "    mov " << arm64_apple_darwin::regs[i] << ", x10\n";
   }
-  while (i < arm64_apple_darwin::regs.size()) {
-    stream << "    mov " << arm64_apple_darwin::regs[i] << ", xzr\n";
-    i++;
+  if (stack)
+    stream << "    sub sp, sp, #" << stack * 8 << "\n";
+  for (i = 0; i < stack; i++) {
+    std::visit(argvisitor, funcall.args[i + funcall.args.size() - stack]);
+    stream << "    str x10, [sp, #" << i * 8 << "]\n";
   }
   stream << "    bl _" << funcall.name << "\n";
+  if (stack)
+    stream << "    add sp, sp, #" << stack * 8 << "\n";
 }
 void arm64_apple_darwin::Visitor::operator()(const DataSection &data) {
   stream << ".data\n";
@@ -200,7 +206,7 @@ void arm64_apple_darwin::Visitor::operator()(const DataSection &data) {
 void arm64_apple_darwin::Visitor::operator()(const ReturnValue &retval) {
   std::visit(argvisitor, retval.arg);
   stream << "    mov x0,x10\n";
-  //stream << "    add sp, sp, #" << 8 * alloc_size << "\n";
+  // stream << "    add sp, sp, #" << 8 * alloc_size << "\n";
   stream << "    ldp x29, x30, [sp], #16\n"; // load reg pair
   stream << "    ret\n";
 }
@@ -256,7 +262,6 @@ void Generator_arm64_apple_darwin::generate_function_prologue(
     const Func &func) {
   assert(func.num_args <= 8 && "too many args");
   size_t alloc_size = func.max_vars_count;
-  std::cout << "ALLOC SIZE : "<<alloc_size<<"\n";
   if (alloc_size % 2)
     alloc_size++;
   textstream << ".globl _" << func.function_name << "\n";
