@@ -192,8 +192,12 @@ void arm64_apple_darwin::Visitor::operator()(const Funcall &funcall) {
     stream << "    str x10, [sp, #" << i * 8 << "]\n";
   }
   stream << "    bl _" << funcall.name << "\n";
-  if (stack)
-    stream << "    add sp, sp, #" << stack * 8 << "\n";
+  if (stack){
+    if(stack % 2 == 0)
+      stream << "    add sp, sp, #" << stack * 8 << "\n";
+    else 
+      stream << "    add sp, sp, #" << (stack+1) * 8 << "\n";
+  }
 }
 void arm64_apple_darwin::Visitor::operator()(const DataSection &data) {
   stream << ".data\n";
