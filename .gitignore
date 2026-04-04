@@ -1,15 +1,15 @@
 /builds/
 *.asm
 *.o
+*.out
 .vscode/
 objs/
 # Editor files
 *.swp
 # Rough Notes
 grammar.md
-.txt 
+*.txt 
 *.csv
-# Added tests
-*.b
 # Mac specific files
 .DS_Store
+*.sh
